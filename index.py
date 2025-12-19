@@ -114,8 +114,55 @@ if ticker:
     if hist is None or hist.empty:
         st.error("No price history returned. Check the ticker or exchange suffix.")
     else:
-        st.subheader("5-Year Daily Close")
-        st.line_chart(hist["Close"])
+        st.subheader("5-Year Daily Close (with Moving Averages)")
+        ma_50 = hist["Close"].rolling(50, min_periods=1).mean()
+        ma_200 = hist["Close"].rolling(200, min_periods=1).mean()
+
+        price_ma = hist[["Close"]].copy()
+        price_ma["MA 50"] = ma_50
+        price_ma["MA 200"] = ma_200
+        st.line_chart(price_ma)
+
+        ma_c1, ma_c2, ma_c3 = st.columns(3)
+        with ma_c1:
+            st.metric("MA 50", format_price(ma_50.iloc[-1], currency))
+        with ma_c2:
+            st.metric("MA 200", format_price(ma_200.iloc[-1], currency))
+        with ma_c3:
+            trend = "Bullish" if ma_50.iloc[-1] >= ma_200.iloc[-1] else "Bearish"
+            st.metric("MA Trend", trend)
+
+        # --- RSI & MACD ---
+        delta = hist["Close"].diff()
+        gain = delta.clip(lower=0)
+        loss = -delta.clip(upper=0)
+        avg_gain = gain.rolling(14, min_periods=14).mean()
+        avg_loss = loss.rolling(14, min_periods=14).mean()
+        rs = avg_gain / avg_loss
+        rsi = 100 - (100 / (1 + rs))
+
+        ema_12 = hist["Close"].ewm(span=12, adjust=False).mean()
+        ema_26 = hist["Close"].ewm(span=26, adjust=False).mean()
+        macd = ema_12 - ema_26
+        signal = macd.ewm(span=9, adjust=False).mean()
+        macd_hist = macd - signal
+
+        st.subheader("RSI & MACD")
+        rsi_c1, rsi_c2, rsi_c3 = st.columns(3)
+        with rsi_c1:
+            st.metric("RSI (14)", f"{rsi.iloc[-1]:.2f}" if rsi.iloc[-1] == rsi.iloc[-1] else "N/A")
+        with rsi_c2:
+            st.metric("MACD", f"{macd.iloc[-1]:.4f}" if macd.iloc[-1] == macd.iloc[-1] else "N/A")
+        with rsi_c3:
+            st.metric("Signal", f"{signal.iloc[-1]:.4f}" if signal.iloc[-1] == signal.iloc[-1] else "N/A")
+
+        rsi_macd = hist[["Close"]].copy()
+        rsi_macd["RSI (14)"] = rsi
+        rsi_macd["MACD"] = macd
+        rsi_macd["Signal"] = signal
+        rsi_macd["Histogram"] = macd_hist
+        st.line_chart(rsi_macd[["RSI (14)"]])
+        st.line_chart(rsi_macd[["MACD", "Signal", "Histogram"]])
 
         st.download_button(
             "Download 5Y Price CSV",
@@ -123,50 +170,5 @@ if ticker:
             file_name=f"{ticker.upper()}_5y_daily_close.csv",
             mime="text/csv",
         )
-
-    # --- Financial Statements ---
-    st.markdown("---")
-    st.subheader("Latest Annual Financial Statements")
-
-    c1, c2, c3 = st.columns(3)
-
-    with c1:
-        st.markdown(f"**Income Statement**  \n_Period: {data['inc_period']}_")
-        if data["inc"] is None or data["inc"].empty:
-            st.info("Not available.")
-        else:
-            st.dataframe(format_commas(data["inc"]), use_container_width=True)
-            st.download_button(
-                "Download Income Statement",
-                data=data["inc"].to_csv(index=False).encode("utf-8"),
-                file_name=f"{ticker.upper()}_income_statement.csv",
-                mime="text/csv",
-            )
-
-    with c2:
-        st.markdown(f"**Balance Sheet**  \n_Period: {data['bal_period']}_")
-        if data["bal"] is None or data["bal"].empty:
-            st.info("Not available.")
-        else:
-            st.dataframe(format_commas(data["bal"]), use_container_width=True)
-            st.download_button(
-                "Download Balance Sheet",
-                data=data["bal"].to_csv(index=False).encode("utf-8"),
-                file_name=f"{ticker.upper()}_balance_sheet.csv",
-                mime="text/csv",
-            )
-
-    with c3:
-        st.markdown(f"**Cash Flow Statement**  \n_Period: {data['cf_period']}_")
-        if data["cf"] is None or data["cf"].empty:
-            st.info("Not available.")
-        else:
-            st.dataframe(format_commas(data["cf"]), use_container_width=True)
-            st.download_button(
-                "Download Cash Flow",
-                data=data["cf"].to_csv(index=False).encode("utf-8"),
-                file_name=f"{ticker.upper()}_cashflow.csv",
-                mime="text/csv",
-            )
 else:
     st.info("Enter a ticker in the sidebar to load data.")
