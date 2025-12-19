@@ -44,11 +44,29 @@ def load_data(tkr: str) -> dict:
     """
     t = yf.Ticker(tkr)
 
-    # --- Meta / names ---
+    # --- Meta / names / key metrics ---
     name = None
+    metrics = {}
     try:
         info = t.get_info() or {}
         name = info.get("longName") or info.get("shortName")
+        metrics = {
+            "currency": info.get("currency", "USD"),
+            "market_cap": info.get("marketCap"),
+            "pe_ratio": info.get("trailingPE"),
+            "forward_pe": info.get("forwardPE"),
+            "eps": info.get("trailingEps"),
+            "dividend_yield": info.get("dividendYield"),
+            "52w_high": info.get("fiftyTwoWeekHigh"),
+            "52w_low": info.get("fiftyTwoWeekLow"),
+            "50d_avg": info.get("fiftyDayAverage"),
+            "200d_avg": info.get("twoHundredDayAverage"),
+            "volume": info.get("averageVolume"),
+            "prev_close": info.get("previousClose"),
+            "open": info.get("open"),
+            "sector": info.get("sector"),
+            "industry": info.get("industry"),
+        }
     except Exception:
         name = None
 
@@ -68,6 +86,7 @@ def load_data(tkr: str) -> dict:
 
     return {
         "name": name,
+        "metrics": metrics,
         "hist": hist,
         "inc": inc_latest,
         "inc_period": _pretty_period(inc_col),
