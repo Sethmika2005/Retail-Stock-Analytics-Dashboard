@@ -190,3 +190,4 @@ def get_chart_layout_defaults():
         ),
         legend=dict(font=dict(color=CHART_FONT_COLOR)),
     )
+

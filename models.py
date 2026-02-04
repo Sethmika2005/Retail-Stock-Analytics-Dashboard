@@ -656,3 +656,4 @@ def generate_view_changers(recommendation, info, price_data):
         changers.append("Sector rotation or market regime change")
 
     return changers
+

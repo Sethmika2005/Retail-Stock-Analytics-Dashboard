@@ -712,3 +712,4 @@ with fundamentals_tab:
 with news_tab:
     news_items = load_finnhub_news(selected)
     news.render(news_items=news_items)
+
