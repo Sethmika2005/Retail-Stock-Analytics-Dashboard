@@ -101,24 +101,6 @@ us-stock-analytics-dashboard/
 | Finnhub | Company news | 30-min cache |
 | Wikipedia | Index constituents (S&P 500, NASDAQ-100, DJIA) | 1-hour cache |
 
-## Key Components
-
-### Stock Universe Construction
-The application dynamically aggregates stocks from:
-- S&P 500 (500 large-cap US stocks)
-- NASDAQ-100 (100 largest NASDAQ companies)
-- Dow Jones Industrial Average (30 blue-chip stocks)
-
-### Sentiment Analysis
-Headlines are classified using keyword-based analysis:
-- **Positive**: beat, surge, growth, profit, upgrade, bullish, strong
-- **Negative**: miss, drop, plunge, downgrade, bearish, weak, decline
-
-### Market Share Visualisation
-- Displays top 10 companies by market cap within the selected stock's sector
-- Companies with ≤2% share grouped into "Others"
-- Selected company highlighted with distinct colour
-
 ## API Configuration
 
 The application uses Finnhub for news data. The API key is configured in the code:
@@ -137,15 +119,6 @@ Get a free API key at [finnhub.io](https://finnhub.io/) (60 calls/minute on free
 - News data requires Finnhub API key
 - Some smaller stocks may have limited fundamental data
 - Real-time data subject to API rate limits
-
-## Future Enhancements
-
-- [ ] Portfolio tracking functionality
-- [ ] Watchlist feature
-- [ ] Email alerts for price movements
-- [ ] Enhanced ML-based sentiment analysis
-- [ ] Options chain analysis
-- [ ] Peer comparison tables
 
 ## Contributing
 
