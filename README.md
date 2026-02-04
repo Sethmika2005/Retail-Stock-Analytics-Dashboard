@@ -40,10 +40,6 @@ This dashboard aggregates financial data from multiple sources to provide real-t
 - Sentiment analysis with visual indicators
 - Sentiment summary metrics (Positive/Neutral/Negative counts)
 
-### 6. Risk Tab
-- Volatility analysis
-- Drawdown metrics
-- Risk score calculation
 
 ## Tech Stack
 
@@ -56,42 +52,6 @@ This dashboard aggregates financial data from multiple sources to provide real-t
 | News Data | Finnhub API |
 | Stock Lists | Wikipedia (S&P 500, NASDAQ-100, DJIA) |
 
-## Installation
-
-### Prerequisites
-- Python 3.8 or higher
-- pip package manager
-
-### Setup
-
-1. Clone the repository:
-```bash
-git clone https://github.com/YOUR_USERNAME/us-stock-analytics-dashboard.git
-cd us-stock-analytics-dashboard
-```
-
-2. Install dependencies:
-```bash
-pip install streamlit pandas numpy plotly yfinance requests
-```
-
-3. Run the application:
-```bash
-streamlit run Test_Run2.py
-```
-
-4. Open your browser and navigate to `http://localhost:8501`
-
-## Project Structure
-
-```
-us-stock-analytics-dashboard/
-│
-├── Test_Run2.py          # Main application file (~5,600 lines)
-├── README.md             # Project documentation
-├── .gitignore            # Git ignore file
-└── requirements.txt      # Python dependencies
-```
 
 ## Data Sources
 
