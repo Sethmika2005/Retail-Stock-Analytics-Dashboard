@@ -101,32 +101,6 @@ us-stock-analytics-dashboard/
 | Finnhub | Company news | 30-min cache |
 | Wikipedia | Index constituents (S&P 500, NASDAQ-100, DJIA) | 1-hour cache |
 
-## API Configuration
-
-The application uses Finnhub for news data. The API key is configured in the code:
-```python
-FINNHUB_API_KEY = "your_api_key_here"
-```
-
-Get a free API key at [finnhub.io](https://finnhub.io/) (60 calls/minute on free tier).
-
-## Screenshots
-
-*Dashboard screenshots to be added*
-
-## Known Limitations
-
-- News data requires Finnhub API key
-- Some smaller stocks may have limited fundamental data
-- Real-time data subject to API rate limits
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Acknowledgements
 
@@ -137,11 +111,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Author
 
-[Your Name]
+Sethmika Dias
 
-## Contact
-
-For questions or feedback, please open an issue on GitHub.
 
 ---
 *Last updated: January 2025*
