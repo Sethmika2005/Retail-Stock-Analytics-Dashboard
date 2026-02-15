@@ -35,7 +35,10 @@
       "Bash(git -C /c/python/Retail-Stock-Analytics-Dashboard remote set-url origin https://github.com/Sethmika2005/Retail-Stock-Analytics-Dashboard.git)",
       "Bash(git stash:*)",
       "Bash(git checkout:*)",
-      "Bash(git merge:*)"
+      "Bash(git merge:*)",
+      "Bash(git -C /c/python/Retail-Stock-Analytics-Dashboard branch -a)",
+      "Bash(git -C /c/python/Retail-Stock-Analytics-Dashboard status)",
+      "Bash(github \"C:/python/Retail-Stock-Analytics-Dashboard\")"
     ]
   }
 }
