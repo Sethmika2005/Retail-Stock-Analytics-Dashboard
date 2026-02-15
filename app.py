@@ -22,8 +22,14 @@ load_dotenv()
 from models import (
     calculate_technical_score,
     calculate_fundamental_score,
+    calculate_volume_score,
+    calculate_fundamental_score_paper2,
     detect_market_regime,
     generate_recommendation,
+    generate_recommendation_paper1,
+    generate_recommendation_paper2,
+    generate_recommendation_combined,
+    generate_paper1_signal,
     classify_headline_sentiment,
 )
 from components import (
@@ -35,7 +41,7 @@ from components import (
     format_large_number,
     format_mcap,
 )
-from tabs import analysis, overview, technical, fundamentals, news
+from tabs import analysis, overview, technical, fundamentals, news, backtest
 
 # =============================================================================
 # PAGE CONFIG
@@ -513,6 +519,9 @@ def load_sector_peers_metrics(tickers: tuple):
             "net_margin": info.get("profitMargins"),
             "rev_growth": info.get("revenueGrowth"),
             "de": info.get("debtToEquity"),
+            "beta": info.get("beta"),
+            "priceToBook": info.get("priceToBook"),
+            "marketCap": info.get("marketCap"),
         })
     return pd.DataFrame(rows)
 
@@ -559,6 +568,49 @@ def compute_indicators(df):
     ma60 = df["Close"].rolling(window=60).mean()
     std60 = df["Close"].rolling(window=60).std()
     df["Z_SCORE_60"] = (df["Close"] - ma60) / std60
+
+    # EMA indicators (Paper 1)
+    df["EMA20"] = df["Close"].ewm(span=20, adjust=False).mean()
+    df["EMA50"] = df["Close"].ewm(span=50, adjust=False).mean()
+
+    # EMA Cross Signal: +1 golden cross, -1 death cross, 0 otherwise
+    ema_cross = pd.Series(0, index=df.index)
+    if len(df) > 1:
+        ema20 = df["EMA20"].values
+        ema50 = df["EMA50"].values
+        for i in range(1, len(df)):
+            if pd.notna(ema20[i]) and pd.notna(ema50[i]) and pd.notna(ema20[i-1]) and pd.notna(ema50[i-1]):
+                if ema20[i-1] <= ema50[i-1] and ema20[i] > ema50[i]:
+                    ema_cross.iloc[i] = 1  # Golden cross
+                elif ema20[i-1] >= ema50[i-1] and ema20[i] < ema50[i]:
+                    ema_cross.iloc[i] = -1  # Death cross
+    df["EMA_Cross_Signal"] = ema_cross
+
+    # Volume indicators
+    if "Volume" in df.columns:
+        df["Volume_SMA20"] = df["Volume"].rolling(window=20).mean()
+        df["Volume_SMA50"] = df["Volume"].rolling(window=50).mean()
+        df["Rel_Volume"] = df["Volume"] / df["Volume_SMA20"]
+        # Volume slope: linear regression slope of Volume_SMA20 over last 10 days
+        vol_sma = df["Volume_SMA20"]
+        slope = vol_sma.rolling(window=10).apply(
+            lambda x: np.polyfit(range(len(x)), x, 1)[0] if len(x) == 10 and x.notna().all() else 0,
+            raw=False,
+        )
+        df["Volume_Slope"] = slope
+
+        # ATV (Average Trading Volume) indicators (Paper 1)
+        df["ATV_20"] = df["Volume"].rolling(window=20).mean()
+        atv_sma = df["ATV_20"]
+        atv_slope = atv_sma.rolling(window=10).apply(
+            lambda x: np.polyfit(range(len(x)), x, 1)[0] if len(x) == 10 and x.notna().all() else 0,
+            raw=False,
+        )
+        df["ATV_Slope"] = atv_slope
+
+    # Monthly return (22-trading-day price change)
+    df["Monthly_Return"] = df["Close"].pct_change(periods=22)
+
     return df
 
 
@@ -616,6 +668,42 @@ with st.sidebar:
         st.caption("Not in S&P 500")
 
     st.divider()
+    st.header("Strategy")
+    selected_strategy = st.radio(
+        "Scoring Strategy",
+        options=["Current", "Volume+RSI", "Optimized Weights", "Combined"],
+        index=0,
+        help="Current = Baseline (tech+fund). Volume+RSI = Paper 1 (EMA+ATV+RSI+RL). Optimized Weights = Paper 2 (5-factor scoring). Combined = Paper 1 timing + Paper 2 quality.",
+        captions=["Baseline", "Paper 1: EMA+ATV+RL", "Paper 2: Factor Weights", "Papers 1+2"],
+    )
+
+    # Risk profile selector (for Paper 2 and Combined strategies)
+    risk_profile = "moderate"
+    if selected_strategy in ["Optimized Weights", "Combined"]:
+        risk_profile = st.selectbox(
+            "Risk Profile",
+            options=["conservative", "moderate", "aggressive"],
+            index=1,
+            format_func=lambda x: x.title(),
+            help="Conservative: heavy on beta + market cap. Moderate/Aggressive: P/B, ROE, momentum weighted."
+        )
+
+    # RL Agent controls (Paper 1)
+    rl_model = None
+    rl_prediction = None
+    if selected_strategy in ["Volume+RSI"]:
+        try:
+            import rl_agent
+            if rl_agent.is_available():
+                st.divider()
+                st.header("RL Agent")
+                if st.button("Retrain RL Agent", help="Retrain PPO model on current stock data (~10-30s)"):
+                    st.session_state["force_retrain_rl"] = True
+                st.caption("PPO agent acts as meta-decision layer on rule-based signals.")
+        except ImportError:
+            pass
+
+    st.divider()
     # Clear cache button
     if st.button("Refresh Data", help="Clear cached data and reload fresh data"):
         st.cache_data.clear()
@@ -649,11 +737,51 @@ with st.spinner("Analyzing market conditions..."):
     tech_score, tech_details = calculate_technical_score(price_data)
     fund_score, fund_details = calculate_fundamental_score(info)
 
+    # Volume score (needed for Paper 1 and Combined)
+    volume_score, volume_details = calculate_volume_score(price_data)
+
+    # RSI value for RSI gate
+    rsi_value = price_data["RSI"].iloc[-1] if "RSI" in price_data.columns else 50
+
+    # Load peer metrics for Paper 2 strategies
+    peer_metrics = None
+    fund_stock_sector = all_stocks_df[all_stocks_df["ticker"] == selected]["sector"].values
+    if len(fund_stock_sector) > 0:
+        current_sector = fund_stock_sector[0]
+        sector_peers = all_stocks_df[all_stocks_df["sector"] == current_sector]["ticker"].tolist()
+        sector_peers = [t for t in sector_peers if t != selected][:15]
+        if sector_peers:
+            peer_metrics = load_sector_peers_metrics(tuple(sector_peers + [selected]))
+
+    # Paper 2 fundamental score (with price_data for momentum factor)
+    fund_score_p2, fund_details_p2 = calculate_fundamental_score_paper2(
+        info, peer_metrics=peer_metrics, risk_profile=risk_profile, price_data=price_data
+    )
+
+    # Paper 1 signal details (always init, conditionally compute)
+    paper1_details = None
+    if selected_strategy in ["Volume+RSI", "Combined"] and len(price_data) >= 50:
+        _, paper1_details = generate_paper1_signal(price_data)
+
+    # RL Agent (Paper 1) - always init rl_prediction here to override sidebar init
+    rl_prediction = None
+    if selected_strategy == "Volume+RSI":
+        try:
+            import rl_agent
+            if rl_agent.is_available():
+                force_retrain = st.session_state.pop("force_retrain_rl", False)
+                with st.spinner("Loading RL agent..." if not force_retrain else "Training RL agent..."):
+                    model = rl_agent.get_ppo_agent(price_data, ticker=selected, force_retrain=force_retrain)
+                    if model is not None:
+                        rl_prediction = rl_agent.predict_action(model, price_data)
+        except ImportError:
+            pass
+
 # =============================================================================
 # TABS - Render using modular tab files
 # =============================================================================
-analysis_tab, overview_tab, technical_tab, fundamentals_tab, news_tab = st.tabs(
-    ["Analysis", "Overview", "Technical", "Fundamentals", "News & Sentiment"]
+analysis_tab, overview_tab, technical_tab, fundamentals_tab, news_tab, backtest_tab = st.tabs(
+    ["Analysis", "Overview", "Technical", "Fundamentals", "News & Sentiment", "Backtest"]
 )
 
 with analysis_tab:
@@ -668,6 +796,15 @@ with analysis_tab:
         market_regime=market_regime,
         regime_metrics=regime_metrics,
         last_row=last_row,
+        selected_strategy=selected_strategy,
+        volume_score=volume_score,
+        volume_details=volume_details,
+        rsi_value=rsi_value,
+        risk_profile=risk_profile,
+        fund_score_p2=fund_score_p2,
+        fund_details_p2=fund_details_p2,
+        paper1_details=paper1_details,
+        rl_prediction=rl_prediction,
     )
 
 with overview_tab:
@@ -694,6 +831,9 @@ with technical_tab:
         tech_score=tech_score,
         tech_details=tech_details,
         last_row=last_row,
+        selected_strategy=selected_strategy,
+        volume_score=volume_score,
+        volume_details=volume_details,
     )
 
 with fundamentals_tab:
@@ -707,9 +847,22 @@ with fundamentals_tab:
         filtered_df=filtered_df,
         price_data=price_data,
         load_sector_peers_metrics=load_sector_peers_metrics,
+        selected_strategy=selected_strategy,
+        fund_score_p2=fund_score_p2,
+        fund_details_p2=fund_details_p2,
+        risk_profile=risk_profile,
     )
 
 with news_tab:
     news_items = load_finnhub_news(selected)
     news.render(news_items=news_items)
+
+with backtest_tab:
+    backtest.render(
+        selected=selected,
+        price_data=price_data,
+        info=info,
+        market_regime=market_regime,
+        peer_metrics=peer_metrics,
+    )
 

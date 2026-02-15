@@ -15,73 +15,157 @@ LEGEND_FONT_COLOR = "#1F2937"
 
 
 def render(selected, info, financials, fund_score, fund_details, all_stocks_df, filtered_df,
-           price_data, load_sector_peers_metrics):
+           price_data, load_sector_peers_metrics,
+           selected_strategy="Current", fund_score_p2=50, fund_details_p2=None, risk_profile="moderate"):
     """Render the Fundamentals tab content."""
     st.subheader("Fundamentals")
 
     # =========================================================================
     # FUNDAMENTAL SCORE BREAKDOWN
     # =========================================================================
-    fund_status = "success" if fund_score >= 65 else "warning" if fund_score >= 40 else "danger"
-    fund_color = {"success": "#10B981", "warning": "#F59E0B", "danger": "#EF4444"}.get(fund_status, "#6B7280")
+    # Show percentile-based score when Paper 2 or Combined strategy is active
+    if selected_strategy in ["Optimized Weights", "Combined"] and fund_details_p2:
+        display_score = fund_score_p2
+        f_status = "success" if display_score >= 65 else "warning" if display_score >= 40 else "danger"
+        f_color = {"success": "#10B981", "warning": "#F59E0B", "danger": "#EF4444"}.get(f_status, "#6B7280")
 
-    score_col1, score_col2 = st.columns([1, 3])
+        score_col1, score_col2 = st.columns([1, 3])
 
-    with score_col1:
-        st.markdown(f"""
-        <div style="background: white; border: 1px solid #E0DEDB; border-radius: 8px; padding: 16px; text-align: center;">
-            <div style="font-size: 12px; color: #6B7280; margin-bottom: 4px;">Fundamental Score</div>
-            <div style="font-size: 36px; font-weight: 700; color: {fund_color};">{fund_score}</div>
-            <div style="font-size: 12px; color: #6B7280;">/100</div>
-        </div>
-        """, unsafe_allow_html=True)
+        with score_col1:
+            st.markdown(f"""
+            <div style="background: white; border: 1px solid #E0DEDB; border-radius: 8px; padding: 16px; text-align: center;">
+                <div style="font-size: 12px; color: #6B7280; margin-bottom: 4px;">Fundamental Score (Percentile)</div>
+                <div style="font-size: 36px; font-weight: 700; color: {f_color};">{display_score:.0f}</div>
+                <div style="font-size: 12px; color: #6B7280;">/100 | {risk_profile.title()}</div>
+            </div>
+            """, unsafe_allow_html=True)
 
-    with score_col2:
-        st.markdown("**Score Breakdown**")
+        with score_col2:
+            st.markdown("**5-Factor Score Breakdown** (vs sector peers)")
 
-        # Profitability (25 max)
-        prof_pts = fund_details.get("profitability", 0)
-        roe_val = info.get("returnOnEquity")
-        margin_val = info.get("profitMargins")
-        prof_detail = ""
-        if roe_val and margin_val:
-            prof_detail = f"ROE: {roe_val*100:.1f}% | Margin: {margin_val*100:.1f}%"
-        elif roe_val:
-            prof_detail = f"ROE: {roe_val*100:.1f}%"
-        elif margin_val:
-            prof_detail = f"Margin: {margin_val*100:.1f}%"
+            # Factor 1: P/B Ratio
+            pb_pctile = fund_details_p2.get("pb_pctile", 50)
+            pb_val = info.get("priceToBook")
+            pb_detail = f"P/B: {pb_val:.2f}" if pb_val else ""
+            if fund_details_p2.get("pb_unavailable"):
+                st.markdown(f"P/B Ratio: **N/A** (unavailable — using 4-factor model)")
+            else:
+                st.markdown(f"P/B Ratio: **{pb_pctile:.0f}/100** percentile {(' - ' + pb_detail) if pb_detail else ''}")
+                st.progress(min(1.0, pb_pctile / 100))
 
-        st.markdown(f"Profitability: **{prof_pts}/25** {(' - ' + prof_detail) if prof_detail else ''}")
-        st.progress(prof_pts / 25)
+            # Factor 2: ROE
+            roe_pctile = fund_details_p2.get("roe_pctile", fund_details_p2.get("profitability_pctile", 50))
+            roe_val = info.get("returnOnEquity")
+            roe_detail = f"ROE: {roe_val*100:.1f}%" if roe_val else ""
+            st.markdown(f"ROE: **{roe_pctile:.0f}/100** percentile {(' - ' + roe_detail) if roe_detail else ''}")
+            st.progress(min(1.0, roe_pctile / 100))
 
-        # Growth (25 max)
-        growth_pts = fund_details.get("growth", 0)
-        rev_growth = info.get("revenueGrowth")
-        growth_detail = f"Revenue Growth: {rev_growth*100:.1f}%" if rev_growth else ""
+            # Factor 3: Momentum
+            momentum_pctile = fund_details_p2.get("momentum_pctile", fund_details_p2.get("growth_pctile", 50))
+            monthly_ret = None
+            if price_data is not None and "Monthly_Return" in price_data.columns:
+                mr = price_data["Monthly_Return"].iloc[-1]
+                if pd.notna(mr):
+                    monthly_ret = mr
+            mom_detail = f"Monthly Return: {monthly_ret*100:.1f}%" if monthly_ret is not None else ""
+            if not mom_detail:
+                rev_growth = info.get("revenueGrowth")
+                mom_detail = f"Rev Growth: {rev_growth*100:.1f}%" if rev_growth else ""
+            st.markdown(f"Momentum: **{momentum_pctile:.0f}/100** percentile {(' - ' + mom_detail) if mom_detail else ''}")
+            st.progress(min(1.0, momentum_pctile / 100))
 
-        st.markdown(f"Growth: **{growth_pts}/25** {(' - ' + growth_detail) if growth_detail else ''}")
-        st.progress(growth_pts / 25)
+            # Factor 4: Beta
+            beta_pctile = fund_details_p2.get("beta_pctile", fund_details_p2.get("leverage_pctile", 50))
+            beta_val = info.get("beta")
+            beta_detail = f"Beta: {beta_val:.2f}" if beta_val else ""
+            st.markdown(f"Beta: **{beta_pctile:.0f}/100** percentile {(' - ' + beta_detail) if beta_detail else ''}")
+            st.progress(min(1.0, beta_pctile / 100))
 
-        # Leverage (25 max)
-        lev_pts = fund_details.get("leverage", 0)
-        de_val = info.get("debtToEquity")
-        lev_detail = f"D/E: {de_val:.1f}" if de_val else ""
+            # Factor 5: Market Cap
+            mcap_pctile = fund_details_p2.get("market_cap_pctile", 50)
+            mcap_val = info.get("marketCap")
+            mcap_detail = ""
+            if mcap_val:
+                if mcap_val >= 1e12:
+                    mcap_detail = f"MCap: ${mcap_val/1e12:.2f}T"
+                elif mcap_val >= 1e9:
+                    mcap_detail = f"MCap: ${mcap_val/1e9:.1f}B"
+                else:
+                    mcap_detail = f"MCap: ${mcap_val/1e6:.0f}M"
+            st.markdown(f"Market Cap: **{mcap_pctile:.0f}/100** percentile {(' - ' + mcap_detail) if mcap_detail else ''}")
+            st.progress(min(1.0, mcap_pctile / 100))
 
-        st.markdown(f"Leverage: **{lev_pts}/25** {(' - ' + lev_detail) if lev_detail else ''}")
-        st.progress(lev_pts / 25)
+            bonus = fund_details_p2.get("interaction_bonus", 0)
+            if bonus > 0:
+                st.markdown(f"**Interaction Bonus: +{bonus} pts**")
+                interaction_details = fund_details_p2.get("interaction_details", {})
+                if interaction_details:
+                    top_interactions = sorted(interaction_details.items(), key=lambda x: abs(x[1]), reverse=True)[:3]
+                    for name, val in top_interactions:
+                        st.caption(f"{name}: {val:+.3f}")
 
-        # Valuation (25 max)
-        val_pts = fund_details.get("valuation", 0)
-        pe_val = info.get("trailingPE")
-        peg_val = info.get("pegRatio")
-        val_detail = ""
-        if peg_val:
-            val_detail = f"PEG: {peg_val:.2f}"
-        elif pe_val:
-            val_detail = f"P/E: {pe_val:.1f}"
+            n_factors = fund_details_p2.get("n_factors", 5)
+            if fund_details_p2.get("used_percentile"):
+                st.caption(f"Scores based on {n_factors}-factor percentile ranking vs sector peers")
+            else:
+                st.caption(f"Scores based on {n_factors}-factor absolute thresholds (insufficient peer data)")
+    else:
+        fund_status = "success" if fund_score >= 65 else "warning" if fund_score >= 40 else "danger"
+        fund_color = {"success": "#10B981", "warning": "#F59E0B", "danger": "#EF4444"}.get(fund_status, "#6B7280")
 
-        st.markdown(f"Valuation: **{val_pts}/25** {(' - ' + val_detail) if val_detail else ''}")
-        st.progress(val_pts / 25)
+        score_col1, score_col2 = st.columns([1, 3])
+
+        with score_col1:
+            st.markdown(f"""
+            <div style="background: white; border: 1px solid #E0DEDB; border-radius: 8px; padding: 16px; text-align: center;">
+                <div style="font-size: 12px; color: #6B7280; margin-bottom: 4px;">Fundamental Score</div>
+                <div style="font-size: 36px; font-weight: 700; color: {fund_color};">{fund_score}</div>
+                <div style="font-size: 12px; color: #6B7280;">/100</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with score_col2:
+            st.markdown("**Score Breakdown**")
+
+            prof_pts = fund_details.get("profitability", 0)
+            roe_val = info.get("returnOnEquity")
+            margin_val = info.get("profitMargins")
+            prof_detail = ""
+            if roe_val and margin_val:
+                prof_detail = f"ROE: {roe_val*100:.1f}% | Margin: {margin_val*100:.1f}%"
+            elif roe_val:
+                prof_detail = f"ROE: {roe_val*100:.1f}%"
+            elif margin_val:
+                prof_detail = f"Margin: {margin_val*100:.1f}%"
+
+            st.markdown(f"Profitability: **{prof_pts}/25** {(' - ' + prof_detail) if prof_detail else ''}")
+            st.progress(prof_pts / 25)
+
+            growth_pts = fund_details.get("growth", 0)
+            rev_growth = info.get("revenueGrowth")
+            growth_detail = f"Revenue Growth: {rev_growth*100:.1f}%" if rev_growth else ""
+
+            st.markdown(f"Growth: **{growth_pts}/25** {(' - ' + growth_detail) if growth_detail else ''}")
+            st.progress(growth_pts / 25)
+
+            lev_pts = fund_details.get("leverage", 0)
+            de_val = info.get("debtToEquity")
+            lev_detail = f"D/E: {de_val:.1f}" if de_val else ""
+
+            st.markdown(f"Leverage: **{lev_pts}/25** {(' - ' + lev_detail) if lev_detail else ''}")
+            st.progress(lev_pts / 25)
+
+            val_pts = fund_details.get("valuation", 0)
+            pe_val = info.get("trailingPE")
+            peg_val = info.get("pegRatio")
+            val_detail = ""
+            if peg_val:
+                val_detail = f"PEG: {peg_val:.2f}"
+            elif pe_val:
+                val_detail = f"P/E: {pe_val:.1f}"
+
+            st.markdown(f"Valuation: **{val_pts}/25** {(' - ' + val_detail) if val_detail else ''}")
+            st.progress(val_pts / 25)
 
     st.markdown("---")
 

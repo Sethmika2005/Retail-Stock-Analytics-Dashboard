@@ -15,7 +15,7 @@ LEGEND_FONT_COLOR = "#1F2937"
 
 
 def find_crossovers(df):
-    """Find golden cross and death cross points in the data."""
+    """Find golden cross and death cross points in the data (SMA50/200)."""
     if "SMA50" not in df.columns or "SMA200" not in df.columns:
         return [], []
 
@@ -42,7 +42,34 @@ def find_crossovers(df):
     return golden_crosses, death_crosses
 
 
-def render(selected, price_data, info, tech_score, tech_details, last_row):
+def find_ema_crossovers(df):
+    """Find EMA20/50 golden and death cross points."""
+    if "EMA20" not in df.columns or "EMA50" not in df.columns:
+        return [], []
+
+    golden = []
+    death = []
+
+    ema20 = df["EMA20"].values
+    ema50 = df["EMA50"].values
+    dates = df["Date"].values
+    prices = df["Close"].values
+
+    for i in range(1, len(df)):
+        if pd.isna(ema20[i]) or pd.isna(ema50[i]) or pd.isna(ema20[i-1]) or pd.isna(ema50[i-1]):
+            continue
+
+        if ema20[i-1] <= ema50[i-1] and ema20[i] > ema50[i]:
+            golden.append((dates[i], prices[i], ema20[i]))
+
+        if ema20[i-1] >= ema50[i-1] and ema20[i] < ema50[i]:
+            death.append((dates[i], prices[i], ema20[i]))
+
+    return golden, death
+
+
+def render(selected, price_data, info, tech_score, tech_details, last_row,
+           selected_strategy="Current", volume_score=0, volume_details=None):
     """Render the Technical Indicators tab content."""
     st.subheader("Technical Analysis")
 
@@ -452,3 +479,262 @@ def render(selected, price_data, info, tech_score, tech_details, last_row):
 - **Bullish Crossover:** MACD crosses above Signal
 - **Bearish Crossover:** MACD crosses below Signal
         """)
+
+    # =========================================================================
+    # 4. VOLUME CHART (shown when Volume+RSI or Combined strategy is active)
+    # =========================================================================
+    if selected_strategy in ["Volume+RSI", "Combined"]:
+        st.markdown("---")
+        st.markdown("### Volume Analysis")
+
+        vol_fig = go.Figure()
+
+        if "Volume" in chart_data.columns:
+            vol_dates = chart_data["Date"].tolist()
+            vol_values = chart_data["Volume"].tolist()
+
+            # Color bars by price direction
+            close_vals = chart_data["Close"].values
+            prev_close = np.roll(close_vals, 1)
+            prev_close[0] = close_vals[0]
+            vol_colors = ['#10B981' if c >= p else '#F43F5E' for c, p in zip(close_vals, prev_close)]
+
+            vol_fig.add_trace(go.Bar(
+                x=vol_dates,
+                y=vol_values,
+                name="Volume",
+                marker_color=vol_colors,
+                opacity=0.6,
+            ))
+
+            # Volume SMA 20
+            if "Volume_SMA20" in chart_data.columns:
+                vol_fig.add_trace(go.Scatter(
+                    x=vol_dates,
+                    y=chart_data["Volume_SMA20"].tolist(),
+                    name="Vol SMA 20",
+                    line=dict(color="#3B82F6", width=2),
+                    mode='lines',
+                ))
+
+            # Volume SMA 50
+            if "Volume_SMA50" in chart_data.columns:
+                vol_fig.add_trace(go.Scatter(
+                    x=vol_dates,
+                    y=chart_data["Volume_SMA50"].tolist(),
+                    name="Vol SMA 50",
+                    line=dict(color="#F59E0B", width=2),
+                    mode='lines',
+                ))
+
+        vol_fig.update_layout(
+            height=300,
+            margin=dict(l=10, r=10, t=10, b=30),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="center",
+                x=0.5,
+                font=dict(color=LEGEND_FONT_COLOR, size=12)
+            ),
+            font=dict(color=CHART_FONT_COLOR, family="Source Sans Pro, Arial, sans-serif", size=12),
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            hovermode="x unified",
+        )
+        vol_fig.update_xaxes(showgrid=False, showline=True, linecolor='#E5E7EB', tickfont=dict(color=CHART_AXIS_COLOR, size=11))
+        vol_fig.update_yaxes(showgrid=True, gridcolor='#E5E7EB', tickfont=dict(color=CHART_AXIS_COLOR, size=11))
+
+        st.plotly_chart(vol_fig, use_container_width=True)
+
+        # Volume metrics row
+        vol_col1, vol_col2, vol_col3 = st.columns(3)
+        with vol_col1:
+            st.metric("Volume Score", f"{volume_score}/100")
+        with vol_col2:
+            rel_vol = price_data["Rel_Volume"].iloc[-1] if "Rel_Volume" in price_data.columns and pd.notna(price_data["Rel_Volume"].iloc[-1]) else 1.0
+            st.metric("Relative Volume", f"{rel_vol:.2f}x")
+        with vol_col3:
+            confirms = volume_details.get("volume_confirms_trend", False) if volume_details else False
+            st.markdown("**Trend Confirmation**")
+            if confirms:
+                st.markdown("<span style='color:#10B981; font-weight:600;'>Confirmed</span>", unsafe_allow_html=True)
+            else:
+                st.markdown("<span style='color:#F59E0B; font-weight:600;'>Not Confirmed</span>", unsafe_allow_html=True)
+
+        with st.expander("Understanding Volume Analysis"):
+            st.markdown("""
+Volume analysis confirms price movements by measuring participation:
+
+**Key Concepts:**
+- **Rising price + rising volume:** Strong bullish confirmation
+- **Rising price + falling volume:** Weak rally, potential reversal
+- **Falling price + rising volume:** Strong selling pressure
+- **Falling price + falling volume:** Weak selloff, potential bottom
+
+**Volume SMAs:**
+- **SMA 20:** Short-term average volume (blue)
+- **SMA 50:** Medium-term average volume (yellow)
+- Volume above SMA 20 = above-average participation
+            """)
+
+    # =========================================================================
+    # 5. EMA CROSSOVER CHART (shown when Paper 1 or Combined strategy active)
+    # =========================================================================
+    if selected_strategy in ["Volume+RSI", "Combined"]:
+        st.markdown("---")
+        st.markdown("### EMA Crossover (Paper 1)")
+
+        ema_golden, ema_death = find_ema_crossovers(chart_data)
+
+        ema_fig = go.Figure()
+
+        # Price line
+        ema_fig.add_trace(go.Scatter(
+            x=dates,
+            y=close_prices,
+            name="Price",
+            line=dict(color="#000000", width=2.5),
+            mode='lines'
+        ))
+
+        # EMA 20
+        if "EMA20" in chart_data.columns:
+            ema_fig.add_trace(go.Scatter(
+                x=dates,
+                y=chart_data["EMA20"].tolist(),
+                name="EMA 20",
+                line=dict(color="#3B82F6", width=2),
+                mode='lines',
+                connectgaps=False
+            ))
+
+        # EMA 50
+        if "EMA50" in chart_data.columns:
+            ema_fig.add_trace(go.Scatter(
+                x=dates,
+                y=chart_data["EMA50"].tolist(),
+                name="EMA 50",
+                line=dict(color="#F59E0B", width=2),
+                mode='lines',
+                connectgaps=False
+            ))
+
+        # Golden Cross markers
+        for date_val, price_val, ema_val in ema_golden:
+            ema_fig.add_annotation(
+                x=date_val, y=ema_val,
+                text="EMA Golden",
+                showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2,
+                arrowcolor="#10B981",
+                font=dict(size=10, color="#10B981"),
+                bgcolor="white", bordercolor="#10B981", borderwidth=1,
+                ax=0, ay=-40
+            )
+
+        # Death Cross markers
+        for date_val, price_val, ema_val in ema_death:
+            ema_fig.add_annotation(
+                x=date_val, y=ema_val,
+                text="EMA Death",
+                showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2,
+                arrowcolor="#EF4444",
+                font=dict(size=10, color="#EF4444"),
+                bgcolor="white", bordercolor="#EF4444", borderwidth=1,
+                ax=0, ay=40
+            )
+
+        ema_fig.update_layout(
+            height=400,
+            margin=dict(l=10, r=10, t=40, b=40),
+            legend=dict(
+                orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5,
+                font=dict(color=LEGEND_FONT_COLOR, size=12)
+            ),
+            font=dict(color=CHART_FONT_COLOR, family="Source Sans Pro, Arial, sans-serif", size=12),
+            plot_bgcolor='white', paper_bgcolor='white',
+            hovermode="x unified"
+        )
+        ema_fig.update_xaxes(showgrid=False, showline=True, linecolor='#E5E7EB', tickfont=dict(color=CHART_AXIS_COLOR, size=11))
+        ema_fig.update_yaxes(showgrid=True, gridcolor='#E5E7EB', tickfont=dict(color=CHART_AXIS_COLOR, size=11), tickprefix="$")
+
+        st.plotly_chart(ema_fig, use_container_width=True)
+
+        # EMA key values
+        ema20_val = price_data["EMA20"].iloc[-1] if "EMA20" in price_data.columns else None
+        ema50_val = price_data["EMA50"].iloc[-1] if "EMA50" in price_data.columns else None
+
+        if ema20_val and ema50_val:
+            is_ema_golden = ema20_val > ema50_val
+            ema_status = "EMA Golden Cross" if is_ema_golden else "EMA Death Cross"
+            ema_s_color = "#10B981" if is_ema_golden else "#EF4444"
+
+            ec1, ec2, ec3, ec4 = st.columns(4)
+            with ec1:
+                st.metric("Price", f"${current_price:.2f}")
+            with ec2:
+                st.metric("EMA 20", f"${ema20_val:.2f}")
+            with ec3:
+                st.metric("EMA 50", f"${ema50_val:.2f}")
+            with ec4:
+                st.markdown("**EMA Status**")
+                st.markdown(f"<span style='color:{ema_s_color}; font-weight:600;'>{ema_status}</span>", unsafe_allow_html=True)
+
+        # =====================================================================
+        # 6. ATV SLOPE SUBPLOT
+        # =====================================================================
+        st.markdown("---")
+        st.markdown("### ATV Slope")
+
+        if "ATV_Slope" in chart_data.columns:
+            atv_fig = go.Figure()
+
+            atv_dates = chart_data["Date"].tolist()
+            atv_values = chart_data["ATV_Slope"].tolist()
+
+            # Color by positive/negative
+            atv_colors = ['#10B981' if (v is not None and not pd.isna(v) and v >= 0) else '#F43F5E' for v in atv_values]
+
+            atv_fig.add_trace(go.Bar(
+                x=atv_dates,
+                y=atv_values,
+                name="ATV Slope",
+                marker_color=atv_colors,
+                opacity=0.7,
+            ))
+
+            atv_fig.add_hline(y=0, line=dict(color="#9CA3AF", dash="dot", width=1))
+
+            atv_fig.update_layout(
+                height=250,
+                margin=dict(l=10, r=10, t=10, b=30),
+                font=dict(color=CHART_FONT_COLOR, family="Source Sans Pro, Arial, sans-serif", size=12),
+                plot_bgcolor='white', paper_bgcolor='white',
+                showlegend=False,
+                hovermode="x unified",
+            )
+            atv_fig.update_xaxes(showgrid=False, showline=True, linecolor='#E5E7EB', tickfont=dict(color=CHART_AXIS_COLOR, size=11))
+            atv_fig.update_yaxes(showgrid=True, gridcolor='#E5E7EB', tickfont=dict(color=CHART_AXIS_COLOR, size=11))
+
+            st.plotly_chart(atv_fig, use_container_width=True)
+
+            atv_current = price_data["ATV_Slope"].iloc[-1] if pd.notna(price_data["ATV_Slope"].iloc[-1]) else 0
+            atv_direction = "Rising" if atv_current > 0 else "Falling" if atv_current < 0 else "Flat"
+            atv_d_color = "#10B981" if atv_current > 0 else "#EF4444" if atv_current < 0 else "#6B7280"
+
+            ac1, ac2 = st.columns(2)
+            with ac1:
+                st.metric("ATV Slope", f"{atv_current:,.0f}")
+            with ac2:
+                st.markdown("**Volume Trend**")
+                st.markdown(f"<span style='color:{atv_d_color}; font-weight:600;'>{atv_direction}</span>", unsafe_allow_html=True)
+
+            with st.expander("Understanding ATV Slope"):
+                st.markdown("""
+ATV (Average Trading Volume) Slope measures the direction of volume momentum:
+
+- **Positive slope:** Volume is increasing — confirms price moves
+- **Negative slope:** Volume is decreasing — warns of weakening moves
+- Used with EMA crossovers to confirm signal strength (Paper 1)
+                """)

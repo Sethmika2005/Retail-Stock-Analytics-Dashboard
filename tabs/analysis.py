@@ -4,11 +4,21 @@
 
 import streamlit as st
 from components import render_metric_card, render_badge_card, render_compact_card, get_status_color
-from models import generate_recommendation, generate_key_drivers, generate_key_risk, generate_bull_bear_case, generate_action_checklist, generate_view_changers
+from models import (
+    generate_recommendation,
+    generate_recommendation_paper1,
+    generate_recommendation_paper2,
+    generate_recommendation_combined,
+    generate_key_drivers, generate_key_risk, generate_bull_bear_case,
+    generate_action_checklist, generate_view_changers,
+)
 
 
 def render(selected, price_data, info, tech_score, tech_details, fund_score, fund_details,
-           market_regime, regime_metrics, last_row):
+           market_regime, regime_metrics, last_row,
+           selected_strategy="Current", volume_score=0, volume_details=None,
+           rsi_value=50, risk_profile="moderate", fund_score_p2=50, fund_details_p2=None,
+           paper1_details=None, rl_prediction=None):
     """Render the Analysis tab content."""
     st.subheader("Market & Stock Analysis")
 
@@ -20,11 +30,41 @@ def render(selected, price_data, info, tech_score, tech_details, fund_score, fun
     with horizon_col2:
         time_horizon = "short" if st.toggle("Short-term focus", value=False, help="Toggle for short-term (1-3 months) vs long-term (6-12 months) analysis. Short-term emphasizes technicals, long-term emphasizes fundamentals.") else "long"
 
-    # Generate recommendation based on time horizon
-    recommendation_data = generate_recommendation(
-        tech_score, fund_score, market_regime, selected, info, time_horizon
-    )
+    # Generate recommendation based on selected strategy
+    if selected_strategy == "Volume+RSI":
+        recommendation_data = generate_recommendation_paper1(
+            tech_score, fund_score, volume_score, rsi_value,
+            market_regime, selected, info, time_horizon,
+            price_data=price_data, rl_prediction=rl_prediction,
+        )
+    elif selected_strategy == "Optimized Weights":
+        recommendation_data = generate_recommendation_paper2(
+            tech_score, fund_score_p2, market_regime, selected, info,
+            risk_profile, time_horizon
+        )
+    elif selected_strategy == "Combined":
+        recommendation_data = generate_recommendation_combined(
+            tech_score, fund_score_p2, volume_score, rsi_value,
+            market_regime, selected, info, risk_profile, time_horizon,
+            price_data=price_data,
+        )
+    else:  # Current (baseline)
+        recommendation_data = generate_recommendation(
+            tech_score, fund_score, market_regime, selected, info, time_horizon
+        )
+
     rec = recommendation_data["recommendation"]
+
+    # ==========================================================================
+    # STRATEGY INDICATOR
+    # ==========================================================================
+    strategy_labels = {
+        "Current": "Baseline",
+        "Volume+RSI": "Paper 1: EMA + ATV + RSI + RL",
+        "Optimized Weights": "Paper 2: 5-Factor Scoring",
+        "Combined": "Combined: Paper 1 Timing + Paper 2 Quality",
+    }
+    st.caption(f"Active Strategy: **{strategy_labels.get(selected_strategy, selected_strategy)}**")
 
     # ==========================================================================
     # 1. EXECUTIVE SUMMARY (Decision first)
@@ -52,7 +92,65 @@ def render(selected, price_data, info, tech_score, tech_details, fund_score, fun
     with exec_col3:
         composite = recommendation_data["composite_score"]
         comp_status = "success" if composite >= 65 else "warning" if composite >= 45 else "danger"
-        st.markdown(render_metric_card("Score", f"{composite:.0f}/100", "Weighted composite of Technical and Fundamental scores.", comp_status, "large"), unsafe_allow_html=True)
+        st.markdown(render_metric_card("Score", f"{composite:.0f}/100", "Weighted composite score.", comp_status, "large"), unsafe_allow_html=True)
+
+    # RSI gate warning (for Paper 1 and Combined strategies)
+    if selected_strategy in ["Volume+RSI", "Combined"]:
+        rsi_gate = recommendation_data.get("rsi_gate_applied", False)
+        rsi_warning = recommendation_data.get("rsi_warning", "")
+        if rsi_gate:
+            st.warning(f"RSI Gate: {rsi_warning}")
+        vol_confirms = recommendation_data.get("volume_confirms", False)
+        if vol_confirms:
+            st.success("Volume confirms current price trend")
+        else:
+            st.info("Volume does not confirm current price trend")
+
+    # Paper 1 signal details
+    p1_details = recommendation_data.get("paper1_details") or paper1_details
+    if p1_details and selected_strategy in ["Volume+RSI", "Combined"]:
+        with st.expander("Paper 1 Signal Details", expanded=True):
+            d_col1, d_col2, d_col3 = st.columns(3)
+            with d_col1:
+                crossover = p1_details.get("crossover_type", "none")
+                cross_label = crossover.replace("_", " ").title()
+                cross_color = "#10B981" if crossover == "golden_cross" else "#EF4444" if crossover == "death_cross" else "#6B7280"
+                st.markdown(f"**EMA Crossover:** <span style='color:{cross_color}; font-weight:600;'>{cross_label}</span>", unsafe_allow_html=True)
+
+            with d_col2:
+                atv_conf = p1_details.get("atv_confirmed", False)
+                atv_label = "Confirmed" if atv_conf else "Not Confirmed"
+                atv_color = "#10B981" if atv_conf else "#F59E0B"
+                st.markdown(f"**ATV Confirmation:** <span style='color:{atv_color}; font-weight:600;'>{atv_label}</span>", unsafe_allow_html=True)
+
+            with d_col3:
+                rsi_g = p1_details.get("rsi_gate", "n/a")
+                rsi_labels = {
+                    "passed": ("Passed", "#10B981"),
+                    "blocked_overbought": ("Blocked (Overbought)", "#EF4444"),
+                    "blocked_oversold": ("Blocked (Oversold)", "#EF4444"),
+                    "n/a": ("N/A", "#6B7280"),
+                }
+                rsi_label, rsi_color = rsi_labels.get(rsi_g, ("N/A", "#6B7280"))
+                st.markdown(f"**RSI Gate:** <span style='color:{rsi_color}; font-weight:600;'>{rsi_label}</span>", unsafe_allow_html=True)
+
+            # RL agent status
+            rl_signal = p1_details.get("rl_signal")
+            if rl_signal:
+                rl_agrees = p1_details.get("rl_agrees", False)
+                rl_override = p1_details.get("rl_override", False)
+                rl_status_color = "#10B981" if rl_agrees else "#F59E0B"
+                rl_status = "Agrees" if rl_agrees else ("Override" if rl_override else "Disagrees")
+                st.markdown(f"**RL Agent (PPO):** Signal: {rl_signal} — <span style='color:{rl_status_color}; font-weight:600;'>{rl_status}</span>", unsafe_allow_html=True)
+            elif selected_strategy == "Volume+RSI":
+                try:
+                    import rl_agent
+                    if rl_agent.is_available():
+                        st.caption("RL Agent: Available (train via sidebar)")
+                    else:
+                        st.caption("RL Agent: Not available (install stable-baselines3)")
+                except ImportError:
+                    st.caption("RL Agent: Not available")
 
     # Key Drivers inline
     key_drivers = generate_key_drivers(info, tech_score, fund_score, price_data, market_regime)
@@ -216,10 +314,22 @@ def render(selected, price_data, info, tech_score, tech_details, fund_score, fun
     # 5. SCORE DETAILS (Collapsible)
     # ==========================================================================
     with st.expander("Score Breakdown", expanded=False):
-        score_col1, score_col2 = st.columns(2)
         weights = recommendation_data["weights"]
+        has_volume = "volume" in weights
+        has_fundamental = "fundamental" in weights
 
-        with score_col1:
+        # Determine columns based on strategy
+        if has_volume and has_fundamental:
+            score_cols = st.columns(3)
+        elif has_volume or has_fundamental:
+            score_cols = st.columns(2)
+        else:
+            score_cols = [st.columns(1)[0]]
+
+        col_idx = 0
+
+        # Technical score (always shown)
+        with score_cols[col_idx]:
             st.markdown("**Technical Score**")
             tech_status = "success" if tech_score >= 60 else "warning" if tech_score >= 40 else "danger"
             tech_color = get_status_color(tech_status)
@@ -229,18 +339,59 @@ def render(selected, price_data, info, tech_score, tech_details, fund_score, fun
             st.write(f"- Trend: {tech_details.get('trend', 'N/A')}/40")
             st.write(f"- RSI: {tech_details.get('rsi', 'N/A')}/30")
             st.write(f"- MACD: {tech_details.get('macd', 'N/A')}/30")
+        col_idx += 1
 
-        with score_col2:
-            st.markdown("**Fundamental Score**")
-            fund_status = "success" if fund_score >= 60 else "warning" if fund_score >= 40 else "danger"
-            fund_color = get_status_color(fund_status)
-            st.markdown(f"<span style='font-family: Source Sans Pro, Arial, sans-serif; font-size:28px; color:{fund_color};'>{fund_score}/100</span>", unsafe_allow_html=True)
-            st.caption(f"Weight: {weights['fundamental']*100:.0f}%")
-            st.progress(fund_score / 100)
-            st.write(f"- Profitability: {fund_details.get('profitability', 'N/A')}/25")
-            st.write(f"- Growth: {fund_details.get('growth', 'N/A')}/25")
-            st.write(f"- Leverage: {fund_details.get('leverage', 'N/A')}/25")
-            st.write(f"- Valuation: {fund_details.get('valuation', 'N/A')}/25")
+        # Fundamental score (not shown for Volume+RSI / Paper 1)
+        if has_fundamental:
+            with score_cols[col_idx]:
+                if selected_strategy in ["Optimized Weights", "Combined"]:
+                    display_fund = fund_score_p2
+                    st.markdown("**Factor Score (Paper 2)**")
+                    fund_status = "success" if display_fund >= 60 else "warning" if display_fund >= 40 else "danger"
+                    fund_color = get_status_color(fund_status)
+                    st.markdown(f"<span style='font-family: Source Sans Pro, Arial, sans-serif; font-size:28px; color:{fund_color};'>{display_fund:.0f}/100</span>", unsafe_allow_html=True)
+                    st.caption(f"Weight: {weights['fundamental']*100:.0f}% | Profile: {risk_profile.title()}")
+                    st.progress(min(1.0, display_fund / 100))
+                    if fund_details_p2:
+                        st.write(f"- P/B Ratio: {fund_details_p2.get('pb_pctile', fund_details_p2.get('valuation_pctile', 'N/A')):.0f}/100")
+                        st.write(f"- ROE: {fund_details_p2.get('roe_pctile', fund_details_p2.get('profitability_pctile', 'N/A')):.0f}/100")
+                        st.write(f"- Momentum: {fund_details_p2.get('momentum_pctile', fund_details_p2.get('growth_pctile', 'N/A')):.0f}/100")
+                        st.write(f"- Beta: {fund_details_p2.get('beta_pctile', fund_details_p2.get('leverage_pctile', 'N/A')):.0f}/100")
+                        st.write(f"- Market Cap: {fund_details_p2.get('market_cap_pctile', 50):.0f}/100")
+                        bonus = fund_details_p2.get('interaction_bonus', 0)
+                        if bonus > 0:
+                            st.write(f"- Interaction Bonus: +{bonus} pts")
+                        if fund_details_p2.get('pb_unavailable'):
+                            st.caption("P/B unavailable — using 4-factor model")
+                else:
+                    display_fund = fund_score
+                    st.markdown("**Fundamental Score**")
+                    fund_status = "success" if display_fund >= 60 else "warning" if display_fund >= 40 else "danger"
+                    fund_color = get_status_color(fund_status)
+                    st.markdown(f"<span style='font-family: Source Sans Pro, Arial, sans-serif; font-size:28px; color:{fund_color};'>{display_fund}/100</span>", unsafe_allow_html=True)
+                    st.caption(f"Weight: {weights['fundamental']*100:.0f}%")
+                    st.progress(display_fund / 100)
+                    st.write(f"- Profitability: {fund_details.get('profitability', 'N/A')}/25")
+                    st.write(f"- Growth: {fund_details.get('growth', 'N/A')}/25")
+                    st.write(f"- Leverage: {fund_details.get('leverage', 'N/A')}/25")
+                    st.write(f"- Valuation: {fund_details.get('valuation', 'N/A')}/25")
+            col_idx += 1
+
+        # Volume score (shown for Volume+RSI and Combined)
+        if has_volume:
+            with score_cols[col_idx]:
+                st.markdown("**Volume Score**")
+                vol_status = "success" if volume_score >= 60 else "warning" if volume_score >= 40 else "danger"
+                vol_color = get_status_color(vol_status)
+                st.markdown(f"<span style='font-family: Source Sans Pro, Arial, sans-serif; font-size:28px; color:{vol_color};'>{volume_score}/100</span>", unsafe_allow_html=True)
+                st.caption(f"Weight: {weights.get('volume', 0)*100:.0f}%")
+                st.progress(volume_score / 100)
+                if volume_details and "details" in volume_details:
+                    d = volume_details["details"]
+                    st.write(f"- Alignment: {d.get('alignment_score', 'N/A'):.0f}/50")
+                    st.write(f"- Rel Volume: {d.get('rel_volume_score', 'N/A'):.0f}/50")
+                    confirms = volume_details.get("volume_confirms_trend", False)
+                    st.write(f"- Confirms Trend: {'Yes' if confirms else 'No'}")
 
     st.divider()
 
@@ -267,8 +418,11 @@ def render(selected, price_data, info, tech_score, tech_details, fund_score, fun
     with st.expander("Full Analysis Summary"):
         st.markdown(recommendation_data["explanation"])
 
+        weight_lines = "\n".join(
+            f"        - {k.title()}: {v*100:.0f}%"
+            for k, v in recommendation_data['weights'].items()
+        )
         st.markdown(f"""
         **Weight Adjustments for {market_regime} Market:**
-        - Technical: {recommendation_data['weights']['technical']*100:.0f}%
-        - Fundamental: {recommendation_data['weights']['fundamental']*100:.0f}%
+{weight_lines}
         """)

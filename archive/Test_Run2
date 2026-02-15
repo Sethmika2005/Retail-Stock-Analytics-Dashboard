@@ -1,0 +1,514 @@
+import datetime as dt
+
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import streamlit as st
+import yfinance as yf
+
+st.set_page_config(page_title="Tech Stock Dashboard", layout="wide")
+
+TECH_TICKERS = [
+    "AAPL",
+    "MSFT",
+    "NVDA",
+    "AMD",
+    "GOOGL",
+    "GOOG",
+    "META",
+    "AMZN",
+    "TSLA",
+    "INTC",
+    "CRM",
+    "ORCL",
+    "ADBE",
+    "CSCO",
+    "AVGO",
+    "QCOM",
+    "NFLX",
+    "IBM",
+    "TXN",
+    "NOW",
+]
+
+POSITIVE_WORDS = {
+    "beat",
+    "beats",
+    "surge",
+    "surges",
+    "soar",
+    "soars",
+    "record",
+    "growth",
+    "profit",
+    "upgrade",
+    "bull",
+    "bullish",
+    "strong",
+    "tops",
+}
+NEGATIVE_WORDS = {
+    "miss",
+    "misses",
+    "drop",
+    "drops",
+    "plunge",
+    "plunges",
+    "cut",
+    "cuts",
+    "downgrade",
+    "bear",
+    "bearish",
+    "weak",
+    "lawsuit",
+    "decline",
+}
+
+
+def classify_headline_sentiment(title):
+    words = set(title.lower().split())
+    pos = len(words & POSITIVE_WORDS)
+    neg = len(words & NEGATIVE_WORDS)
+    if pos > neg:
+        return "Positive"
+    if neg > pos:
+        return "Negative"
+    return "Neutral"
+
+
+@st.cache_data(ttl=3600)
+def load_history(ticker, period="1y", interval="1d"):
+    data = yf.Ticker(ticker).history(period=period, interval=interval, auto_adjust=False)
+    if data.empty:
+        return data
+    data = data.rename_axis("Date").reset_index()
+    return data
+
+
+@st.cache_data(ttl=3600)
+def load_fundamentals(ticker):
+    info = yf.Ticker(ticker).get_info()
+    return info or {}
+
+
+@st.cache_data(ttl=3600)
+def load_sector_peers_metrics(tickers):
+    rows = []
+    for symbol in tickers:
+        info = load_fundamentals(symbol)
+        rows.append(
+            {
+                "ticker": symbol,
+                "pe": info.get("trailingPE"),
+                "peg": info.get("pegRatio"),
+                "roe": info.get("returnOnEquity"),
+                "net_margin": info.get("profitMargins"),
+                "rev_growth": info.get("revenueGrowth"),
+                "de": info.get("debtToEquity"),
+            }
+        )
+    df = pd.DataFrame(rows)
+    return df
+
+
+def compute_indicators(df):
+    df = df.copy()
+    df["SMA50"] = df["Close"].rolling(window=50).mean()
+    df["SMA200"] = df["Close"].rolling(window=200).mean()
+    rolling_20 = df["Close"].rolling(window=20)
+    df["BB_MID"] = rolling_20.mean()
+    df["BB_UPPER"] = df["BB_MID"] + 2 * rolling_20.std()
+    df["BB_LOWER"] = df["BB_MID"] - 2 * rolling_20.std()
+
+    delta = df["Close"].diff()
+    gain = delta.where(delta > 0, 0.0)
+    loss = -delta.where(delta < 0, 0.0)
+    avg_gain = gain.rolling(window=14).mean()
+    avg_loss = loss.rolling(window=14).mean()
+    rs = avg_gain / avg_loss
+    df["RSI"] = 100 - (100 / (1 + rs))
+
+    ema12 = df["Close"].ewm(span=12, adjust=False).mean()
+    ema26 = df["Close"].ewm(span=26, adjust=False).mean()
+    df["MACD"] = ema12 - ema26
+    df["MACD_SIGNAL"] = df["MACD"].ewm(span=9, adjust=False).mean()
+    df["MACD_HIST"] = df["MACD"] - df["MACD_SIGNAL"]
+
+    high_low = df["High"] - df["Low"]
+    high_close = (df["High"] - df["Close"].shift()).abs()
+    low_close = (df["Low"] - df["Close"].shift()).abs()
+    tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
+    df["ATR"] = tr.rolling(window=14).mean()
+
+    ma60 = df["Close"].rolling(window=60).mean()
+    std60 = df["Close"].rolling(window=60).std()
+    df["Z_SCORE_60"] = (df["Close"] - ma60) / std60
+    return df
+
+
+def format_metric(value, suffix=""):
+    if value is None or (isinstance(value, float) and np.isnan(value)):
+        return "N/A"
+    if isinstance(value, float):
+        return f"{value:.2f}{suffix}"
+    return f"{value}{suffix}"
+
+
+def metric_color(value, good_high=True):
+    if value is None or (isinstance(value, float) and np.isnan(value)):
+        return "gray"
+    if good_high:
+        return "green" if value >= 0 else "red"
+    return "green" if value <= 0 else "red"
+
+
+def classify_risk(df):
+    returns = df["Close"].pct_change().dropna()
+    if returns.empty:
+        return "Unknown", "gray", []
+    vol = returns.tail(60).std() * np.sqrt(252)
+    rsi = df["RSI"].iloc[-1]
+    factors = []
+    if vol > 0.5:
+        level = "High"
+        color = "red"
+        factors.append("Elevated 60d volatility")
+    elif vol > 0.3:
+        level = "Medium"
+        color = "orange"
+        factors.append("Moderate 60d volatility")
+    else:
+        level = "Low"
+        color = "green"
+        factors.append("Stable 60d volatility")
+
+    if rsi > 70:
+        factors.append("RSI above 70 (overbought)")
+    elif rsi < 30:
+        factors.append("RSI below 30 (oversold)")
+
+    return level, color, factors
+
+
+st.title("US Tech Stock Analytics Dashboard")
+
+with st.sidebar:
+    st.header("Ticker Selection")
+    selected = st.selectbox("Choose a tech stock", TECH_TICKERS, index=0)
+    show_sma = st.checkbox("Show SMA 50/200", value=True)
+    show_boll = st.checkbox("Show Bollinger Bands", value=True)
+    show_volume = st.checkbox("Show Volume", value=True)
+    show_rsi = st.checkbox("Show RSI", value=True)
+    show_macd = st.checkbox("Show MACD", value=True)
+
+with st.spinner("Loading data..."):
+    price_data = load_history(selected)
+    info = load_fundamentals(selected)
+
+if price_data.empty:
+    st.error("No price data available for this ticker. Try another selection.")
+    st.stop()
+
+price_data = compute_indicators(price_data)
+
+last_row = price_data.iloc[-1]
+prev_row = price_data.iloc[-2] if len(price_data) > 1 else last_row
+change_pct = (last_row["Close"] - prev_row["Close"]) / prev_row["Close"] * 100
+
+sector = info.get("sector", "Technology")
+industry = info.get("industry", "N/A")
+
+overview_tab, technical_tab, fundamentals_tab, news_tab, risk_tab = st.tabs(
+    ["Overview", "Technical", "Fundamentals", "News & Sentiment", "Risk"]
+)
+
+with overview_tab:
+    st.subheader(f"{selected} Overview")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Last Price", f"${last_row['Close']:.2f}")
+    col2.metric("Daily Change", f"{change_pct:.2f}%")
+    col3.metric("Sector", sector)
+    col4.metric("Industry", industry)
+
+    st.markdown("### Key Metrics")
+    metrics_col1, metrics_col2, metrics_col3 = st.columns(3)
+    metrics_col1.metric("P/E", format_metric(info.get("trailingPE")))
+    metrics_col1.metric("PEG", format_metric(info.get("pegRatio")))
+    metrics_col2.metric("ROE", format_metric(info.get("returnOnEquity"), "%"))
+    metrics_col2.metric("Debt/Equity", format_metric(info.get("debtToEquity")))
+    metrics_col3.metric("RSI", format_metric(last_row["RSI"]))
+    metrics_col3.metric("MACD", format_metric(last_row["MACD"]))
+
+    risk_level, risk_color, risk_factors = classify_risk(price_data)
+    st.markdown("### Risk Regime")
+    st.markdown(
+        f"<span style='color:{risk_color}; font-weight:600'>{risk_level}</span>",
+        unsafe_allow_html=True,
+    )
+    st.caption("Placeholder based on recent volatility and RSI.")
+
+    st.markdown("### Relative Valuation")
+    peers = load_sector_peers_metrics(TECH_TICKERS)
+    peer_pe = peers["pe"].dropna().mean()
+    if info.get("trailingPE") and peer_pe:
+        if info.get("trailingPE") > peer_pe:
+            st.warning("Valuation above peer average. Could be priced for growth.")
+        else:
+            st.success("Valuation below peer average. Could be undervalued vs peers.")
+    else:
+        st.info("Peer valuation comparison unavailable.")
+
+with technical_tab:
+    st.subheader("Technical Indicators")
+    st.caption("Toggle indicators from the sidebar to customize the chart.")
+
+    rows = 1 + int(show_volume) + int(show_rsi) + int(show_macd)
+    heights = [0.5]
+    if show_volume:
+        heights.append(0.15)
+    if show_rsi:
+        heights.append(0.15)
+    if show_macd:
+        heights.append(0.2)
+
+    fig = make_subplots(
+        rows=rows,
+        cols=1,
+        shared_xaxes=True,
+        vertical_spacing=0.03,
+        row_heights=heights,
+    )
+
+    fig.add_trace(
+        go.Candlestick(
+            x=price_data["Date"],
+            open=price_data["Open"],
+            high=price_data["High"],
+            low=price_data["Low"],
+            close=price_data["Close"],
+            name="Price",
+        ),
+        row=1,
+        col=1,
+    )
+
+    if show_sma:
+        fig.add_trace(
+            go.Scatter(
+                x=price_data["Date"],
+                y=price_data["SMA50"],
+                name="SMA 50",
+                line=dict(color="#1f77b4"),
+            ),
+            row=1,
+            col=1,
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=price_data["Date"],
+                y=price_data["SMA200"],
+                name="SMA 200",
+                line=dict(color="#ff7f0e"),
+            ),
+            row=1,
+            col=1,
+        )
+
+    if show_boll:
+        fig.add_trace(
+            go.Scatter(
+                x=price_data["Date"],
+                y=price_data["BB_UPPER"],
+                name="Bollinger Upper",
+                line=dict(color="rgba(200,200,200,0.6)"),
+            ),
+            row=1,
+            col=1,
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=price_data["Date"],
+                y=price_data["BB_LOWER"],
+                name="Bollinger Lower",
+                line=dict(color="rgba(200,200,200,0.6)"),
+            ),
+            row=1,
+            col=1,
+        )
+
+    current_row = 2
+    if show_volume:
+        fig.add_trace(
+            go.Bar(
+                x=price_data["Date"],
+                y=price_data["Volume"],
+                name="Volume",
+                marker_color="rgba(100,100,100,0.5)",
+            ),
+            row=current_row,
+            col=1,
+        )
+        current_row += 1
+
+    if show_rsi:
+        fig.add_trace(
+            go.Scatter(
+                x=price_data["Date"],
+                y=price_data["RSI"],
+                name="RSI",
+                line=dict(color="#9467bd"),
+            ),
+            row=current_row,
+            col=1,
+        )
+        fig.add_hline(y=70, line=dict(color="red", dash="dash"), row=current_row, col=1)
+        fig.add_hline(y=30, line=dict(color="green", dash="dash"), row=current_row, col=1)
+        current_row += 1
+
+    if show_macd:
+        fig.add_trace(
+            go.Bar(
+                x=price_data["Date"],
+                y=price_data["MACD_HIST"],
+                name="MACD Hist",
+                marker_color="rgba(44,160,44,0.6)",
+            ),
+            row=current_row,
+            col=1,
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=price_data["Date"],
+                y=price_data["MACD"],
+                name="MACD",
+                line=dict(color="#1f77b4"),
+            ),
+            row=current_row,
+            col=1,
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=price_data["Date"],
+                y=price_data["MACD_SIGNAL"],
+                name="Signal",
+                line=dict(color="#ff7f0e"),
+            ),
+            row=current_row,
+            col=1,
+        )
+
+    fig.update_layout(height=800, legend_orientation="h", legend_y=-0.1)
+    st.plotly_chart(fig, use_container_width=True)
+
+    with st.expander("Indicator Guide"):
+        st.markdown(
+            "- SMA: smooths price trends over 50/200 days.\n"
+            "- Bollinger Bands: volatility envelope around the 20-day mean.\n"
+            "- RSI: momentum oscillator; >70 overbought, <30 oversold.\n"
+            "- MACD: momentum trend via EMA crossovers and histogram."
+        )
+
+with fundamentals_tab:
+    st.subheader("Fundamentals")
+    st.caption("Metrics pulled from yfinance. Values are reported if available.")
+
+    metrics = {
+        "P/E": info.get("trailingPE"),
+        "PEG": info.get("pegRatio"),
+        "ROE": info.get("returnOnEquity"),
+        "Net Margin": info.get("profitMargins"),
+        "Revenue Growth": info.get("revenueGrowth"),
+        "Debt/Equity": info.get("debtToEquity"),
+    }
+    metrics_df = pd.DataFrame(
+        {"Metric": list(metrics.keys()), "Value": list(metrics.values())}
+    )
+
+    peers = load_sector_peers_metrics(TECH_TICKERS)
+    peer_means = peers.drop(columns=["ticker"]).mean()
+
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        st.dataframe(metrics_df, use_container_width=True)
+
+    with col2:
+        compare_df = pd.DataFrame(
+            {
+                "Metric": ["P/E", "PEG", "ROE", "Net Margin", "Revenue Growth", "Debt/Equity"],
+                "Company": [
+                    metrics.get("P/E"),
+                    metrics.get("PEG"),
+                    metrics.get("ROE"),
+                    metrics.get("Net Margin"),
+                    metrics.get("Revenue Growth"),
+                    metrics.get("Debt/Equity"),
+                ],
+                "Peer Avg": [
+                    peer_means.get("pe"),
+                    peer_means.get("peg"),
+                    peer_means.get("roe"),
+                    peer_means.get("net_margin"),
+                    peer_means.get("rev_growth"),
+                    peer_means.get("de"),
+                ],
+            }
+        )
+        compare_df["Z-Score"] = (
+            (compare_df["Company"] - compare_df["Peer Avg"]) / compare_df["Peer Avg"]
+        )
+        st.dataframe(compare_df, use_container_width=True)
+
+    st.caption("Peer averages are computed from the preset tech ticker list.")
+
+with news_tab:
+    st.subheader("News & Sentiment")
+    st.caption("News provided by yfinance when available. Sentiment is a simple heuristic.")
+
+    news_items = info.get("news") or []
+    if not news_items:
+        st.info("No news available from the current data source.")
+    else:
+        sentiment_rows = []
+        for item in news_items[:15]:
+            title = item.get("title", "Untitled")
+            publisher = item.get("publisher", "Unknown")
+            ts = item.get("providerPublishTime")
+            when = dt.datetime.utcfromtimestamp(ts).strftime("%Y-%m-%d %H:%M") if ts else "N/A"
+            sentiment = classify_headline_sentiment(title)
+            sentiment_rows.append({"Date": when.split(" ")[0], "Sentiment": sentiment})
+
+            st.markdown(f"**{title}**")
+            st.caption(f"{publisher} | {when} | {sentiment}")
+
+        sentiment_df = pd.DataFrame(sentiment_rows)
+        if not sentiment_df.empty:
+            sentiment_counts = sentiment_df.groupby(["Date", "Sentiment"]).size().reset_index(name="Count")
+            fig = go.Figure()
+            for label, color in [("Positive", "green"), ("Neutral", "gray"), ("Negative", "red")]:
+                subset = sentiment_counts[sentiment_counts["Sentiment"] == label]
+                fig.add_trace(
+                    go.Bar(
+                        x=subset["Date"],
+                        y=subset["Count"],
+                        name=label,
+                        marker_color=color,
+                    )
+                )
+            fig.update_layout(title="Headline Sentiment Count", barmode="stack", height=400)
+            st.plotly_chart(fig, use_container_width=True)
+
+with risk_tab:
+    st.subheader("Risk Outlook")
+    st.caption("Placeholder for ML volatility regime model. Currently derived from recent volatility.")
+
+    risk_level, risk_color, risk_factors = classify_risk(price_data)
+    st.markdown(
+        f"<span style='color:{risk_color}; font-weight:600'>{risk_level}</span>",
+        unsafe_allow_html=True,
+    )
+    if risk_factors:
+        st.write("Contributing factors:")
+        for factor in risk_factors:
+            st.write(f"- {factor}")
+    st.info("Future enhancement: add ML-based classifier and macro sentiment signals.")

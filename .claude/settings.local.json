@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(streamlit run:*)",
+      "WebSearch",
+      "WebFetch(domain:community.vercel.com)",
+      "WebFetch(domain:v0.app)",
+      "Bash(timeout 15 python:*)",
+      "Bash(timeout:*)",
+      "Bash(python:*)",
+      "Bash(dir /b \"C:\\\\python\\\\wip2\")",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nInitial commit: US Stock Analytics Dashboard\n\nFeatures:\n- Multi-tab dashboard \\(Analysis, Overview, Technical, Fundamentals, News, Risk\\)\n- Real-time stock data via yfinance\n- News feed integration with Finnhub API\n- Sentiment analysis for news headlines\n- Sector market share pie chart visualization\n- Technical indicators \\(RSI, MACD, Bollinger Bands, Moving Averages\\)\n- Risk assessment scoring\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git config:*)",
+      "Bash(dir \"C:\\\\python\\\\wip2\\\\tools\")",
+      "Bash(dir \"C:\\\\python\\\\wip2\\\\Test_Run2\")",
+      "Bash(move \"C:\\\\python\\\\wip2\\\\tabs\\\\risk.py\" \"C:\\\\python\\\\wip2\\\\archive\"\")",
+      "Bash(move C:pythonwip2tabsrisk.py C:pythonwip2archive)",
+      "Bash(netstat:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr view:*)",
+      "Bash(GIT_SEQUENCE_EDITOR=\"sed -i 's/^pick dea01cd/reword dea01cd/; s/^pick 6f18d62/reword 6f18d62/'\" git rebase:*)",
+      "Bash(curl:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)",
+      "Bash(pip install:*)",
+      "Bash(pip show:*)",
+      "Bash(pip uninstall:*)",
+      "Bash(dir:*)",
+      "Bash(ping:*)",
+      "Bash(git -C /c/python/Retail-Stock-Analytics-Dashboard remote -v)",
+      "Bash(git -C /c/python/Retail-Stock-Analytics-Dashboard remote set-url origin https://github.com/Sethmika2005/Retail-Stock-Analytics-Dashboard.git)",
+      "Bash(git stash:*)",
+      "Bash(git checkout:*)",
+      "Bash(git merge:*)"
+    ]
+  }
+}
