@@ -38,7 +38,8 @@
       "Bash(git merge:*)",
       "Bash(git -C /c/python/Retail-Stock-Analytics-Dashboard branch -a)",
       "Bash(git -C /c/python/Retail-Stock-Analytics-Dashboard status)",
-      "Bash(github \"C:/python/Retail-Stock-Analytics-Dashboard\")"
+      "Bash(github \"C:/python/Retail-Stock-Analytics-Dashboard\")",
+      "Bash(gh api:*)"
     ]
   }
 }
