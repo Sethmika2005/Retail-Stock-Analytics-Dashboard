@@ -700,8 +700,12 @@ with st.sidebar:
                 if st.button("Retrain RL Agent", help="Retrain PPO model on current stock data (~10-30s)"):
                     st.session_state["force_retrain_rl"] = True
                 st.caption("PPO agent acts as meta-decision layer on rule-based signals.")
+            else:
+                st.divider()
+                st.warning("⚠️ RL Agent unavailable — install `stable-baselines3` and `gymnasium` for full Paper 1 analysis.")
         except ImportError:
-            pass
+            st.divider()
+            st.warning("⚠️ RL Agent unavailable — install `stable-baselines3` and `gymnasium` for full Paper 1 analysis.")
 
     st.divider()
     # Clear cache button

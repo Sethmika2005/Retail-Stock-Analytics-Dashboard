@@ -142,15 +142,15 @@ def render(selected, price_data, info, tech_score, tech_details, fund_score, fun
                 rl_status_color = "#10B981" if rl_agrees else "#F59E0B"
                 rl_status = "Agrees" if rl_agrees else ("Override" if rl_override else "Disagrees")
                 st.markdown(f"**RL Agent (PPO):** Signal: {rl_signal} — <span style='color:{rl_status_color}; font-weight:600;'>{rl_status}</span>", unsafe_allow_html=True)
-            elif selected_strategy == "Volume+RSI":
+            elif selected_strategy in ["Volume+RSI", "Combined"]:
                 try:
                     import rl_agent
                     if rl_agent.is_available():
                         st.caption("RL Agent: Available (train via sidebar)")
                     else:
-                        st.caption("RL Agent: Not available (install stable-baselines3)")
+                        st.warning("RL Agent: Unavailable — install `stable-baselines3` and `gymnasium`. Recommendations are based on rule-based signals only.")
                 except ImportError:
-                    st.caption("RL Agent: Not available")
+                    st.warning("RL Agent: Unavailable — install `stable-baselines3` and `gymnasium`. Recommendations are based on rule-based signals only.")
 
     # Key Drivers inline
     key_drivers = generate_key_drivers(info, tech_score, fund_score, price_data, market_regime)
