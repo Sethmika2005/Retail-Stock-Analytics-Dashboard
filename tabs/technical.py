@@ -9,9 +9,9 @@ import streamlit as st
 from components import get_status_color
 
 # Chart styling constants
-CHART_FONT_COLOR = "#1F2937"
-CHART_AXIS_COLOR = "#374151"
-LEGEND_FONT_COLOR = "#1F2937"
+CHART_FONT_COLOR = "#1A3C40"
+CHART_AXIS_COLOR = "#37616A"
+LEGEND_FONT_COLOR = "#1A3C40"
 
 
 def find_crossovers(df):
@@ -69,7 +69,7 @@ def find_ema_crossovers(df):
 
 
 def render(selected, price_data, info, tech_score, tech_details, last_row,
-           selected_strategy="Current", volume_score=0, volume_details=None):
+           selected_strategy="Volume+RSI", volume_score=0, volume_details=None):
     """Render the Technical Indicators tab content."""
     st.subheader("Technical Analysis")
 
@@ -127,7 +127,7 @@ def render(selected, price_data, info, tech_score, tech_details, last_row,
         x=dates,
         y=close_prices,
         name="Price",
-        line=dict(color="#000000", width=2.5),
+        line=dict(color="#1A3C40", width=2.5),
         mode='lines'
     ))
 
@@ -138,7 +138,7 @@ def render(selected, price_data, info, tech_score, tech_details, last_row,
             x=dates,
             y=sma50_data,
             name="SMA 50",
-            line=dict(color="#3B82F6", width=2, dash='solid'),
+            line=dict(color="#0097A7", width=2, dash='solid'),
             mode='lines',
             connectgaps=False
         ))
@@ -150,7 +150,7 @@ def render(selected, price_data, info, tech_score, tech_details, last_row,
             x=dates,
             y=sma200_data,
             name="SMA 200",
-            line=dict(color="#F59E0B", width=2, dash='solid'),
+            line=dict(color="#FF6B6B", width=2, dash='solid'),
             mode='lines',
             connectgaps=False
         ))
@@ -208,12 +208,12 @@ def render(selected, price_data, info, tech_score, tech_details, last_row,
     trend_fig.update_xaxes(
         showgrid=False,
         showline=True,
-        linecolor='#E5E7EB',
+        linecolor='#D0E8EA',
         tickfont=dict(color=CHART_AXIS_COLOR, size=11)
     )
     trend_fig.update_yaxes(
         showgrid=True,
-        gridcolor='#E5E7EB',
+        gridcolor='#D0E8EA',
         tickfont=dict(color=CHART_AXIS_COLOR, size=11),
         tickprefix="$"
     )
@@ -296,7 +296,7 @@ def render(selected, price_data, info, tech_score, tech_details, last_row,
             x=rsi_dates,
             y=rsi_values,
             name="RSI",
-            line=dict(color="#8B5CF6", width=2),
+            line=dict(color="#0097A7", width=2),
             mode='lines'
         ))
 
@@ -314,8 +314,8 @@ def render(selected, price_data, info, tech_score, tech_details, last_row,
         showlegend=False,
         hovermode="x unified"
     )
-    rsi_fig.update_xaxes(showgrid=False, showline=True, linecolor='#E5E7EB', tickfont=dict(color=CHART_AXIS_COLOR, size=11))
-    rsi_fig.update_yaxes(showgrid=True, gridcolor='#E5E7EB', tickfont=dict(color=CHART_AXIS_COLOR, size=11))
+    rsi_fig.update_xaxes(showgrid=False, showline=True, linecolor='#D0E8EA', tickfont=dict(color=CHART_AXIS_COLOR, size=11))
+    rsi_fig.update_yaxes(showgrid=True, gridcolor='#D0E8EA', tickfont=dict(color=CHART_AXIS_COLOR, size=11))
 
     st.plotly_chart(rsi_fig, use_container_width=True)
 
@@ -393,7 +393,7 @@ def render(selected, price_data, info, tech_score, tech_details, last_row,
             x=macd_dates,
             y=macd_values,
             name="MACD",
-            line=dict(color="#0EA5E9", width=2)
+            line=dict(color="#0097A7", width=2)
         ))
 
     if "MACD_SIGNAL" in chart_data.columns:
@@ -402,7 +402,7 @@ def render(selected, price_data, info, tech_score, tech_details, last_row,
             x=macd_dates,
             y=signal_values,
             name="Signal",
-            line=dict(color="#F59E0B", width=2)
+            line=dict(color="#FF6B6B", width=2)
         ))
 
     macd_fig.add_hline(y=0, line=dict(color="#9CA3AF", dash="dot", width=1))
@@ -423,8 +423,8 @@ def render(selected, price_data, info, tech_score, tech_details, last_row,
         paper_bgcolor='white',
         hovermode="x unified"
     )
-    macd_fig.update_xaxes(showgrid=False, showline=True, linecolor='#E5E7EB', tickfont=dict(color=CHART_AXIS_COLOR, size=11))
-    macd_fig.update_yaxes(showgrid=True, gridcolor='#E5E7EB', tickfont=dict(color=CHART_AXIS_COLOR, size=11))
+    macd_fig.update_xaxes(showgrid=False, showline=True, linecolor='#D0E8EA', tickfont=dict(color=CHART_AXIS_COLOR, size=11))
+    macd_fig.update_yaxes(showgrid=True, gridcolor='#D0E8EA', tickfont=dict(color=CHART_AXIS_COLOR, size=11))
 
     st.plotly_chart(macd_fig, use_container_width=True)
 
@@ -483,7 +483,7 @@ def render(selected, price_data, info, tech_score, tech_details, last_row,
     # =========================================================================
     # 4. VOLUME CHART (shown when Volume+RSI or Combined strategy is active)
     # =========================================================================
-    if selected_strategy in ["Volume+RSI", "Combined"]:
+    if selected_strategy == "Volume+RSI":
         st.markdown("---")
         st.markdown("### Volume Analysis")
 
@@ -513,7 +513,7 @@ def render(selected, price_data, info, tech_score, tech_details, last_row,
                     x=vol_dates,
                     y=chart_data["Volume_SMA20"].tolist(),
                     name="Vol SMA 20",
-                    line=dict(color="#3B82F6", width=2),
+                    line=dict(color="#0097A7", width=2),
                     mode='lines',
                 ))
 
@@ -523,7 +523,7 @@ def render(selected, price_data, info, tech_score, tech_details, last_row,
                     x=vol_dates,
                     y=chart_data["Volume_SMA50"].tolist(),
                     name="Vol SMA 50",
-                    line=dict(color="#F59E0B", width=2),
+                    line=dict(color="#FF6B6B", width=2),
                     mode='lines',
                 ))
 
@@ -543,8 +543,8 @@ def render(selected, price_data, info, tech_score, tech_details, last_row,
             paper_bgcolor='white',
             hovermode="x unified",
         )
-        vol_fig.update_xaxes(showgrid=False, showline=True, linecolor='#E5E7EB', tickfont=dict(color=CHART_AXIS_COLOR, size=11))
-        vol_fig.update_yaxes(showgrid=True, gridcolor='#E5E7EB', tickfont=dict(color=CHART_AXIS_COLOR, size=11))
+        vol_fig.update_xaxes(showgrid=False, showline=True, linecolor='#D0E8EA', tickfont=dict(color=CHART_AXIS_COLOR, size=11))
+        vol_fig.update_yaxes(showgrid=True, gridcolor='#D0E8EA', tickfont=dict(color=CHART_AXIS_COLOR, size=11))
 
         st.plotly_chart(vol_fig, use_container_width=True)
 
@@ -582,7 +582,7 @@ Volume analysis confirms price movements by measuring participation:
     # =========================================================================
     # 5. EMA CROSSOVER CHART (shown when Paper 1 or Combined strategy active)
     # =========================================================================
-    if selected_strategy in ["Volume+RSI", "Combined"]:
+    if selected_strategy == "Volume+RSI":
         st.markdown("---")
         st.markdown("### EMA Crossover (Paper 1)")
 
@@ -595,7 +595,7 @@ Volume analysis confirms price movements by measuring participation:
             x=dates,
             y=close_prices,
             name="Price",
-            line=dict(color="#000000", width=2.5),
+            line=dict(color="#1A3C40", width=2.5),
             mode='lines'
         ))
 
@@ -605,7 +605,7 @@ Volume analysis confirms price movements by measuring participation:
                 x=dates,
                 y=chart_data["EMA20"].tolist(),
                 name="EMA 20",
-                line=dict(color="#3B82F6", width=2),
+                line=dict(color="#0097A7", width=2),
                 mode='lines',
                 connectgaps=False
             ))
@@ -616,7 +616,7 @@ Volume analysis confirms price movements by measuring participation:
                 x=dates,
                 y=chart_data["EMA50"].tolist(),
                 name="EMA 50",
-                line=dict(color="#F59E0B", width=2),
+                line=dict(color="#FF6B6B", width=2),
                 mode='lines',
                 connectgaps=False
             ))
@@ -656,8 +656,8 @@ Volume analysis confirms price movements by measuring participation:
             plot_bgcolor='white', paper_bgcolor='white',
             hovermode="x unified"
         )
-        ema_fig.update_xaxes(showgrid=False, showline=True, linecolor='#E5E7EB', tickfont=dict(color=CHART_AXIS_COLOR, size=11))
-        ema_fig.update_yaxes(showgrid=True, gridcolor='#E5E7EB', tickfont=dict(color=CHART_AXIS_COLOR, size=11), tickprefix="$")
+        ema_fig.update_xaxes(showgrid=False, showline=True, linecolor='#D0E8EA', tickfont=dict(color=CHART_AXIS_COLOR, size=11))
+        ema_fig.update_yaxes(showgrid=True, gridcolor='#D0E8EA', tickfont=dict(color=CHART_AXIS_COLOR, size=11), tickprefix="$")
 
         st.plotly_chart(ema_fig, use_container_width=True)
 
@@ -714,8 +714,8 @@ Volume analysis confirms price movements by measuring participation:
                 showlegend=False,
                 hovermode="x unified",
             )
-            atv_fig.update_xaxes(showgrid=False, showline=True, linecolor='#E5E7EB', tickfont=dict(color=CHART_AXIS_COLOR, size=11))
-            atv_fig.update_yaxes(showgrid=True, gridcolor='#E5E7EB', tickfont=dict(color=CHART_AXIS_COLOR, size=11))
+            atv_fig.update_xaxes(showgrid=False, showline=True, linecolor='#D0E8EA', tickfont=dict(color=CHART_AXIS_COLOR, size=11))
+            atv_fig.update_yaxes(showgrid=True, gridcolor='#D0E8EA', tickfont=dict(color=CHART_AXIS_COLOR, size=11))
 
             st.plotly_chart(atv_fig, use_container_width=True)
 

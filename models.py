@@ -196,90 +196,6 @@ def calculate_technical_score(df):
     return total, scores
 
 
-def calculate_fundamental_score(info):
-    """Calculate fundamental score (0-100) based on profitability, growth, leverage, valuation."""
-    scores = {}
-
-    roe = info.get("returnOnEquity")
-    profit_margin = info.get("profitMargins")
-
-    prof_score = 12
-    if roe is not None and profit_margin is not None:
-        if roe > 0.20 and profit_margin > 0.15:
-            prof_score = 25
-        elif roe > 0.15 and profit_margin > 0.10:
-            prof_score = 20
-        elif roe > 0.10 and profit_margin > 0.05:
-            prof_score = 15
-        elif roe > 0 and profit_margin > 0:
-            prof_score = 10
-        else:
-            prof_score = 5
-    scores["profitability"] = prof_score
-
-    rev_growth = info.get("revenueGrowth")
-
-    growth_score = 12
-    if rev_growth is not None:
-        if rev_growth > 0.25:
-            growth_score = 25
-        elif rev_growth > 0.15:
-            growth_score = 20
-        elif rev_growth > 0.05:
-            growth_score = 15
-        elif rev_growth > 0:
-            growth_score = 10
-        else:
-            growth_score = 5
-    scores["growth"] = growth_score
-
-    debt_equity = info.get("debtToEquity")
-
-    leverage_score = 12
-    if debt_equity is not None:
-        if debt_equity < 30:
-            leverage_score = 25
-        elif debt_equity < 50:
-            leverage_score = 20
-        elif debt_equity < 100:
-            leverage_score = 15
-        elif debt_equity < 150:
-            leverage_score = 10
-        else:
-            leverage_score = 5
-    scores["leverage"] = leverage_score
-
-    pe = info.get("trailingPE")
-    peg = info.get("pegRatio")
-
-    val_score = 12
-    if pe is not None and pe > 0:
-        if peg is not None and peg > 0:
-            if peg < 1:
-                val_score = 25
-            elif peg < 1.5:
-                val_score = 20
-            elif peg < 2:
-                val_score = 15
-            else:
-                val_score = 10
-        else:
-            if pe < 15:
-                val_score = 20
-            elif pe < 25:
-                val_score = 15
-            elif pe < 35:
-                val_score = 10
-            else:
-                val_score = 5
-    scores["valuation"] = val_score
-
-    total = prof_score + growth_score + leverage_score + val_score
-    scores["total"] = total
-
-    return total, scores
-
-
 def calculate_risk_score(df):
     """Calculate risk score (0-100, higher = less risky/better)."""
     if df.empty:
@@ -334,120 +250,6 @@ def calculate_risk_score(df):
 # =============================================================================
 # RECOMMENDATION ENGINE
 # =============================================================================
-
-def generate_recommendation(tech_score, fund_score, market_regime, ticker, info, time_horizon="long"):
-    """
-    Generate BUY/HOLD/SELL recommendation with confidence score and explanation.
-    Dynamically weight scores based on market regime and time horizon.
-    """
-    # Base weights adjusted by market regime
-    if market_regime == "Bull":
-        base_weights = {"technical": 0.60, "fundamental": 0.40}
-    elif market_regime == "Bear":
-        base_weights = {"technical": 0.35, "fundamental": 0.65}
-    elif market_regime == "High-Volatility":
-        base_weights = {"technical": 0.40, "fundamental": 0.60}
-    else:  # Sideways
-        base_weights = {"technical": 0.50, "fundamental": 0.50}
-
-    # Adjust weights based on time horizon
-    if time_horizon == "short":
-        weights = {
-            "technical": min(0.70, base_weights["technical"] + 0.10),
-            "fundamental": max(0.30, base_weights["fundamental"] - 0.10),
-        }
-    else:  # long-term
-        weights = {
-            "technical": max(0.30, base_weights["technical"] - 0.10),
-            "fundamental": min(0.70, base_weights["fundamental"] + 0.10),
-        }
-
-    # Calculate weighted composite score
-    composite = (
-        tech_score * weights["technical"] +
-        fund_score * weights["fundamental"]
-    )
-
-    # Determine recommendation
-    if composite >= 65:
-        recommendation = "BUY"
-        rec_color = "green"
-    elif composite >= 45:
-        recommendation = "HOLD"
-        rec_color = "orange"
-    else:
-        recommendation = "SELL"
-        rec_color = "red"
-
-    # Confidence score
-    if composite >= 75 or composite <= 30:
-        confidence = min(95, 60 + abs(composite - 50))
-    elif composite >= 60 or composite <= 40:
-        confidence = min(80, 50 + abs(composite - 50))
-    else:
-        confidence = max(30, 50 - abs(composite - 50))
-    confidence = int(confidence)
-
-    # Generate explanation
-    company_name = info.get("shortName", ticker)
-    sector = info.get("sector", "N/A")
-
-    explanation = f"**Market Context:** The U.S. market is currently in a **{market_regime}** regime. "
-
-    if market_regime == "Bull":
-        explanation += "Conditions favor growth and momentum strategies. "
-    elif market_regime == "Bear":
-        explanation += "Defensive positioning and risk management are prioritized. "
-    elif market_regime == "High-Volatility":
-        explanation += "Elevated uncertainty requires cautious positioning and strong risk controls. "
-    else:
-        explanation += "Mixed signals suggest a balanced approach between opportunity and caution. "
-
-    horizon_label = "Short-term (1-3 months)" if time_horizon == "short" else "Long-term (6-12 months)"
-    explanation += f"\n\n**Analysis Horizon: {horizon_label}** — "
-    if time_horizon == "short":
-        explanation += "Technical factors weighted more heavily for near-term trading. "
-    else:
-        explanation += "Fundamentals weighted more heavily for position investing. "
-
-    explanation += f"\n\n**Stock Analysis ({company_name}, {sector}):** "
-
-    if tech_score >= 60:
-        explanation += "Technical indicators show positive momentum with favorable trend alignment. "
-    elif tech_score >= 40:
-        explanation += "Technical indicators are neutral with mixed signals. "
-    else:
-        explanation += "Technical indicators suggest weakness in price momentum. "
-
-    if fund_score >= 60:
-        explanation += "Fundamentals are strong with solid profitability and reasonable valuation."
-    elif fund_score >= 40:
-        explanation += "Fundamentals are adequate but not exceptional."
-    else:
-        explanation += "Fundamental metrics show concerns in profitability, growth, or valuation."
-
-    explanation += f"\n\n**Recommendation Rationale:** "
-    if recommendation == "BUY":
-        explanation += f"The combination of {market_regime.lower()} market conditions and the stock's "
-        explanation += f"{'strong' if composite >= 70 else 'favorable'} composite score ({composite:.0f}/100) "
-        explanation += "supports accumulation at current levels."
-    elif recommendation == "HOLD":
-        explanation += f"Given the {market_regime.lower()} market environment and mixed signals "
-        explanation += f"(composite score: {composite:.0f}/100), maintaining current positions is prudent "
-        explanation += "while monitoring for clearer directional signals."
-    else:
-        explanation += f"The {market_regime.lower()} market backdrop combined with concerning metrics "
-        explanation += f"(composite score: {composite:.0f}/100) suggests reducing exposure or avoiding new positions."
-
-    return {
-        "recommendation": recommendation,
-        "rec_color": rec_color,
-        "confidence": confidence,
-        "composite_score": composite,
-        "weights": weights,
-        "explanation": explanation,
-    }
-
 
 def generate_key_drivers(info, tech_score, fund_score, price_data, market_regime):
     """Generate 3 key drivers in plain English."""
@@ -627,6 +429,69 @@ def generate_bull_bear_case(info, tech_score, fund_score, price_data, market_reg
         bear_case.append("Standard market and execution risks")
 
     return bull_case[:4], bear_case[:4]
+
+
+def generate_dashboard_narrative(recommendation_data, paper1_details, market_regime,
+                                  rsi_value, info, price_data, selected_strategy,
+                                  tech_score, volume_score, fund_score_p2):
+    """Generate a plain-English 4-sentence intelligence summary for the dashboard.
+
+    Sentences:
+    1. Headline: company + signal + confidence
+    2. Evidence: strategy-specific reasoning
+    3. RSI context
+    4. Market regime context
+    """
+    company = info.get("shortName", info.get("symbol", "This stock"))
+    rec = recommendation_data.get("recommendation", "HOLD")
+    confidence = recommendation_data.get("confidence", 50)
+
+    # Sentence 1 — Headline
+    s1 = f"{company} is showing a {rec} signal with {confidence}% confidence."
+
+    # Sentence 2 — Evidence (strategy-dependent)
+    if selected_strategy == "Volume+RSI":
+        if paper1_details and paper1_details.get("crossover_type") in ("golden_cross", "death_cross"):
+            cross_label = "bullish golden cross" if paper1_details["crossover_type"] == "golden_cross" else "bearish death cross"
+            if paper1_details.get("atv_confirmed"):
+                s2 = f"The short-term trend just triggered a {cross_label} confirmed by rising trading volume."
+            else:
+                s2 = f"A {cross_label} was detected, but trading volume did not confirm the move."
+        else:
+            if tech_score >= 65:
+                s2 = f"No crossover event today, but the technical picture is positive (score {tech_score}/100)."
+            elif tech_score >= 40:
+                s2 = f"No crossover event today and technicals are mixed (score {tech_score}/100)."
+            else:
+                s2 = f"No crossover event today and the technical setup is weak (score {tech_score}/100)."
+    else:
+        composite = recommendation_data.get("composite_score", 50)
+        s2 = f"The composite score combining technical ({tech_score}/100) and fundamental ({fund_score_p2:.0f}/100) analysis is {composite:.0f}/100."
+
+    # Sentence 3 — RSI context
+    if rsi_value is None or pd.isna(rsi_value):
+        rsi_value = 50
+    if rsi_value > 70:
+        s3 = f"RSI at {rsi_value:.0f} indicates overbought conditions — the price may be stretched."
+    elif rsi_value > 55:
+        s3 = f"RSI at {rsi_value:.0f} shows bullish momentum without being overextended."
+    elif rsi_value > 45:
+        s3 = f"RSI at {rsi_value:.0f} is neutral, suggesting no strong directional pressure."
+    elif rsi_value > 30:
+        s3 = f"RSI at {rsi_value:.0f} leans bearish, indicating weakening momentum."
+    else:
+        s3 = f"RSI at {rsi_value:.0f} signals oversold conditions — a bounce may be ahead."
+
+    # Sentence 4 — Market regime
+    regime_map = {
+        "Bull": "The broader market is in a bull regime, which supports risk-on positioning.",
+        "Bear": "The broader market is in a bear regime, suggesting a defensive stance.",
+        "High-Volatility": "Market volatility is elevated, so position sizing and risk management are key.",
+        "Sideways": "The market is range-bound, making stock-specific factors more important.",
+    }
+    s4 = regime_map.get(market_regime, "Market conditions are currently unclear.")
+
+    return f"{s1} {s2} {s3} {s4}"
 
 
 def generate_view_changers(recommendation, info, price_data):
@@ -1400,166 +1265,4 @@ def generate_recommendation_paper2(tech_score, fund_score, market_regime, ticker
     }
 
 
-# =============================================================================
-# STRATEGY 4: Combined — Best of Both Papers
-# =============================================================================
-
-def generate_recommendation_combined(tech_score, fund_score_paper2, volume_score, rsi_value,
-                                      market_regime, ticker, info,
-                                      risk_profile="moderate", time_horizon="long",
-                                      price_data=None):
-    """
-    Combined strategy: Paper 1 timing (EMA crossover) + Paper 2 quality (factor score).
-    - Paper 1 BUY + Paper 2 high score → strong BUY
-    - Paper 1 BUY + Paper 2 low score → HOLD
-    - Paper 1 SELL + Paper 2 low score → strong SELL
-    - Paper 1 SELL + Paper 2 high score → HOLD
-    """
-    # Get Paper 1 timing signal
-    p1_signal = "HOLD"
-    p1_details = {}
-    if price_data is not None and not price_data.empty:
-        p1_signal, p1_details = generate_paper1_signal(price_data)
-
-    # Determine Paper 2 quality tier
-    p2_high = fund_score_paper2 >= 60
-    p2_low = fund_score_paper2 < 40
-
-    # Combined logic
-    if p1_details.get("crossover_type") in ("golden_cross", "death_cross"):
-        # Active crossover event — use timing + quality logic
-        if p1_signal == "BUY" and p2_high:
-            recommendation = "BUY"
-            confidence = 85
-        elif p1_signal == "BUY" and p2_low:
-            recommendation = "HOLD"
-            confidence = 50
-        elif p1_signal == "BUY":
-            recommendation = "BUY"
-            confidence = 65
-        elif p1_signal == "SELL" and p2_low:
-            recommendation = "SELL"
-            confidence = 85
-        elif p1_signal == "SELL" and p2_high:
-            recommendation = "HOLD"
-            confidence = 50
-        elif p1_signal == "SELL":
-            recommendation = "SELL"
-            confidence = 65
-        else:
-            recommendation = "HOLD"
-            confidence = 45
-    else:
-        # No crossover — fall back to weighted composite
-        if risk_profile == "conservative":
-            base_weights = {"technical": 0.30, "fundamental": 0.55, "volume": 0.15}
-        elif risk_profile == "aggressive":
-            base_weights = {"technical": 0.50, "fundamental": 0.30, "volume": 0.20}
-        else:
-            base_weights = {"technical": 0.40, "fundamental": 0.40, "volume": 0.20}
-
-        if market_regime == "Bull":
-            base_weights["technical"] += 0.05
-            base_weights["fundamental"] -= 0.05
-        elif market_regime == "Bear":
-            base_weights["technical"] -= 0.10
-            base_weights["fundamental"] += 0.10
-        elif market_regime == "High-Volatility":
-            base_weights["technical"] -= 0.05
-            base_weights["fundamental"] += 0.05
-
-        if time_horizon == "short":
-            base_weights["technical"] += 0.10
-            base_weights["fundamental"] -= 0.10
-        else:
-            base_weights["technical"] -= 0.05
-            base_weights["fundamental"] += 0.05
-
-        w_total = sum(base_weights.values())
-        weights = {k: max(0.05, v / w_total) for k, v in base_weights.items()}
-        w_total = sum(weights.values())
-        weights = {k: v / w_total for k, v in weights.items()}
-
-        composite = (
-            tech_score * weights["technical"] +
-            fund_score_paper2 * weights["fundamental"] +
-            volume_score * weights["volume"]
-        )
-
-        if composite >= 65:
-            recommendation = "BUY"
-        elif composite >= 45:
-            recommendation = "HOLD"
-        else:
-            recommendation = "SELL"
-
-        if composite >= 75 or composite <= 30:
-            confidence = min(95, 60 + abs(composite - 50))
-        elif composite >= 60 or composite <= 40:
-            confidence = min(80, 50 + abs(composite - 50))
-        else:
-            confidence = max(30, 50 - abs(composite - 50))
-
-    # RSI gate
-    rsi_gate_applied = False
-    rsi_warning = ""
-    if recommendation == "BUY" and rsi_value is not None and rsi_value > 70:
-        recommendation = "HOLD"
-        rsi_gate_applied = True
-        rsi_warning = f"RSI at {rsi_value:.1f} (overbought) - BUY downgraded to HOLD"
-    elif recommendation == "SELL" and rsi_value is not None and rsi_value < 30:
-        recommendation = "HOLD"
-        rsi_gate_applied = True
-        rsi_warning = f"RSI at {rsi_value:.1f} (oversold) - SELL downgraded to HOLD"
-
-    confidence = int(confidence)
-    if rsi_gate_applied:
-        confidence = max(30, confidence - 15)
-
-    rec_color = {"BUY": "green", "SELL": "red"}.get(recommendation, "orange")
-
-    # Compute composite for display
-    weights = {"technical": 0.35, "fundamental": 0.40, "volume": 0.25}
-    composite = (
-        tech_score * weights["technical"] +
-        fund_score_paper2 * weights["fundamental"] +
-        volume_score * weights["volume"]
-    )
-
-    company_name = info.get("shortName", ticker)
-    sector = info.get("sector", "N/A")
-    explanation = f"**Strategy: Combined (Papers 1 + 2)**\n\n"
-    explanation += f"**Risk Profile:** {risk_profile.title()}\n\n"
-
-    crossover_type = p1_details.get("crossover_type", "none")
-    if crossover_type != "none":
-        explanation += f"**Paper 1 Timing:** {crossover_type.replace('_', ' ').title()} detected. Signal: {p1_signal}. "
-        if p1_details.get("atv_confirmed"):
-            explanation += "ATV confirmed. "
-    else:
-        explanation += "**Paper 1 Timing:** No crossover event. Using composite fallback. "
-
-    explanation += f"\n\n**Paper 2 Quality:** Factor score {fund_score_paper2:.0f}/100. "
-    explanation += f"{'High quality' if p2_high else 'Low quality' if p2_low else 'Medium quality'}. "
-
-    explanation += f"\n\n**Market Context:** {market_regime} regime. "
-    explanation += f"\n\n**Stock Analysis ({company_name}, {sector}):** "
-    explanation += f"Technical: {tech_score}/100, Fundamental: {fund_score_paper2:.0f}/100, Volume: {volume_score}/100. "
-    if rsi_gate_applied:
-        explanation += f"\n\n**RSI Gate Applied:** {rsi_warning}"
-    explanation += f"\n\n**Composite Score:** {composite:.0f}/100"
-
-    return {
-        "recommendation": recommendation,
-        "rec_color": rec_color,
-        "confidence": confidence,
-        "composite_score": composite,
-        "weights": weights,
-        "explanation": explanation,
-        "rsi_gate_applied": rsi_gate_applied,
-        "rsi_warning": rsi_warning,
-        "volume_confirms": volume_score > 50,
-        "paper1_details": p1_details,
-        "paper1_signal": p1_signal,
-    }
 

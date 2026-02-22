@@ -19,14 +19,11 @@ import yfinance as yf
 
 from models import (
     calculate_technical_score,
-    calculate_fundamental_score,
     calculate_volume_score,
     calculate_fundamental_score_paper2,
     detect_market_regime,
-    generate_recommendation,
     generate_recommendation_paper1,
     generate_recommendation_paper2,
-    generate_recommendation_combined,
     generate_paper1_signal,
 )
 
@@ -277,19 +274,6 @@ def calculate_backtest_metrics(equity_curve, trades, risk_free_rate=0.04):
 # STRATEGY WRAPPER FUNCTIONS
 # =============================================================================
 
-def _make_baseline_strategy(info, market_regime):
-    """Strategy 1: Baseline (tech + fund)."""
-    def strategy_fn(df, idx):
-        historical = df.iloc[:idx + 1]
-        if len(historical) < 200:
-            return "HOLD"
-        tech_score, _ = calculate_technical_score(historical)
-        fund_score, _ = calculate_fundamental_score(info)
-        rec = generate_recommendation(tech_score, fund_score, market_regime, "BACKTEST", info)
-        return rec["recommendation"]
-    return strategy_fn
-
-
 def _make_paper1_strategy(info, market_regime):
     """Strategy 2: Paper 1 — EMA + ATV + RSI gate."""
     def strategy_fn(df, idx):
@@ -313,26 +297,6 @@ def _make_paper2_strategy(info, market_regime, peer_metrics=None):
         )
         rec = generate_recommendation_paper2(
             tech_score, fund_score_p2, market_regime, "BACKTEST", info
-        )
-        return rec["recommendation"]
-    return strategy_fn
-
-
-def _make_combined_strategy(info, market_regime, peer_metrics=None):
-    """Strategy 4: Combined — Paper 1 timing + Paper 2 quality."""
-    def strategy_fn(df, idx):
-        historical = df.iloc[:idx + 1]
-        if len(historical) < 200:
-            return "HOLD"
-        tech_score, _ = calculate_technical_score(historical)
-        volume_score, _ = calculate_volume_score(historical)
-        rsi_val = historical["RSI"].iloc[-1] if "RSI" in historical.columns and pd.notna(historical["RSI"].iloc[-1]) else 50
-        fund_score_p2, _ = calculate_fundamental_score_paper2(
-            info, peer_metrics=peer_metrics, risk_profile="moderate", price_data=historical
-        )
-        rec = generate_recommendation_combined(
-            tech_score, fund_score_p2, volume_score, rsi_val,
-            market_regime, "BACKTEST", info, price_data=historical
         )
         return rec["recommendation"]
     return strategy_fn
@@ -373,10 +337,8 @@ def _make_paper1_rl_strategy(info, market_regime, ppo_model):
 def get_strategy_functions(info, market_regime, peer_metrics=None, backtest_df=None, ticker="UNKNOWN"):
     """Return dict of all strategy functions (includes RL if available)."""
     strategies = {
-        "Baseline": _make_baseline_strategy(info, market_regime),
         "Paper 1: EMA+ATV+RSI": _make_paper1_strategy(info, market_regime),
         "Paper 2: Factor Weights": _make_paper2_strategy(info, market_regime, peer_metrics),
-        "Combined": _make_combined_strategy(info, market_regime, peer_metrics),
     }
 
     # Add RL-enhanced strategy if available

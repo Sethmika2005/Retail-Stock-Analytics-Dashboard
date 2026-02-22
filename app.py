@@ -21,14 +21,11 @@ load_dotenv()
 # Import from modular files
 from models import (
     calculate_technical_score,
-    calculate_fundamental_score,
     calculate_volume_score,
     calculate_fundamental_score_paper2,
     detect_market_regime,
-    generate_recommendation,
     generate_recommendation_paper1,
     generate_recommendation_paper2,
-    generate_recommendation_combined,
     generate_paper1_signal,
     classify_headline_sentiment,
 )
@@ -38,10 +35,12 @@ from components import (
     render_metric_card,
     render_badge_card,
     render_compact_card,
+    render_hero_card,
+    render_accent_card,
     format_large_number,
     format_mcap,
 )
-from tabs import analysis, overview, technical, fundamentals, news, backtest
+from tabs import dashboard, analysis, overview, technical, fundamentals, news, backtest
 
 # =============================================================================
 # PAGE CONFIG
@@ -56,9 +55,9 @@ st.markdown("""
 /* Import Fonts */
 @import url('https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&display=swap');
 
-/* Global Styles - Light Theme */
+/* Global Styles - Teal/Coral Light Theme */
 .stApp {
-    background-color: #F7F5F3 !important;
+    background-color: #F0F7F8 !important;
     font-family: 'Source Sans Pro', Arial, sans-serif !important;
 }
 
@@ -66,7 +65,7 @@ st.markdown("""
 .main .block-container {
     max-width: 1100px !important;
     padding: 2rem 1rem !important;
-    background-color: #F7F5F3 !important;
+    background-color: #F0F7F8 !important;
 }
 
 /* Hide Streamlit branding */
@@ -75,8 +74,8 @@ footer {visibility: hidden;}
 
 /* Sidebar styling */
 [data-testid="stSidebar"] {
-    background-color: #FBFAF9 !important;
-    border-right: 1px solid #E0DEDB !important;
+    background-color: #E8F4F5 !important;
+    border-right: 1px solid #D0E8EA !important;
 }
 [data-testid="stSidebar"] .stMarkdown {
     font-family: 'Source Sans Pro', Arial, sans-serif !important;
@@ -84,7 +83,7 @@ footer {visibility: hidden;}
 [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {
     font-family: 'Source Sans Pro', Arial, sans-serif !important;
     font-weight: 600 !important;
-    color: #37322F !important;
+    color: #1A3C40 !important;
     font-size: 14px !important;
     text-transform: uppercase !important;
     letter-spacing: 0.05em !important;
@@ -94,20 +93,20 @@ footer {visibility: hidden;}
 .stTabs [data-baseweb="tab-list"] {
     gap: 8px;
     background-color: transparent !important;
-    border-bottom: 1px solid #E0DEDB !important;
+    border-bottom: 1px solid #D0E8EA !important;
 }
 .stTabs [data-baseweb="tab"] {
     font-family: 'Source Sans Pro', Arial, sans-serif !important;
     font-size: 14px !important;
     font-weight: 500 !important;
-    color: #605A57 !important;
+    color: #5A7D82 !important;
     background-color: transparent !important;
     border: none !important;
     padding: 12px 16px !important;
 }
 .stTabs [aria-selected="true"] {
-    color: #37322F !important;
-    border-bottom: 2px solid #37322F !important;
+    color: #0097A7 !important;
+    border-bottom: 3px solid #0097A7 !important;
     background-color: transparent !important;
 }
 
@@ -116,45 +115,46 @@ h1 {
     font-family: 'Source Sans Pro', Arial, sans-serif !important;
     font-size: 32px !important;
     font-weight: 600 !important;
-    color: #37322F !important;
+    color: #005662 !important;
 }
 h2, h3 {
     font-family: 'Source Sans Pro', Arial, sans-serif !important;
     font-weight: 600 !important;
-    color: #37322F !important;
+    color: #00717E !important;
 }
 
 /* Body text */
-p, span { color: #37322F; }
-.muted { color: #605A57 !important; }
+p, span { color: #1A3C40; }
+.muted { color: #5A7D82 !important; }
 
 /* Streamlit metric styling */
 [data-testid="stMetric"] {
     background: #FFFFFF;
-    border: 1px solid #E0DEDB;
+    border: 1px solid #D0E8EA;
     border-radius: 8px;
     padding: 12px;
 }
-[data-testid="stMetricLabel"] { color: #605A57 !important; }
-[data-testid="stMetricValue"] { color: #37322F !important; }
-[data-testid="stMetricDelta"] { color: #37322F !important; }
+[data-testid="stMetricLabel"] { color: #5A7D82 !important; }
+[data-testid="stMetricValue"] { color: #1A3C40 !important; }
+[data-testid="stMetricDelta"] { color: #1A3C40 !important; }
 
 /* Caption styling */
-[data-testid="stCaptionContainer"] { color: #605A57 !important; }
-.stCaption, small { color: #605A57 !important; }
+[data-testid="stCaptionContainer"] { color: #5A7D82 !important; }
+.stCaption, small { color: #5A7D82 !important; }
 
 /* Progress bar styling */
-[data-testid="stProgress"] > div > div { background-color: #E0DEDB !important; }
+[data-testid="stProgress"] > div > div { background-color: #D0E8EA !important; }
+[data-testid="stProgress"] > div > div > div { background-color: #0097A7 !important; }
 
 /* Expander text */
-[data-testid="stExpander"] { color: #37322F !important; }
-[data-testid="stExpander"] summary { color: #37322F !important; }
+[data-testid="stExpander"] { color: #1A3C40 !important; }
+[data-testid="stExpander"] summary { color: #1A3C40 !important; }
 
 /* Toggle styling - more visible */
-[data-testid="stToggle"] label { color: #37322F !important; }
+[data-testid="stToggle"] label { color: #1A3C40 !important; }
 [data-testid="stToggle"] {
     background-color: #FFFFFF !important;
-    border: 1px solid #E0DEDB !important;
+    border: 1px solid #D0E8EA !important;
     border-radius: 8px !important;
     padding: 8px 12px !important;
 }
@@ -165,8 +165,8 @@ p, span { color: #37322F; }
 /* Button styling - light background */
 .stButton > button {
     background-color: #FFFFFF !important;
-    color: #37322F !important;
-    border: 1px solid #E0DEDB !important;
+    color: #1A3C40 !important;
+    border: 1px solid #D0E8EA !important;
     border-radius: 8px !important;
     font-family: 'Source Sans Pro', Arial, sans-serif !important;
     font-weight: 500 !important;
@@ -174,45 +174,57 @@ p, span { color: #37322F; }
     transition: all 200ms ease !important;
 }
 .stButton > button:hover {
-    background-color: #F7F5F3 !important;
-    border-color: #37322F !important;
+    background-color: #F0F7F8 !important;
+    border-color: #0097A7 !important;
 }
 .stButton > button:active {
-    background-color: #E0DEDB !important;
+    background-color: #D0E8EA !important;
+}
+
+/* Primary button teal styling */
+.stButton > button[kind="primary"],
+button[data-testid="stBaseButton-primary"] {
+    background-color: #0097A7 !important;
+    color: #FFFFFF !important;
+    border: 1px solid #0097A7 !important;
+}
+button[data-testid="stBaseButton-primary"]:hover {
+    background-color: #00838F !important;
+    border-color: #00838F !important;
 }
 
 /* Sidebar button styling */
 [data-testid="stSidebar"] .stButton > button {
     background-color: #FFFFFF !important;
-    color: #37322F !important;
-    border: 1px solid #E0DEDB !important;
+    color: #1A3C40 !important;
+    border: 1px solid #D0E8EA !important;
     width: 100% !important;
 }
 [data-testid="stSidebar"] .stButton > button:hover {
-    background-color: #F7F5F3 !important;
-    border-color: #37322F !important;
+    background-color: #F0F7F8 !important;
+    border-color: #0097A7 !important;
 }
 
 /* Write/Text styling */
-[data-testid="stText"] { color: #37322F !important; }
+[data-testid="stText"] { color: #1A3C40 !important; }
 
 /* Markdown text */
-[data-testid="stMarkdownContainer"] { color: #37322F !important; }
-[data-testid="stMarkdownContainer"] p { color: #37322F !important; }
-[data-testid="stMarkdownContainer"] li { color: #37322F !important; }
+[data-testid="stMarkdownContainer"] { color: #1A3C40 !important; }
+[data-testid="stMarkdownContainer"] p { color: #1A3C40 !important; }
+[data-testid="stMarkdownContainer"] li { color: #1A3C40 !important; }
 
 /* Card base style */
 .metric-card {
     background: #FFFFFF;
-    border: 1px solid #E0DEDB;
+    border: 1px solid #D0E8EA;
     border-radius: 10px;
     padding: 20px;
-    box-shadow: 0px 2px 4px rgba(55, 50, 47, 0.08);
+    box-shadow: 0px 2px 4px rgba(0, 151, 167, 0.08);
     transition: all 300ms ease-in-out;
     text-align: center;
 }
 .metric-card:hover {
-    box-shadow: 0px 4px 12px rgba(55, 50, 47, 0.12);
+    box-shadow: 0px 4px 12px rgba(0, 151, 167, 0.12);
     transform: translateY(-1px);
 }
 
@@ -221,7 +233,7 @@ p, span { color: #37322F; }
     font-family: 'Source Sans Pro', Arial, sans-serif;
     font-size: 12px;
     font-weight: 500;
-    color: #605A57;
+    color: #5A7D82;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     margin-bottom: 8px;
@@ -232,20 +244,20 @@ p, span { color: #37322F; }
     font-family: 'Source Sans Pro', Arial, sans-serif;
     font-size: 36px;
     font-weight: 400;
-    color: #37322F;
+    color: #1A3C40;
 }
 
 /* Status colors */
 .status-success { color: #10B981 !important; }
 .status-warning { color: #F59E0B !important; }
 .status-danger { color: #F43F5E !important; }
-.status-info { color: #0EA5E9 !important; }
+.status-info { color: #0097A7 !important; }
 
 /* Status backgrounds */
 .bg-success { background-color: rgba(16, 185, 129, 0.1) !important; }
 .bg-warning { background-color: rgba(245, 158, 11, 0.1) !important; }
 .bg-danger { background-color: #FFE4E6 !important; }
-.bg-info { background-color: rgba(14, 165, 233, 0.1) !important; }
+.bg-info { background-color: rgba(0, 151, 167, 0.1) !important; }
 
 /* Badge/Pill style */
 .badge {
@@ -255,32 +267,53 @@ p, span { color: #37322F; }
     font-family: 'Source Sans Pro', Arial, sans-serif;
     font-size: 13px;
     font-weight: 500;
-    box-shadow: 0 0 0 4px rgba(55, 50, 47, 0.05);
+    box-shadow: 0 0 0 4px rgba(0, 151, 167, 0.05);
 }
 
 /* Section spacing */
 .section-gap { margin-top: 48px !important; }
 .row-gap { margin-top: 24px !important; }
 
+/* Gradient section divider */
+.section-divider {
+    height: 2px;
+    background: linear-gradient(90deg, #0097A7 0%, #FF6B6B 50%, #00BCD4 100%);
+    border: none;
+    margin: 32px 0;
+    border-radius: 1px;
+    opacity: 0.5;
+}
+
+/* Section header with teal left-border */
+.section-header {
+    border-left: 4px solid #0097A7;
+    padding-left: 12px;
+    margin: 24px 0 16px 0;
+}
+.section-header h3 {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
 /* Expander styling - white box with thin border */
 .streamlit-expanderHeader {
     font-family: 'Source Sans Pro', Arial, sans-serif !important;
     font-size: 14px !important;
     font-weight: 500 !important;
-    color: #37322F !important;
+    color: #1A3C40 !important;
     background-color: #FFFFFF !important;
-    border: 1px solid #E0DEDB !important;
+    border: 1px solid #D0E8EA !important;
     border-radius: 8px !important;
 }
 [data-testid="stExpander"] {
     background-color: #FFFFFF !important;
-    border: 1px solid #E0DEDB !important;
+    border: 1px solid #D0E8EA !important;
     border-radius: 8px !important;
     padding: 0 !important;
 }
 [data-testid="stExpander"] details {
     background-color: #FFFFFF !important;
-    border: 1px solid #E0DEDB !important;
+    border: 1px solid #D0E8EA !important;
     border-radius: 8px !important;
 }
 [data-testid="stExpander"] summary {
@@ -291,50 +324,50 @@ p, span { color: #37322F; }
 [data-testid="stExpander"] [data-testid="stExpanderDetails"] {
     background-color: #FFFFFF !important;
     padding: 16px !important;
-    border-top: 1px solid #E0DEDB !important;
+    border-top: 1px solid #D0E8EA !important;
 }
 
 /* DataFrame styling */
 .stDataFrame {
-    border: 1px solid #E0DEDB !important;
+    border: 1px solid #D0E8EA !important;
     border-radius: 8px !important;
 }
 
 /* Info/Warning boxes */
 .stAlert {
-    background-color: #FBFAF9 !important;
-    border: 1px solid #E0DEDB !important;
+    background-color: #E8F4F5 !important;
+    border: 1px solid #D0E8EA !important;
     border-radius: 8px !important;
-    color: #37322F !important;
+    color: #1A3C40 !important;
 }
 
 /* Sidebar selectbox and input styling */
 [data-testid="stSidebar"] [data-baseweb="select"] { background-color: #FFFFFF !important; }
 [data-testid="stSidebar"] [data-baseweb="select"] > div {
     background-color: #FFFFFF !important;
-    border-color: #E0DEDB !important;
-    color: #37322F !important;
+    border-color: #D0E8EA !important;
+    color: #1A3C40 !important;
 }
-[data-testid="stSidebar"] [data-baseweb="select"] svg { color: #605A57 !important; }
+[data-testid="stSidebar"] [data-baseweb="select"] svg { color: #5A7D82 !important; }
 [data-testid="stSidebar"] [data-baseweb="input"] {
     background-color: #FFFFFF !important;
-    border-color: #E0DEDB !important;
+    border-color: #D0E8EA !important;
 }
 [data-testid="stSidebar"] input {
-    color: #37322F !important;
+    color: #1A3C40 !important;
     background-color: #FFFFFF !important;
 }
-[data-testid="stSidebar"] label { color: #37322F !important; }
-[data-testid="stSidebar"] .stCheckbox label span { color: #37322F !important; }
+[data-testid="stSidebar"] label { color: #1A3C40 !important; }
+[data-testid="stSidebar"] .stCheckbox label span { color: #1A3C40 !important; }
 
 /* Dropdown menu styling */
 [data-baseweb="popover"] { background-color: #FFFFFF !important; }
-[data-baseweb="popover"] li { color: #37322F !important; }
-[data-baseweb="popover"] li:hover { background-color: #F7F5F3 !important; }
+[data-baseweb="popover"] li { color: #1A3C40 !important; }
+[data-baseweb="popover"] li:hover { background-color: #F0F7F8 !important; }
 
 /* Fix selectbox text color */
-[data-baseweb="select"] span { color: #37322F !important; }
-[data-baseweb="select"] div[data-testid="stMarkdownContainer"] p { color: #37322F !important; }
+[data-baseweb="select"] span { color: #1A3C40 !important; }
+[data-baseweb="select"] div[data-testid="stMarkdownContainer"] p { color: #1A3C40 !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -449,6 +482,19 @@ def load_industry_market_caps(tickers):
         except Exception:
             continue
     return result
+
+
+@st.cache_data(ttl=86400)
+def load_company_logo(ticker):
+    """Fetch company logo URL from Finnhub profile endpoint."""
+    try:
+        url = f"https://finnhub.io/api/v1/stock/profile2?symbol={ticker}&token={FINNHUB_API_KEY}"
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            return response.json().get("logo", "")
+        return ""
+    except Exception:
+        return ""
 
 
 @st.cache_data(ttl=1800)
@@ -671,15 +717,15 @@ with st.sidebar:
     st.header("Strategy")
     selected_strategy = st.radio(
         "Scoring Strategy",
-        options=["Current", "Volume+RSI", "Optimized Weights", "Combined"],
+        options=["Volume+RSI", "Optimized Weights"],
         index=0,
-        help="Current = Baseline (tech+fund). Volume+RSI = Paper 1 (EMA+ATV+RSI+RL). Optimized Weights = Paper 2 (5-factor scoring). Combined = Paper 1 timing + Paper 2 quality.",
-        captions=["Baseline", "Paper 1: EMA+ATV+RL", "Paper 2: Factor Weights", "Papers 1+2"],
+        help="Volume+RSI = Paper 1 (EMA+ATV+RSI+RL). Optimized Weights = Paper 2 (5-factor scoring).",
+        captions=["Paper 1: EMA+ATV+RL", "Paper 2: Factor Weights"],
     )
 
     # Risk profile selector (for Paper 2 and Combined strategies)
     risk_profile = "moderate"
-    if selected_strategy in ["Optimized Weights", "Combined"]:
+    if selected_strategy == "Optimized Weights":
         risk_profile = st.selectbox(
             "Risk Profile",
             options=["conservative", "moderate", "aggressive"],
@@ -706,6 +752,14 @@ with st.sidebar:
         except ImportError:
             st.divider()
             st.warning("⚠️ RL Agent unavailable — install `stable-baselines3` and `gymnasium` for full Paper 1 analysis.")
+
+    # Position tracker
+    st.divider()
+    st.header("My Position")
+    owns_stock = st.toggle("I own this stock", value=False)
+    cost_basis = None
+    if owns_stock:
+        cost_basis = st.number_input("Avg cost per share ($)", min_value=0.01, value=100.0, step=0.01)
 
     st.divider()
     # Clear cache button
@@ -739,9 +793,8 @@ with st.spinner("Analyzing market conditions..."):
 
     # Calculate scores
     tech_score, tech_details = calculate_technical_score(price_data)
-    fund_score, fund_details = calculate_fundamental_score(info)
 
-    # Volume score (needed for Paper 1 and Combined)
+    # Volume score (needed for Paper 1)
     volume_score, volume_details = calculate_volume_score(price_data)
 
     # RSI value for RSI gate
@@ -764,7 +817,7 @@ with st.spinner("Analyzing market conditions..."):
 
     # Paper 1 signal details (always init, conditionally compute)
     paper1_details = None
-    if selected_strategy in ["Volume+RSI", "Combined"] and len(price_data) >= 50:
+    if selected_strategy == "Volume+RSI" and len(price_data) >= 50:
         _, paper1_details = generate_paper1_signal(price_data)
 
     # RL Agent (Paper 1) - always init rl_prediction here to override sidebar init
@@ -782,11 +835,54 @@ with st.spinner("Analyzing market conditions..."):
             pass
 
 # =============================================================================
+# Dashboard recommendation (long-term horizon) + news + logo (shared by Dashboard & News tabs)
+# =============================================================================
+company_logo_url = load_company_logo(selected)
+
+if selected_strategy == "Volume+RSI":
+    dashboard_recommendation = generate_recommendation_paper1(
+        tech_score, fund_score_p2, volume_score, rsi_value,
+        market_regime, selected, info, time_horizon="long",
+        price_data=price_data, rl_prediction=rl_prediction,
+    )
+else:
+    dashboard_recommendation = generate_recommendation_paper2(
+        tech_score, fund_score_p2, market_regime, selected, info,
+        risk_profile="moderate", time_horizon="long",
+    )
+
+news_items = load_finnhub_news(selected)
+
+# =============================================================================
 # TABS - Render using modular tab files
 # =============================================================================
-analysis_tab, overview_tab, technical_tab, fundamentals_tab, news_tab, backtest_tab = st.tabs(
-    ["Analysis", "Overview", "Technical", "Fundamentals", "News & Sentiment", "Backtest"]
+dashboard_tab, analysis_tab, overview_tab, technical_tab, fundamentals_tab, news_tab, backtest_tab = st.tabs(
+    ["Dashboard", "Analysis", "Overview", "Technical", "Fundamentals", "News & Sentiment", "Backtest"]
 )
+
+with dashboard_tab:
+    dashboard.render(
+        selected=selected,
+        price_data=price_data,
+        info=info,
+        last_row=last_row,
+        change_pct=change_pct,
+        tech_score=tech_score,
+        tech_details=tech_details,
+        volume_score=volume_score,
+        volume_details=volume_details,
+        fund_score_p2=fund_score_p2,
+        fund_details_p2=fund_details_p2,
+        market_regime=market_regime,
+        regime_metrics=regime_metrics,
+        recommendation_data=dashboard_recommendation,
+        rsi_value=rsi_value,
+        selected_strategy=selected_strategy,
+        news_items=news_items,
+        cost_basis=cost_basis,
+        paper1_details=paper1_details,
+        logo_url=company_logo_url,
+    )
 
 with analysis_tab:
     analysis.render(
@@ -795,8 +891,6 @@ with analysis_tab:
         info=info,
         tech_score=tech_score,
         tech_details=tech_details,
-        fund_score=fund_score,
-        fund_details=fund_details,
         market_regime=market_regime,
         regime_metrics=regime_metrics,
         last_row=last_row,
@@ -809,6 +903,7 @@ with analysis_tab:
         fund_details_p2=fund_details_p2,
         paper1_details=paper1_details,
         rl_prediction=rl_prediction,
+        cost_basis=cost_basis,
     )
 
 with overview_tab:
@@ -845,8 +940,6 @@ with fundamentals_tab:
         selected=selected,
         info=info,
         financials=financials,
-        fund_score=fund_score,
-        fund_details=fund_details,
         all_stocks_df=all_stocks_df,
         filtered_df=filtered_df,
         price_data=price_data,
@@ -858,7 +951,6 @@ with fundamentals_tab:
     )
 
 with news_tab:
-    news_items = load_finnhub_news(selected)
     news.render(news_items=news_items)
 
 with backtest_tab:

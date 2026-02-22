@@ -9,9 +9,9 @@ def get_status_color(status_type):
         "success": "#10B981",  # Emerald - Bull/BUY/Low risk
         "warning": "#F59E0B",  # Amber - Sideways/HOLD/Medium risk
         "danger": "#F43F5E",   # Rose - Bear/SELL/High risk
-        "info": "#0EA5E9",     # Sky - Info accents
-        "neutral": "#37322F",  # Primary text
-        "muted": "#605A57",    # Secondary text
+        "info": "#0097A7",     # Teal - Info accents
+        "neutral": "#1A3C40",  # Primary text (dark teal-charcoal)
+        "muted": "#5A7D82",    # Secondary text
     }
     return colors.get(status_type, colors["neutral"])
 
@@ -22,7 +22,7 @@ def get_status_bg(status_type):
         "success": "rgba(16, 185, 129, 0.1)",
         "warning": "rgba(245, 158, 11, 0.1)",
         "danger": "#FFE4E6",
-        "info": "rgba(14, 165, 233, 0.1)",
+        "info": "rgba(0, 151, 167, 0.1)",
         "neutral": "#FFFFFF",
     }
     return bgs.get(status_type, bgs["neutral"])
@@ -45,9 +45,9 @@ def render_metric_card(label, value, tooltip="", status="neutral", size="normal"
         text-align: center;
         padding: 20px;
         background: {bg};
-        border: 1px solid #E0DEDB;
+        border: 1px solid #D0E8EA;
         border-radius: 10px;
-        box-shadow: 0px 2px 4px rgba(55, 50, 47, 0.08);
+        box-shadow: 0px 2px 4px rgba(0, 151, 167, 0.08);
         cursor: help;
         transition: all 300ms ease-in-out;
     ' title='{tooltip}'>
@@ -55,7 +55,7 @@ def render_metric_card(label, value, tooltip="", status="neutral", size="normal"
             font-family: Source Sans Pro, Arial, sans-serif;
             font-size: 12px;
             font-weight: 500;
-            color: #605A57;
+            color: #5A7D82;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             margin-bottom: 8px;
@@ -75,9 +75,9 @@ def render_badge_card(label, value, icon="", tooltip="", status="neutral"):
         text-align: center;
         padding: 24px;
         background: {bg};
-        border: 1px solid #E0DEDB;
+        border: 1px solid #D0E8EA;
         border-radius: 12px;
-        box-shadow: 0px 2px 4px rgba(55, 50, 47, 0.08);
+        box-shadow: 0px 2px 4px rgba(0, 151, 167, 0.08);
         cursor: help;
     ' title='{tooltip}'>
         <div style='font-size: 48px; margin-bottom: 8px;'>{icon}</div>
@@ -85,7 +85,7 @@ def render_badge_card(label, value, icon="", tooltip="", status="neutral"):
             font-family: Source Sans Pro, Arial, sans-serif;
             font-size: 12px;
             font-weight: 500;
-            color: #605A57;
+            color: #5A7D82;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             margin-bottom: 4px;
@@ -109,9 +109,9 @@ def render_compact_card(label, value, tooltip="", status="neutral"):
         text-align: center;
         padding: 16px;
         background: #FFFFFF;
-        border: 1px solid #E0DEDB;
+        border: 1px solid #D0E8EA;
         border-radius: 8px;
-        box-shadow: 0px 2px 4px rgba(55, 50, 47, 0.08);
+        box-shadow: 0px 2px 4px rgba(0, 151, 167, 0.08);
         margin-bottom: 8px;
         cursor: help;
     ' title='{tooltip}'>
@@ -119,7 +119,7 @@ def render_compact_card(label, value, tooltip="", status="neutral"):
             font-family: Source Sans Pro, Arial, sans-serif;
             font-size: 11px;
             font-weight: 500;
-            color: #605A57;
+            color: #5A7D82;
             text-transform: uppercase;
             letter-spacing: 0.04em;
             margin-bottom: 6px;
@@ -166,10 +166,10 @@ def format_mcap(val):
 
 
 def get_chart_layout_defaults():
-    """Return common chart layout settings with dark grey fonts."""
-    CHART_FONT_COLOR = "#4A4A4A"
-    CHART_AXIS_COLOR = "#4A4A4A"
-    CHART_GRID_COLOR = "rgba(74, 74, 74, 0.15)"
+    """Return common chart layout settings with teal-themed fonts."""
+    CHART_FONT_COLOR = "#1A3C40"
+    CHART_AXIS_COLOR = "#37616A"
+    CHART_GRID_COLOR = "#D0E8EA"
 
     return dict(
         font=dict(color=CHART_FONT_COLOR, family="Source Sans Pro, Arial, sans-serif"),
@@ -188,6 +188,95 @@ def get_chart_layout_defaults():
             gridcolor=CHART_GRID_COLOR,
             linecolor=CHART_GRID_COLOR,
         ),
-        legend=dict(font=dict(color=CHART_FONT_COLOR)),
+        legend=dict(
+            font=dict(color=CHART_FONT_COLOR),
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="center",
+            x=0.5,
+        ),
+        hovermode="x unified",
     )
+
+
+def render_hero_card(label, value, subtitle="", status="neutral"):
+    """Render a large gradient hero card for BUY/HOLD/SELL recommendations."""
+    gradients = {
+        "success": "linear-gradient(135deg, #0097A7 0%, #00BCD4 100%)",
+        "warning": "linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)",
+        "danger": "linear-gradient(135deg, #FF6B6B 0%, #F43F5E 100%)",
+        "neutral": "linear-gradient(135deg, #1A3C40 0%, #37616A 100%)",
+    }
+    gradient = gradients.get(status, gradients["neutral"])
+
+    return f"""
+    <div style='
+        text-align: center;
+        padding: 28px 20px;
+        background: {gradient};
+        border-radius: 14px;
+        box-shadow: 0px 4px 16px rgba(0, 151, 167, 0.2);
+        cursor: help;
+    ' title='{subtitle}'>
+        <div style='
+            font-family: Source Sans Pro, Arial, sans-serif;
+            font-size: 12px;
+            font-weight: 600;
+            color: rgba(255,255,255,0.85);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 8px;
+        '>{label}</div>
+        <div style='
+            font-family: "Source Sans Pro", Arial, sans-serif;
+            font-size: 48px;
+            font-weight: 700;
+            color: #FFFFFF;
+            line-height: 1.1;
+        '>{value}</div>
+        <div style='
+            font-family: Source Sans Pro, Arial, sans-serif;
+            font-size: 11px;
+            color: rgba(255,255,255,0.7);
+            margin-top: 6px;
+        '>{subtitle}</div>
+    </div>
+    """
+
+
+def render_accent_card(label, value, tooltip="", status="neutral", border_color=None):
+    """Render an accent-bordered card for confidence/score metrics."""
+    color = get_status_color(status)
+    if border_color is None:
+        border_color = "#0097A7" if status in ("info", "neutral") else color
+
+    return f"""
+    <div style='
+        text-align: center;
+        padding: 20px;
+        background: #FFFFFF;
+        border: 2px solid {border_color};
+        border-radius: 12px;
+        box-shadow: 0px 2px 8px rgba(0, 151, 167, 0.1);
+        cursor: help;
+        transition: all 300ms ease-in-out;
+    ' title='{tooltip}'>
+        <div style='
+            font-family: Source Sans Pro, Arial, sans-serif;
+            font-size: 12px;
+            font-weight: 500;
+            color: #5A7D82;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 8px;
+        '>{label}</div>
+        <div style='
+            font-family: "Source Sans Pro", Arial, sans-serif;
+            font-size: 36px;
+            font-weight: 600;
+            color: {color};
+        '>{value}</div>
+    </div>
+    """
 

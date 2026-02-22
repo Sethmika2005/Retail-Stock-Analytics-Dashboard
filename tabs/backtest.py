@@ -7,16 +7,14 @@ import plotly.graph_objects as go
 import streamlit as st
 
 # Chart styling constants
-CHART_FONT_COLOR = "#1F2937"
-CHART_AXIS_COLOR = "#374151"
-LEGEND_FONT_COLOR = "#1F2937"
+CHART_FONT_COLOR = "#1A3C40"
+CHART_AXIS_COLOR = "#37616A"
+LEGEND_FONT_COLOR = "#1A3C40"
 
 STRATEGY_COLORS = {
-    "Baseline": "#6B7280",
-    "Paper 1: EMA+ATV+RSI": "#3B82F6",
-    "Paper 2: Factor Weights": "#F59E0B",
-    "Combined": "#10B981",
-    "Paper 1 + RL Agent": "#8B5CF6",
+    "Paper 1: EMA+ATV+RSI": "#0097A7",
+    "Paper 2: Factor Weights": "#FF6B6B",
+    "Paper 1 + RL Agent": "#00BCD4",
 }
 
 
@@ -164,7 +162,7 @@ def _run_and_display_backtest(
             y=values,
             name=name,
             line=dict(
-                color=STRATEGY_COLORS.get(name, "#6B7280"),
+                color=STRATEGY_COLORS.get(name, "#5A7D82"),
                 width=2,
             ),
             mode="lines",
@@ -187,11 +185,11 @@ def _run_and_display_backtest(
         hovermode="x unified",
     )
     eq_fig.update_xaxes(
-        showgrid=False, showline=True, linecolor="#E5E7EB",
+        showgrid=False, showline=True, linecolor="#D0E8EA",
         tickfont=dict(color=CHART_AXIS_COLOR, size=11),
     )
     eq_fig.update_yaxes(
-        showgrid=True, gridcolor="#E5E7EB",
+        showgrid=True, gridcolor="#D0E8EA",
         tickfont=dict(color=CHART_AXIS_COLOR, size=11),
         tickprefix="$",
     )
@@ -238,7 +236,7 @@ def _run_and_display_backtest(
             x=sig_dates,
             y=sig_prices,
             name="Price",
-            line=dict(color="#000000", width=1.5),
+            line=dict(color="#1A3C40", width=1.5),
             mode="lines",
         ))
 
@@ -281,11 +279,11 @@ def _run_and_display_backtest(
             hovermode="x unified",
         )
         sig_fig.update_xaxes(
-            showgrid=False, showline=True, linecolor="#E5E7EB",
+            showgrid=False, showline=True, linecolor="#D0E8EA",
             tickfont=dict(color=CHART_AXIS_COLOR, size=11),
         )
         sig_fig.update_yaxes(
-            showgrid=True, gridcolor="#E5E7EB",
+            showgrid=True, gridcolor="#D0E8EA",
             tickfont=dict(color=CHART_AXIS_COLOR, size=11),
             tickprefix="$",
         )

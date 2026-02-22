@@ -152,18 +152,18 @@ def render(selected, price_data, info, all_stocks_df, filtered_df, sector, indus
                 values = grouped_values
                 percentages = grouped_percentages
 
-                # Light blue-teal gradient palette (aesthetically pleasing)
+                # Teal gradient palette (matching dashboard theme)
                 gradient_colors = [
-                    "#2D8BBA",  # Deep blue
-                    "#41B8D5",  # Bright teal
-                    "#6CE5E8",  # Light cyan
-                    "#5DADE2",  # Sky blue
-                    "#85C1E9",  # Soft blue
-                    "#A9CCE3",  # Pale blue
-                    "#7FB3D5",  # Muted blue
-                    "#AED6F1",  # Light periwinkle
-                    "#3498DB",  # Bright blue
-                    "#5DADE2",  # Sky blue (repeat for more)
+                    "#005662",  # Deepest teal
+                    "#00717E",  # Dark teal
+                    "#0097A7",  # Primary teal
+                    "#00ACC1",  # Medium teal
+                    "#00BCD4",  # Light teal
+                    "#26C6DA",  # Bright cyan-teal
+                    "#4DD0E1",  # Soft cyan
+                    "#80DEEA",  # Pale cyan
+                    "#B2EBF2",  # Very light cyan
+                    "#E0F7FA",  # Lightest teal
                 ]
 
                 # Create colors - selected gets coral, Others gets gray
@@ -235,7 +235,7 @@ def render(selected, price_data, info, all_stocks_df, filtered_df, sector, indus
                     textinfo='text',
                     text=text_display,
                     textposition='outside',
-                    textfont=dict(size=11, family='Source Sans Pro', color='#2d3436'),
+                    textfont=dict(size=11, family='Source Sans Pro', color='#1A3C40'),
                     hovertext=hover_text,
                     hoverinfo='text',
                     direction='clockwise',
@@ -250,7 +250,7 @@ def render(selected, price_data, info, all_stocks_df, filtered_df, sector, indus
                     plot_bgcolor='rgba(0,0,0,0)',
                     title=dict(
                         text=f"<b>{chart_sector} Sector</b> - Top {len(tickers)} by Market Cap",
-                        font=dict(size=14, color='#2d3436', family='Source Sans Pro'),
+                        font=dict(size=14, color='#1A3C40', family='Source Sans Pro'),
                         x=0.5,
                         xanchor='center'
                     )

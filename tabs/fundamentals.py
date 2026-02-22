@@ -9,14 +9,14 @@ import streamlit as st
 from components import format_large_number
 
 # Chart styling constants
-CHART_FONT_COLOR = "#1F2937"
-CHART_AXIS_COLOR = "#374151"
-LEGEND_FONT_COLOR = "#1F2937"
+CHART_FONT_COLOR = "#1A3C40"
+CHART_AXIS_COLOR = "#37616A"
+LEGEND_FONT_COLOR = "#1A3C40"
 
 
-def render(selected, info, financials, fund_score, fund_details, all_stocks_df, filtered_df,
+def render(selected, info, financials, all_stocks_df, filtered_df,
            price_data, load_sector_peers_metrics,
-           selected_strategy="Current", fund_score_p2=50, fund_details_p2=None, risk_profile="moderate"):
+           selected_strategy="Volume+RSI", fund_score_p2=50, fund_details_p2=None, risk_profile="moderate"):
     """Render the Fundamentals tab content."""
     st.subheader("Fundamentals")
 
@@ -24,19 +24,19 @@ def render(selected, info, financials, fund_score, fund_details, all_stocks_df, 
     # FUNDAMENTAL SCORE BREAKDOWN
     # =========================================================================
     # Show percentile-based score when Paper 2 or Combined strategy is active
-    if selected_strategy in ["Optimized Weights", "Combined"] and fund_details_p2:
+    if fund_details_p2:
         display_score = fund_score_p2
         f_status = "success" if display_score >= 65 else "warning" if display_score >= 40 else "danger"
-        f_color = {"success": "#10B981", "warning": "#F59E0B", "danger": "#EF4444"}.get(f_status, "#6B7280")
+        f_color = {"success": "#10B981", "warning": "#FF6B6B", "danger": "#FF6B6B"}.get(f_status, "#5A7D82")
 
         score_col1, score_col2 = st.columns([1, 3])
 
         with score_col1:
             st.markdown(f"""
-            <div style="background: white; border: 1px solid #E0DEDB; border-radius: 8px; padding: 16px; text-align: center;">
-                <div style="font-size: 12px; color: #6B7280; margin-bottom: 4px;">Fundamental Score (Percentile)</div>
+            <div style="background: white; border: 1px solid #D0E8EA; border-radius: 8px; padding: 16px; text-align: center;">
+                <div style="font-size: 12px; color: #5A7D82; margin-bottom: 4px;">Fundamental Score (Percentile)</div>
                 <div style="font-size: 36px; font-weight: 700; color: {f_color};">{display_score:.0f}</div>
-                <div style="font-size: 12px; color: #6B7280;">/100 | {risk_profile.title()}</div>
+                <div style="font-size: 12px; color: #5A7D82;">/100 | {risk_profile.title()}</div>
             </div>
             """, unsafe_allow_html=True)
 
@@ -109,63 +109,6 @@ def render(selected, info, financials, fund_score, fund_details, all_stocks_df, 
                 st.caption(f"Scores based on {n_factors}-factor percentile ranking vs sector peers")
             else:
                 st.caption(f"Scores based on {n_factors}-factor absolute thresholds (insufficient peer data)")
-    else:
-        fund_status = "success" if fund_score >= 65 else "warning" if fund_score >= 40 else "danger"
-        fund_color = {"success": "#10B981", "warning": "#F59E0B", "danger": "#EF4444"}.get(fund_status, "#6B7280")
-
-        score_col1, score_col2 = st.columns([1, 3])
-
-        with score_col1:
-            st.markdown(f"""
-            <div style="background: white; border: 1px solid #E0DEDB; border-radius: 8px; padding: 16px; text-align: center;">
-                <div style="font-size: 12px; color: #6B7280; margin-bottom: 4px;">Fundamental Score</div>
-                <div style="font-size: 36px; font-weight: 700; color: {fund_color};">{fund_score}</div>
-                <div style="font-size: 12px; color: #6B7280;">/100</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        with score_col2:
-            st.markdown("**Score Breakdown**")
-
-            prof_pts = fund_details.get("profitability", 0)
-            roe_val = info.get("returnOnEquity")
-            margin_val = info.get("profitMargins")
-            prof_detail = ""
-            if roe_val and margin_val:
-                prof_detail = f"ROE: {roe_val*100:.1f}% | Margin: {margin_val*100:.1f}%"
-            elif roe_val:
-                prof_detail = f"ROE: {roe_val*100:.1f}%"
-            elif margin_val:
-                prof_detail = f"Margin: {margin_val*100:.1f}%"
-
-            st.markdown(f"Profitability: **{prof_pts}/25** {(' - ' + prof_detail) if prof_detail else ''}")
-            st.progress(prof_pts / 25)
-
-            growth_pts = fund_details.get("growth", 0)
-            rev_growth = info.get("revenueGrowth")
-            growth_detail = f"Revenue Growth: {rev_growth*100:.1f}%" if rev_growth else ""
-
-            st.markdown(f"Growth: **{growth_pts}/25** {(' - ' + growth_detail) if growth_detail else ''}")
-            st.progress(growth_pts / 25)
-
-            lev_pts = fund_details.get("leverage", 0)
-            de_val = info.get("debtToEquity")
-            lev_detail = f"D/E: {de_val:.1f}" if de_val else ""
-
-            st.markdown(f"Leverage: **{lev_pts}/25** {(' - ' + lev_detail) if lev_detail else ''}")
-            st.progress(lev_pts / 25)
-
-            val_pts = fund_details.get("valuation", 0)
-            pe_val = info.get("trailingPE")
-            peg_val = info.get("pegRatio")
-            val_detail = ""
-            if peg_val:
-                val_detail = f"PEG: {peg_val:.2f}"
-            elif pe_val:
-                val_detail = f"P/E: {pe_val:.1f}"
-
-            st.markdown(f"Valuation: **{val_pts}/25** {(' - ' + val_detail) if val_detail else ''}")
-            st.progress(val_pts / 25)
 
     st.markdown("---")
 
@@ -233,7 +176,7 @@ def render(selected, info, financials, fund_score, fund_details, all_stocks_df, 
 
             # Net Income bars
             prof_fig.add_trace(
-                go.Bar(x=prof_dates, y=ni_values, name="Net Income ($B)", marker_color="#3B82F6"),
+                go.Bar(x=prof_dates, y=ni_values, name="Net Income ($B)", marker_color="#0097A7"),
                 secondary_y=False
             )
 
@@ -245,7 +188,7 @@ def render(selected, info, financials, fund_score, fund_details, all_stocks_df, 
                     go.Scatter(
                         x=prof_dates, y=[roe_pct] * len(prof_dates),
                         name=f"ROE ({roe_pct:.1f}%)", mode='lines',
-                        line=dict(color="#F59E0B", width=2, dash='dash')
+                        line=dict(color="#FF6B6B", width=2, dash='dash')
                     ),
                     secondary_y=True
                 )
@@ -257,7 +200,7 @@ def render(selected, info, financials, fund_score, fund_details, all_stocks_df, 
                         go.Scatter(
                             x=prof_dates, y=[peer_roe] * len(prof_dates),
                             name=f"Industry ROE ({peer_roe:.1f}%)", mode='lines',
-                            line=dict(color="#9CA3AF", width=2, dash='dot')
+                            line=dict(color="#80A4AA", width=2, dash='dot')
                         ),
                         secondary_y=True
                     )
@@ -270,7 +213,7 @@ def render(selected, info, financials, fund_score, fund_details, all_stocks_df, 
                 hovermode="x unified", bargap=0.3
             )
             prof_fig.update_xaxes(showgrid=False, tickfont=dict(color=CHART_AXIS_COLOR, size=11))
-            prof_fig.update_yaxes(title_text="Net Income ($B)", ticksuffix=" B", secondary_y=False, showgrid=True, gridcolor='#E5E7EB', tickfont=dict(color=CHART_AXIS_COLOR, size=11), title_font=dict(color=CHART_AXIS_COLOR, size=12), rangemode="tozero")
+            prof_fig.update_yaxes(title_text="Net Income ($B)", ticksuffix=" B", secondary_y=False, showgrid=True, gridcolor='#D0E8EA', tickfont=dict(color=CHART_AXIS_COLOR, size=11), title_font=dict(color=CHART_AXIS_COLOR, size=12), rangemode="tozero")
             prof_fig.update_yaxes(title_text="ROE %", ticksuffix="%", secondary_y=True, showgrid=False, tickfont=dict(color=CHART_AXIS_COLOR, size=11), title_font=dict(color=CHART_AXIS_COLOR, size=12))
 
             st.plotly_chart(prof_fig, use_container_width=True, config={'scrollZoom': True})
@@ -309,7 +252,7 @@ def render(selected, info, financials, fund_score, fund_details, all_stocks_df, 
 
             # Revenue bars
             growth_fig.add_trace(
-                go.Bar(x=growth_dates, y=rev_values, name="Revenue ($B)", marker_color="#10B981"),
+                go.Bar(x=growth_dates, y=rev_values, name="Revenue ($B)", marker_color="#0097A7"),
                 secondary_y=False
             )
 
@@ -328,8 +271,8 @@ def render(selected, info, financials, fund_score, fund_details, all_stocks_df, 
                 go.Scatter(
                     x=growth_dates, y=growth_rates,
                     name="Growth Rate %", mode='lines+markers',
-                    line=dict(color="#F59E0B", width=2),
-                    marker=dict(size=6, color="#F59E0B"),
+                    line=dict(color="#FF6B6B", width=2),
+                    marker=dict(size=6, color="#FF6B6B"),
                     connectgaps=True
                 ),
                 secondary_y=True
@@ -342,7 +285,7 @@ def render(selected, info, financials, fund_score, fund_details, all_stocks_df, 
                     go.Scatter(
                         x=growth_dates, y=[peer_rev_growth] * len(growth_dates),
                         name=f"Industry Avg ({peer_rev_growth:.1f}%)", mode='lines',
-                        line=dict(color="#9CA3AF", width=2, dash='dot')
+                        line=dict(color="#80A4AA", width=2, dash='dot')
                     ),
                     secondary_y=True
                 )
@@ -355,7 +298,7 @@ def render(selected, info, financials, fund_score, fund_details, all_stocks_df, 
                 hovermode="x unified", bargap=0.3
             )
             growth_fig.update_xaxes(showgrid=False, tickfont=dict(color=CHART_AXIS_COLOR, size=11))
-            growth_fig.update_yaxes(title_text="Revenue ($B)", ticksuffix=" B", secondary_y=False, showgrid=True, gridcolor='#E5E7EB', tickfont=dict(color=CHART_AXIS_COLOR, size=11), title_font=dict(color=CHART_AXIS_COLOR, size=12), rangemode="tozero")
+            growth_fig.update_yaxes(title_text="Revenue ($B)", ticksuffix=" B", secondary_y=False, showgrid=True, gridcolor='#D0E8EA', tickfont=dict(color=CHART_AXIS_COLOR, size=11), title_font=dict(color=CHART_AXIS_COLOR, size=12), rangemode="tozero")
             growth_fig.update_yaxes(title_text="Growth %", ticksuffix="%", secondary_y=True, showgrid=False, tickfont=dict(color=CHART_AXIS_COLOR, size=11), title_font=dict(color=CHART_AXIS_COLOR, size=12))
 
             st.plotly_chart(growth_fig, use_container_width=True)
@@ -404,14 +347,14 @@ def render(selected, info, financials, fund_score, fund_details, all_stocks_df, 
             if debt_col:
                 debt_values = (lev_data[debt_col] / 1e9).tolist()
                 lev_fig.add_trace(
-                    go.Bar(x=lev_dates, y=debt_values, name="Debt ($B)", marker_color="#EF4444", width=0.35, offset=-0.2),
+                    go.Bar(x=lev_dates, y=debt_values, name="Debt ($B)", marker_color="#FF6B6B", width=0.35, offset=-0.2),
                     secondary_y=False
                 )
 
             if equity_col:
                 equity_values = (lev_data[equity_col] / 1e9).tolist()
                 lev_fig.add_trace(
-                    go.Bar(x=lev_dates, y=equity_values, name="Equity ($B)", marker_color="#3B82F6", width=0.35, offset=0.2),
+                    go.Bar(x=lev_dates, y=equity_values, name="Equity ($B)", marker_color="#0097A7", width=0.35, offset=0.2),
                     secondary_y=False
                 )
 
@@ -422,7 +365,7 @@ def render(selected, info, financials, fund_score, fund_details, all_stocks_df, 
                     go.Scatter(
                         x=lev_dates, y=[de_val] * len(lev_dates),
                         name=f"D/E Ratio ({de_val:.1f})", mode='lines',
-                        line=dict(color="#F59E0B", width=2, dash='dash')
+                        line=dict(color="#FF6B6B", width=2, dash='dash')
                     ),
                     secondary_y=True
                 )
@@ -433,7 +376,7 @@ def render(selected, info, financials, fund_score, fund_details, all_stocks_df, 
                         go.Scatter(
                             x=lev_dates, y=[peer_de] * len(lev_dates),
                             name=f"Industry D/E ({peer_de:.1f})", mode='lines',
-                            line=dict(color="#9CA3AF", width=2, dash='dot')
+                            line=dict(color="#80A4AA", width=2, dash='dot')
                         ),
                         secondary_y=True
                     )
@@ -446,7 +389,7 @@ def render(selected, info, financials, fund_score, fund_details, all_stocks_df, 
                 hovermode="x unified", bargap=0.3
             )
             lev_fig.update_xaxes(showgrid=False, tickfont=dict(color=CHART_AXIS_COLOR, size=11))
-            lev_fig.update_yaxes(title_text="Amount ($B)", ticksuffix=" B", secondary_y=False, showgrid=True, gridcolor='#E5E7EB', tickfont=dict(color=CHART_AXIS_COLOR, size=11), title_font=dict(color=CHART_AXIS_COLOR, size=12), rangemode="tozero")
+            lev_fig.update_yaxes(title_text="Amount ($B)", ticksuffix=" B", secondary_y=False, showgrid=True, gridcolor='#D0E8EA', tickfont=dict(color=CHART_AXIS_COLOR, size=11), title_font=dict(color=CHART_AXIS_COLOR, size=12), rangemode="tozero")
             lev_fig.update_yaxes(title_text="D/E Ratio", secondary_y=True, showgrid=False, tickfont=dict(color=CHART_AXIS_COLOR, size=11), title_font=dict(color=CHART_AXIS_COLOR, size=12))
 
             st.plotly_chart(lev_fig, use_container_width=True)
@@ -484,15 +427,15 @@ def render(selected, info, financials, fund_score, fund_details, all_stocks_df, 
             go.Scatter(
                 x=val_dates, y=pe_values,
                 name="P/E Ratio", mode='lines',
-                line=dict(color="#8B5CF6", width=2),
-                fill='tozeroy', fillcolor='rgba(139, 92, 246, 0.1)'
+                line=dict(color="#0097A7", width=2),
+                fill='tozeroy', fillcolor='rgba(0, 151, 167, 0.1)'
             )
         )
 
         # Average P/E line
         avg_pe = hist_pe.mean()
         val_fig.add_hline(
-            y=avg_pe, line=dict(color="#F59E0B", dash="dash", width=1.5),
+            y=avg_pe, line=dict(color="#FF6B6B", dash="dash", width=1.5),
             annotation_text=f"Avg: {avg_pe:.1f}", annotation_position="right"
         )
 
@@ -500,7 +443,7 @@ def render(selected, info, financials, fund_score, fund_details, all_stocks_df, 
         if show_peer_comparison and peer_means.get("pe"):
             peer_pe = peer_means.get("pe")
             val_fig.add_hline(
-                y=peer_pe, line=dict(color="#9CA3AF", dash="dot", width=1.5),
+                y=peer_pe, line=dict(color="#80A4AA", dash="dot", width=1.5),
                 annotation_text=f"Industry: {peer_pe:.1f}", annotation_position="left"
             )
 
@@ -512,7 +455,7 @@ def render(selected, info, financials, fund_score, fund_details, all_stocks_df, 
             hovermode="x unified", showlegend=False
         )
         val_fig.update_xaxes(showgrid=False, tickfont=dict(color=CHART_AXIS_COLOR, size=11))
-        val_fig.update_yaxes(title_text="P/E Ratio", showgrid=True, gridcolor='#E5E7EB', tickfont=dict(color=CHART_AXIS_COLOR, size=11), title_font=dict(color=CHART_AXIS_COLOR, size=12))
+        val_fig.update_yaxes(title_text="P/E Ratio", showgrid=True, gridcolor='#D0E8EA', tickfont=dict(color=CHART_AXIS_COLOR, size=11), title_font=dict(color=CHART_AXIS_COLOR, size=12))
 
         st.plotly_chart(val_fig, use_container_width=True)
 
