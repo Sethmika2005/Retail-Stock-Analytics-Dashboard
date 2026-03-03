@@ -1,0 +1,5 @@
+model,sharpe_ratio,sortino_ratio,total_return,annual_return,max_drawdown,trade_count,accuracy
+Paper 1 Rules Only,-0.00800000000000003,0.12000000000000002,36.142,13.190000000000001,-16.14,0.4,20.0
+Paper 1 + RL (Original),0.866,1.534,50.084,19.926,-21.348,3.6,42.239999999999995
+Novel Hybrid (Ours),0.784,1.106,52.465999999999994,20.696,-25.152,3.8,70.28
+Paper 2 (5-Factor),0.388,0.508,27.165999999999997,10.828,-23.808,3.8,24.06

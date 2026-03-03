@@ -1,0 +1,270 @@
+Slide 1 / 9
+Text
+
+An Intelligent Stock Analytics
+Platform for Retail Investors
+
+Sethmika Dias Bellana | Abarnah Kirupananda
+w19857518
+Informatics Institute of Technology, Colombo, Sri Lanka
+
+Combining Rule-Based Trading Signals with
+Reinforcement learning
+
+Visual
+
+No image. Clean title slide with centered text.
+
+Slide 2 / 9
+Text
+
+Problem Domain
+
+Investors have access to numbers and price charts, but no
+system that turns those numbers into clear, justified
+guidance.
+This is the reality for over 150 million retail investors today.
+
+Cost Barrier: Professional terminals like
+Bloomberg/Refinitiv cost $20,000+/year.
+
+Raw Data: Access to charts & ratios ≠ unified
+interpretation.
+
+Knowledge Gap: Understanding metrics like
+MACD or RSI requires expertise most users lack.
+
+“The gap isn’t access to data –
+its interpretation.”
+
+Visual Description
+
+Top right: icon of a group of people.
+
+Three icon bullets on left:
+
+Dollar sign icon (Cost Barrier)
+
+Upward bar chart icon (Raw Data)
+
+Graduation cap icon (Knowledge Gap)
+
+Bottom right comparison:
+
+Professional Reality: Multiple trading screens showing dashboards. Caption:
+“$20,000+ Terminals. Synthesized, clear recommendations.”
+
+Retail Reality: Smartphone with simple price chart. Caption:
+“Raw Data. Disconnected metrics and no unified interpretation.”
+
+Slide 3 / 9
+Text
+
+Academic Signals to Actionable Intelligence
+(Literature Review)
+
+Existing Literature
+
+EMA Crossover – Trend Detection
+When EMA20 crosses above the EMA50,
+it’s a potential uptrend.
+
+Volume Confirmation — Validating the Signal
+When the Average Traded Volume slope is
+rising during a crossover, it confirms
+institutional participation.
+
+RSI Safety Gate — Preventing Bad Entries
+RSI acts as a guardrail: it blocks buy signals
+and sell signals.
+
+Kadia et al. (2025) demonstrated that
+combining these three indicators with PPO
+reinforcement learning achieves 85%
+signal accuracy. But the model is rigid — it
+applies the same logic regardless of market
+conditions.
+
+Research Gap
+
+(Nguyen, H., & Yoon, S, 2023)
+(Kadia, A., Dey, R., & Kar, A, 2025)
+(Kadia, A., Dey, R., & Kar, A, 2025)
+(Qureshi, M., & Zhang, W, 2023)
+
+Visual
+
+No standalone image. Text-based slide.
+
+Slide 4 / 9
+Text
+
+Methodology: A Three-layer Intelligence
+system
+
+Layer 1: Data & Indicator Computation
+Extracts live data and calculates
+technical indicators, fundamental
+scores, news and detects market
+regime and volatility.
+
+Layer 2: Signal Generation
+Framework
+Transforms indicators into
+structured buy, sell, or hold
+signals.
+
+Layer 3: Reinforcement
+Learning Optimisation
+The agent learns optimal
+decisions by maximising long-
+term returns.
+
+Optimises
+& Overrides
+
+Visual
+
+Structured layered layout. No complex graphic. “Optimises & Overrides” placed between layers to indicate RL adjusts signal layer.
+
+Slide 5 / 9
+Text
+
+Problem Solution Fit..: The Retail Insight
+Gap
+
+01 | THE PROBLEM
+Data Rich, Insight Poor
+Retail investors struggle to synthesise raw
+market data into confident, actionable
+trading decisions.
+
+02 | THE OBJECTIVE
+Intelligent Dashboard
+Design an intelligent, data-driven
+dashboard that simplifies financial analysis
+and enhances decision-making support.
+
+03 | THE OUTCOME
+Hybrid Intelligence
+A transparent platform providing clear Buy,
+Sell, or Hold recommendations with plain-
+language reasoning, explaining the "why"
+behind every signal.
+
+Visual Description
+
+Right side shows a screenshot mock-up titled:
+
+US Stock Analytics Dashboard
+
+Tabs:
+Dashboard | Analysis | Overview | Technical | Fundamentals | News & Sentiment | Backtest
+
+Main components visible:
+
+Price chart (Apple Inc.)
+
+Sell tag
+
+News panel
+
+Technical trend chart (SMA 50 / SMA 200)
+
+Fundamentals score panel (Tech Score, Volume Score, Factor Score, RSI)
+
+Slide 6 / 9
+Text
+
+Problem Statement: The Retail Insight Gap
+
+Analysis
+Technicals
+Dynamic Interpretations
+Fundamental scoring
+Latest News
+Decision Support (Buy/Sell)
+
+Visual Description
+
+Large dashboard screenshot again (US Stock Analytics Dashboard).
+
+Red pointer labels:
+
+Analysis (pointing to main chart)
+
+Dynamic Interpretations (technical crossover explanation)
+
+Latest News (news panel)
+
+Decision Support (Buy/Sell indicator)
+
+Fundamental scoring (score section)
+
+Technicals (trend chart)
+
+Slide 7 / 9
+Text
+
+Business Value: Bridging the Gap
+
+Informed, Not Automated
+We do not make decisions for investors. We empower them
+with structured, data-driven frameworks, translating complex
+analysis into plain language so the user retains control.
+
+Premium Data, Democratised
+Access to insights previously locked behind $20,000+
+professional terminals. We bring institutional-grade data to the
+public market—entirely for free.
+
+A Level Playing Field
+Historically, retail investors faced a massive information
+disadvantage. We eliminate this gap by arming everyday investors
+with the same analytical depth used by major institutions.
+
+Learning the “Why”
+Users don’t just follow blind signals. Every recommendation
+includes the rationale, teaching users how markets behave over
+time for long-term financial mastery.
+
+Visual Description
+
+Four icons:
+
+Brain with upward chart (Informed, Not Automated)
+
+Open lock (Premium Data, Democratised)
+
+Balanced scale (A Level Playing Field)
+
+Magnifying glass with upward arrow (Learning the “Why”)
+
+Slide 8 / 9
+Text
+
+References
+
+Nguyen, H., & Yoon, S. (2023). Technical analysis-based hybrid model for stock price prediction using exponential moving average and LSTM. Applied Soft Computing, 141, 110285.
+
+Kadia, A., Dey, R., & Kar, A. (2025). Smart Stock Trading using an Advanced Combination of Technical Indicators with Volume Confirmation Integrated in Reinforcement Learning. International Journal on Science and Technology (IJSAT).
+
+Qureshi, M., & Zhang, W. (2023). Intelligent trading using deep reinforcement learning and technical analysis. Expert Systems with Applications, 214, 119028.
+
+Visual
+
+Text only.
+
+Slide 9 / 9
+Text
+
+Where academic research
+meets real-world investing
+
+Sethmika Dias Bellana | sethmika.20221906@iit.ac.lk
+
+SCAN TO CONNECT
+
+Visual Description
+
+Large QR code centered on slide.
