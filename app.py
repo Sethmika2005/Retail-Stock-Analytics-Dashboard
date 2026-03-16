@@ -455,10 +455,6 @@ if not FINNHUB_API_KEY:
     except (KeyError, FileNotFoundError, AttributeError):
         FINNHUB_API_KEY = ""
 
-# Hardcoded fallback for deployment
-if not FINNHUB_API_KEY:
-    FINNHUB_API_KEY = "RTDKINDE2HVAQFYA"
-
 
 @st.cache_data(ttl=86400)
 def load_sp500_tickers():
