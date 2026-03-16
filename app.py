@@ -817,6 +817,12 @@ if price_data.empty:
     st.error("No price data available for this ticker. Try another selection or wait a moment if rate limited.")
     st.stop()
 
+# Drop rows with NaN Close prices
+price_data = price_data.dropna(subset=["Close"])
+if price_data.empty:
+    st.error("Price data contains no valid entries. Try again in a moment.")
+    st.stop()
+
 price_data = compute_indicators(price_data)
 
 last_row = price_data.iloc[-1]
