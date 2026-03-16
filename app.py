@@ -449,6 +449,11 @@ button[data-testid="stBaseButton-primary"]:hover {
 # =============================================================================
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY", "")
+if not FINNHUB_API_KEY:
+    try:
+        FINNHUB_API_KEY = st.secrets.get("FINNHUB_API_KEY", "")
+    except Exception:
+        pass
 
 
 @st.cache_data(ttl=86400)
