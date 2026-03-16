@@ -1,8 +1,9 @@
-ModuleNotFoundError: This app has encountered an error. The original error message is redacted to prevent data leaks. Full error details have been recorded in the logs (if you're on Streamlit Cloud, click on 'Manage app' in the lower right of your app).
+KeyError: This app has encountered an error. The original error message is redacted to prevent data leaks. Full error details have been recorded in the logs (if you're on Streamlit Cloud, click on 'Manage app' in the lower right of your app).
 Traceback:
-File "/mount/src/retail-stock-analytics-dashboard/app.py", line 41, in <module>
-    from tabs import dashboard, analysis, technical, fundamentals, news
-File "/mount/src/retail-stock-analytics-dashboard/tabs/__init__.py", line 5, in <module>
-    from . import dashboard
-File "/mount/src/retail-stock-analytics-dashboard/tabs/dashboard.py", line 8, in <module>
-    import plotly.graph_objects as go
+File "/mount/src/retail-stock-analytics-dashboard/app.py", line 743, in <module>
+    sp500_set = set(all_stocks_df[all_stocks_df["is_sp500"]]["ticker"].tolist())
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+File "/home/adminuser/venv/lib/python3.14/site-packages/pandas/core/frame.py", line 4113, in __getitem__
+    indexer = self.columns.get_loc(key)
+File "/home/adminuser/venv/lib/python3.14/site-packages/pandas/core/indexes/base.py", line 3819, in get_loc
+    raise KeyError(key) from err

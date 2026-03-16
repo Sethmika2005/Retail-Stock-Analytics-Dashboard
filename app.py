@@ -740,6 +740,9 @@ st.title("US Stock Analytics Dashboard")
 # Load stock list
 with st.spinner("Loading US stocks..."):
     all_stocks_df = load_all_us_stocks()
+    if all_stocks_df.empty or "is_sp500" not in all_stocks_df.columns:
+        st.error("Failed to load stock list. Please refresh the page.")
+        st.stop()
     sp500_set = set(all_stocks_df[all_stocks_df["is_sp500"]]["ticker"].tolist())
 
 # Sidebar (matches Dash: Stock Selection, My Position, Refresh Data)
