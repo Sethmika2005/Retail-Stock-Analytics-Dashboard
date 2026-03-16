@@ -542,8 +542,11 @@ def load_history(ticker, period="max", interval="1d"):
 @st.cache_data(ttl=3600)
 def load_fundamentals(ticker):
     """Load fundamental data from yfinance."""
-    info = yf.Ticker(ticker).get_info()
-    return info or {}
+    try:
+        info = yf.Ticker(ticker).get_info()
+        return info or {}
+    except Exception:
+        return {}
 
 
 @st.cache_data(ttl=3600)
@@ -802,12 +805,16 @@ with st.sidebar:
 
 # Load data for selected stock
 with st.spinner("Loading data..."):
-    price_data = load_history(selected)
+    try:
+        price_data = load_history(selected)
+    except Exception as e:
+        st.error(f"Rate limited by Yahoo Finance. Please wait a moment and refresh. ({type(e).__name__})")
+        st.stop()
     info = load_fundamentals(selected)
     financials = load_financial_statements(selected)
 
 if price_data.empty:
-    st.error("No price data available for this ticker. Try another selection.")
+    st.error("No price data available for this ticker. Try another selection or wait a moment if rate limited.")
     st.stop()
 
 price_data = compute_indicators(price_data)

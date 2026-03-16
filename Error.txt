@@ -1,9 +1,48 @@
-KeyError: This app has encountered an error. The original error message is redacted to prevent data leaks. Full error details have been recorded in the logs (if you're on Streamlit Cloud, click on 'Manage app' in the lower right of your app).
+finance.exceptions.YFRateLimitError: This app has encountered an error. The original error message is redacted to prevent data leaks. Full error details have been recorded in the logs (if you're on Streamlit Cloud, click on 'Manage app' in the lower right of your app).
 Traceback:
-File "/mount/src/retail-stock-analytics-dashboard/app.py", line 743, in <module>
-    sp500_set = set(all_stocks_df[all_stocks_df["is_sp500"]]["ticker"].tolist())
-                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
-File "/home/adminuser/venv/lib/python3.14/site-packages/pandas/core/frame.py", line 4113, in __getitem__
-    indexer = self.columns.get_loc(key)
-File "/home/adminuser/venv/lib/python3.14/site-packages/pandas/core/indexes/base.py", line 3819, in get_loc
-    raise KeyError(key) from err
+File "/mount/src/retail-stock-analytics-dashboard/app.py", line 806, in <module>
+    info = load_fundamentals(selected)
+File "/home/adminuser/venv/lib/python3.14/site-packages/streamlit/runtime/caching/cache_utils.py", line 281, in __call__
+    return self._get_or_create_cached_value(args, kwargs, spinner_message)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "/home/adminuser/venv/lib/python3.14/site-packages/streamlit/runtime/caching/cache_utils.py", line 326, in _get_or_create_cached_value
+    return self._handle_cache_miss(cache, value_key, func_args, func_kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "/home/adminuser/venv/lib/python3.14/site-packages/streamlit/runtime/caching/cache_utils.py", line 385, in _handle_cache_miss
+    computed_value = self._info.func(*func_args, **func_kwargs)
+File "/mount/src/retail-stock-analytics-dashboard/app.py", line 545, in load_fundamentals
+    info = yf.Ticker(ticker).get_info()
+File "/home/adminuser/venv/lib/python3.14/site-packages/yfinance/base.py", line 282, in get_info
+    data = self._quote.info
+           ^^^^^^^^^^^^^^^^
+File "/home/adminuser/venv/lib/python3.14/site-packages/yfinance/scrapers/quote.py", line 503, in info
+    self._fetch_info()
+    ~~~~~~~~~~~~~~~~^^
+File "/home/adminuser/venv/lib/python3.14/site-packages/yfinance/scrapers/quote.py", line 612, in _fetch_info
+    result = self._fetch(modules=modules)
+File "/home/adminuser/venv/lib/python3.14/site-packages/yfinance/scrapers/quote.py", line 588, in _fetch
+    result = self._data.get_raw_json(_QUOTE_SUMMARY_URL_ + f"/{self._symbol}", params=params_dict)
+File "/home/adminuser/venv/lib/python3.14/site-packages/yfinance/data.py", line 462, in get_raw_json
+    response = self.get(url, params=params, timeout=timeout)
+File "/home/adminuser/venv/lib/python3.14/site-packages/yfinance/utils.py", line 95, in wrapper
+    result = func(*args, **kwargs)
+File "/home/adminuser/venv/lib/python3.14/site-packages/yfinance/data.py", line 375, in get
+    response = self._make_request(url, request_method = self._session.get, params=params, timeout=timeout)
+File "/home/adminuser/venv/lib/python3.14/site-packages/yfinance/utils.py", line 95, in wrapper
+    result = func(*args, **kwargs)
+File "/home/adminuser/venv/lib/python3.14/site-packages/yfinance/data.py", line 444, in _make_request
+    crumb, strategy = self._get_cookie_and_crumb(timeout)
+                      ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+File "/home/adminuser/venv/lib/python3.14/site-packages/yfinance/utils.py", line 95, in wrapper
+    result = func(*args, **kwargs)
+File "/home/adminuser/venv/lib/python3.14/site-packages/yfinance/data.py", line 365, in _get_cookie_and_crumb
+    crumb = self._get_cookie_and_crumb_basic(timeout)
+File "/home/adminuser/venv/lib/python3.14/site-packages/yfinance/utils.py", line 95, in wrapper
+    result = func(*args, **kwargs)
+File "/home/adminuser/venv/lib/python3.14/site-packages/yfinance/data.py", line 246, in _get_cookie_and_crumb_basic
+    return self._get_crumb_basic(timeout)
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+File "/home/adminuser/venv/lib/python3.14/site-packages/yfinance/utils.py", line 95, in wrapper
+    result = func(*args, **kwargs)
+File "/home/adminuser/venv/lib/python3.14/site-packages/yfinance/data.py", line 233, in _get_crumb_basic
+    raise YFRateLimitError()
