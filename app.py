@@ -22,10 +22,8 @@ load_dotenv()
 from models import (
     calculate_technical_score,
     calculate_volume_score,
-    calculate_fundamental_score_paper2,
     detect_market_regime,
     generate_recommendation_paper1,
-    generate_recommendation_paper2,
     generate_paper1_signal,
     classify_headline_sentiment,
 )
@@ -37,10 +35,10 @@ from components import (
     render_compact_card,
     render_hero_card,
     render_accent_card,
-    format_large_number,
+    render_metrics_strip,
     format_mcap,
 )
-from tabs import dashboard, analysis, overview, technical, fundamentals, news, backtest
+from tabs import dashboard, analysis, technical, fundamentals, news
 
 # =============================================================================
 # PAGE CONFIG
@@ -53,19 +51,19 @@ st.set_page_config(page_title="US Stock Analytics Dashboard", layout="wide")
 st.markdown("""
 <style>
 /* Import Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700&display=swap');
 
-/* Global Styles - Teal/Coral Light Theme */
+/* Global Styles — matches Dash design tokens */
 .stApp {
-    background-color: #F0F7F8 !important;
-    font-family: 'Source Sans Pro', Arial, sans-serif !important;
+    background-color: #F4F7F9 !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
 }
 
 /* Main container styling */
 .main .block-container {
-    max-width: 1100px !important;
+    max-width: 1200px !important;
     padding: 2rem 1rem !important;
-    background-color: #F0F7F8 !important;
+    background-color: #F4F7F9 !important;
 }
 
 /* Hide Streamlit branding */
@@ -74,111 +72,120 @@ footer {visibility: hidden;}
 
 /* Sidebar styling */
 [data-testid="stSidebar"] {
-    background-color: #E8F4F5 !important;
-    border-right: 1px solid #D0E8EA !important;
+    background-color: #F8FAFB !important;
+    border-right: 1px solid #E8EDF2 !important;
 }
 [data-testid="stSidebar"] .stMarkdown {
-    font-family: 'Source Sans Pro', Arial, sans-serif !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
 }
 [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {
-    font-family: 'Source Sans Pro', Arial, sans-serif !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
     font-weight: 600 !important;
-    color: #1A3C40 !important;
+    color: #1E293B !important;
     font-size: 14px !important;
     text-transform: uppercase !important;
-    letter-spacing: 0.05em !important;
+    letter-spacing: 0.06em !important;
 }
 
 /* Tab styling */
 .stTabs [data-baseweb="tab-list"] {
-    gap: 8px;
+    gap: 2px;
     background-color: transparent !important;
-    border-bottom: 1px solid #D0E8EA !important;
+    border-bottom: 1px solid #E8EDF2 !important;
 }
 .stTabs [data-baseweb="tab"] {
-    font-family: 'Source Sans Pro', Arial, sans-serif !important;
-    font-size: 14px !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+    font-size: 13px !important;
     font-weight: 500 !important;
-    color: #5A7D82 !important;
+    color: #94A3B8 !important;
     background-color: transparent !important;
     border: none !important;
-    padding: 12px 16px !important;
+    padding: 10px 18px !important;
+    letter-spacing: 0.01em !important;
 }
 .stTabs [aria-selected="true"] {
     color: #0097A7 !important;
-    border-bottom: 3px solid #0097A7 !important;
+    font-weight: 600 !important;
+    border-bottom: 2px solid #0097A7 !important;
     background-color: transparent !important;
 }
 
 /* Headers */
 h1 {
-    font-family: 'Source Sans Pro', Arial, sans-serif !important;
-    font-size: 32px !important;
-    font-weight: 600 !important;
-    color: #005662 !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+    font-size: 24px !important;
+    font-weight: 700 !important;
+    color: #0F172A !important;
+    letter-spacing: -0.03em !important;
 }
 h2, h3 {
-    font-family: 'Source Sans Pro', Arial, sans-serif !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
     font-weight: 600 !important;
-    color: #00717E !important;
+    color: #0F172A !important;
 }
 
 /* Body text */
-p, span { color: #1A3C40; }
-.muted { color: #5A7D82 !important; }
+p, span { color: #1E293B; }
+.muted { color: #94A3B8 !important; }
 
 /* Streamlit metric styling */
 [data-testid="stMetric"] {
     background: #FFFFFF;
-    border: 1px solid #D0E8EA;
-    border-radius: 8px;
+    border: 1px solid #E8EDF2;
+    border-radius: 12px;
     padding: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02);
 }
-[data-testid="stMetricLabel"] { color: #5A7D82 !important; }
-[data-testid="stMetricValue"] { color: #1A3C40 !important; }
-[data-testid="stMetricDelta"] { color: #1A3C40 !important; }
+[data-testid="stMetricLabel"] { color: #64748B !important; }
+[data-testid="stMetricValue"] { color: #1E293B !important; }
+[data-testid="stMetricDelta"] { color: #1E293B !important; }
 
 /* Caption styling */
-[data-testid="stCaptionContainer"] { color: #5A7D82 !important; }
-.stCaption, small { color: #5A7D82 !important; }
+[data-testid="stCaptionContainer"] { color: #64748B !important; }
+.stCaption, small { color: #64748B !important; }
 
 /* Progress bar styling */
-[data-testid="stProgress"] > div > div { background-color: #D0E8EA !important; }
+[data-testid="stProgress"] > div > div { background-color: #F1F5F9 !important; }
 [data-testid="stProgress"] > div > div > div { background-color: #0097A7 !important; }
 
 /* Expander text */
-[data-testid="stExpander"] { color: #1A3C40 !important; }
-[data-testid="stExpander"] summary { color: #1A3C40 !important; }
+[data-testid="stExpander"] { color: #1E293B !important; }
+[data-testid="stExpander"] summary { color: #1E293B !important; }
 
-/* Toggle styling - more visible */
-[data-testid="stToggle"] label { color: #1A3C40 !important; }
+/* Toggle styling — visible card with border */
+[data-testid="stToggle"] label { color: #1E293B !important; font-weight: 500 !important; }
 [data-testid="stToggle"] {
     background-color: #FFFFFF !important;
-    border: 1px solid #D0E8EA !important;
-    border-radius: 8px !important;
-    padding: 8px 12px !important;
+    border: 1.5px solid #CBD5E1 !important;
+    border-radius: 12px !important;
+    padding: 10px 14px !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
+    transition: border-color 150ms ease !important;
+}
+[data-testid="stToggle"]:hover {
+    border-color: #0097A7 !important;
 }
 [data-testid="stToggle"] > div {
     background-color: #FFFFFF !important;
 }
 
-/* Button styling - light background */
+/* Button styling */
 .stButton > button {
     background-color: #FFFFFF !important;
-    color: #1A3C40 !important;
-    border: 1px solid #D0E8EA !important;
-    border-radius: 8px !important;
-    font-family: 'Source Sans Pro', Arial, sans-serif !important;
+    color: #1E293B !important;
+    border: 1px solid #E8EDF2 !important;
+    border-radius: 12px !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
     font-weight: 500 !important;
     padding: 8px 16px !important;
-    transition: all 200ms ease !important;
+    transition: all 150ms ease !important;
 }
 .stButton > button:hover {
-    background-color: #F0F7F8 !important;
+    background-color: #F4F7F9 !important;
     border-color: #0097A7 !important;
 }
 .stButton > button:active {
-    background-color: #D0E8EA !important;
+    background-color: #E8EDF2 !important;
 }
 
 /* Primary button teal styling */
@@ -196,55 +203,50 @@ button[data-testid="stBaseButton-primary"]:hover {
 /* Sidebar button styling */
 [data-testid="stSidebar"] .stButton > button {
     background-color: #FFFFFF !important;
-    color: #1A3C40 !important;
-    border: 1px solid #D0E8EA !important;
+    color: #1E293B !important;
+    border: 1px solid #E8EDF2 !important;
     width: 100% !important;
 }
 [data-testid="stSidebar"] .stButton > button:hover {
-    background-color: #F0F7F8 !important;
+    background-color: #F4F7F9 !important;
     border-color: #0097A7 !important;
 }
 
 /* Write/Text styling */
-[data-testid="stText"] { color: #1A3C40 !important; }
+[data-testid="stText"] { color: #1E293B !important; }
 
 /* Markdown text */
-[data-testid="stMarkdownContainer"] { color: #1A3C40 !important; }
-[data-testid="stMarkdownContainer"] p { color: #1A3C40 !important; }
-[data-testid="stMarkdownContainer"] li { color: #1A3C40 !important; }
+[data-testid="stMarkdownContainer"] { color: #1E293B !important; }
+[data-testid="stMarkdownContainer"] p { color: #1E293B !important; }
+[data-testid="stMarkdownContainer"] li { color: #1E293B !important; }
 
 /* Card base style */
 .metric-card {
     background: #FFFFFF;
-    border: 1px solid #D0E8EA;
-    border-radius: 10px;
-    padding: 20px;
-    box-shadow: 0px 2px 4px rgba(0, 151, 167, 0.08);
-    transition: all 300ms ease-in-out;
+    border: 1px solid #E8EDF2;
+    border-radius: 14px;
+    padding: 16px 20px;
     text-align: center;
-}
-.metric-card:hover {
-    box-shadow: 0px 4px 12px rgba(0, 151, 167, 0.12);
-    transform: translateY(-1px);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02);
 }
 
 /* Card label */
 .card-label {
-    font-family: 'Source Sans Pro', Arial, sans-serif;
-    font-size: 12px;
-    font-weight: 500;
-    color: #5A7D82;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    color: #64748B;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
     margin-bottom: 8px;
 }
 
 /* Big numbers */
 .big-number {
-    font-family: 'Source Sans Pro', Arial, sans-serif;
-    font-size: 36px;
-    font-weight: 400;
-    color: #1A3C40;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 22px;
+    font-weight: 500;
+    color: #1E293B;
 }
 
 /* Status colors */
@@ -254,120 +256,190 @@ button[data-testid="stBaseButton-primary"]:hover {
 .status-info { color: #0097A7 !important; }
 
 /* Status backgrounds */
-.bg-success { background-color: rgba(16, 185, 129, 0.1) !important; }
-.bg-warning { background-color: rgba(245, 158, 11, 0.1) !important; }
-.bg-danger { background-color: #FFE4E6 !important; }
-.bg-info { background-color: rgba(0, 151, 167, 0.1) !important; }
+.bg-success { background-color: rgba(16, 185, 129, 0.08) !important; }
+.bg-warning { background-color: rgba(245, 158, 11, 0.08) !important; }
+.bg-danger { background-color: rgba(244, 63, 94, 0.08) !important; }
+.bg-info { background-color: rgba(0, 151, 167, 0.08) !important; }
 
 /* Badge/Pill style */
 .badge {
     display: inline-block;
-    padding: 6px 16px;
-    border-radius: 90px;
-    font-family: 'Source Sans Pro', Arial, sans-serif;
-    font-size: 13px;
-    font-weight: 500;
-    box-shadow: 0 0 0 4px rgba(0, 151, 167, 0.05);
+    padding: 3px 14px;
+    border-radius: 20px;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
 }
 
 /* Section spacing */
-.section-gap { margin-top: 48px !important; }
-.row-gap { margin-top: 24px !important; }
+.section-gap { margin-top: 20px !important; }
+.row-gap { margin-top: 10px !important; }
 
-/* Gradient section divider */
+/* Section divider */
 .section-divider {
-    height: 2px;
-    background: linear-gradient(90deg, #0097A7 0%, #FF6B6B 50%, #00BCD4 100%);
+    height: 1px;
+    background: #E8EDF2;
     border: none;
-    margin: 32px 0;
-    border-radius: 1px;
-    opacity: 0.5;
+    margin: 12px 0;
 }
 
 /* Section header with teal left-border */
 .section-header {
-    border-left: 4px solid #0097A7;
+    border-left: 3px solid #0097A7;
     padding-left: 12px;
-    margin: 24px 0 16px 0;
+    margin: 16px 0 8px 0;
 }
 .section-header h3 {
     margin: 0 !important;
     padding: 0 !important;
+    font-size: 17px !important;
+    letter-spacing: -0.01em !important;
 }
 
-/* Expander styling - white box with thin border */
+/* Expander styling */
 .streamlit-expanderHeader {
-    font-family: 'Source Sans Pro', Arial, sans-serif !important;
-    font-size: 14px !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+    font-size: 13px !important;
     font-weight: 500 !important;
-    color: #1A3C40 !important;
+    color: #1E293B !important;
     background-color: #FFFFFF !important;
-    border: 1px solid #D0E8EA !important;
-    border-radius: 8px !important;
+    border: 1px solid #E8EDF2 !important;
+    border-radius: 14px !important;
 }
 [data-testid="stExpander"] {
     background-color: #FFFFFF !important;
-    border: 1px solid #D0E8EA !important;
-    border-radius: 8px !important;
+    border: 1px solid #E8EDF2 !important;
+    border-radius: 14px !important;
     padding: 0 !important;
 }
 [data-testid="stExpander"] details {
     background-color: #FFFFFF !important;
-    border: 1px solid #D0E8EA !important;
-    border-radius: 8px !important;
+    border: 1px solid #E8EDF2 !important;
+    border-radius: 14px !important;
 }
 [data-testid="stExpander"] summary {
     background-color: #FFFFFF !important;
     padding: 12px 16px !important;
-    border-radius: 8px !important;
+    border-radius: 14px !important;
 }
 [data-testid="stExpander"] [data-testid="stExpanderDetails"] {
     background-color: #FFFFFF !important;
     padding: 16px !important;
-    border-top: 1px solid #D0E8EA !important;
+    border-top: 1px solid #E8EDF2 !important;
 }
 
 /* DataFrame styling */
 .stDataFrame {
-    border: 1px solid #D0E8EA !important;
-    border-radius: 8px !important;
+    border: 1px solid #E8EDF2 !important;
+    border-radius: 14px !important;
 }
 
 /* Info/Warning boxes */
 .stAlert {
-    background-color: #E8F4F5 !important;
-    border: 1px solid #D0E8EA !important;
-    border-radius: 8px !important;
-    color: #1A3C40 !important;
+    background-color: #F8FAFB !important;
+    border: 1px solid #E8EDF2 !important;
+    border-radius: 14px !important;
+    color: #1E293B !important;
 }
 
 /* Sidebar selectbox and input styling */
 [data-testid="stSidebar"] [data-baseweb="select"] { background-color: #FFFFFF !important; }
 [data-testid="stSidebar"] [data-baseweb="select"] > div {
     background-color: #FFFFFF !important;
-    border-color: #D0E8EA !important;
-    color: #1A3C40 !important;
+    border-color: #E8EDF2 !important;
+    border-radius: 10px !important;
+    color: #1E293B !important;
 }
-[data-testid="stSidebar"] [data-baseweb="select"] svg { color: #5A7D82 !important; }
+[data-testid="stSidebar"] [data-baseweb="select"] svg { color: #64748B !important; }
 [data-testid="stSidebar"] [data-baseweb="input"] {
     background-color: #FFFFFF !important;
-    border-color: #D0E8EA !important;
+    border-color: #E8EDF2 !important;
+    border-radius: 10px !important;
 }
 [data-testid="stSidebar"] input {
-    color: #1A3C40 !important;
+    color: #1E293B !important;
     background-color: #FFFFFF !important;
 }
-[data-testid="stSidebar"] label { color: #1A3C40 !important; }
-[data-testid="stSidebar"] .stCheckbox label span { color: #1A3C40 !important; }
+[data-testid="stSidebar"] label {
+    color: #1E293B !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+}
+[data-testid="stSidebar"] .stCheckbox label span { color: #1E293B !important; }
 
-/* Dropdown menu styling */
+/* Sidebar divider — subtle */
+[data-testid="stSidebar"] hr {
+    border-color: #E8EDF2 !important;
+    margin: 16px 0 !important;
+}
+
+/* Dropdown menu styling — white background, dark text */
 [data-baseweb="popover"] { background-color: #FFFFFF !important; }
-[data-baseweb="popover"] li { color: #1A3C40 !important; }
-[data-baseweb="popover"] li:hover { background-color: #F0F7F8 !important; }
+[data-baseweb="popover"] ul { background-color: #FFFFFF !important; }
+[data-baseweb="popover"] li {
+    color: #1E293B !important;
+    background-color: #FFFFFF !important;
+}
+[data-baseweb="popover"] li:hover {
+    background-color: #F4F7F9 !important;
+}
+[data-baseweb="popover"] li[aria-selected="true"] {
+    background-color: #E0F4F5 !important;
+    color: #0097A7 !important;
+}
+
+/* Dropdown list container — force white everywhere */
+[data-baseweb="menu"],
+[data-baseweb="menu"] > div,
+[data-baseweb="menu"] ul,
+[data-baseweb="menu"] li,
+[role="listbox"],
+[role="listbox"] > div,
+[role="listbox"] li,
+[role="option"],
+[data-baseweb="popover"] > div,
+[data-baseweb="popover"] > div > div,
+[data-baseweb="popover"] > div > div > div,
+[data-baseweb="popover"] [data-baseweb="menu"],
+[data-baseweb="popover"] [role="listbox"] {
+    background-color: #FFFFFF !important;
+    background: #FFFFFF !important;
+    color: #1E293B !important;
+}
+[role="listbox"] li:hover,
+[role="option"]:hover,
+[data-baseweb="menu"] li:hover {
+    background-color: #F4F7F9 !important;
+    background: #F4F7F9 !important;
+}
+[role="option"][aria-selected="true"] {
+    background-color: #E0F4F5 !important;
+    background: #E0F4F5 !important;
+    color: #0097A7 !important;
+}
+
+/* Sidebar button — compact and styled */
+[data-testid="stSidebar"] .stButton > button {
+    font-size: 12px !important;
+    padding: 6px 14px !important;
+    min-height: 0 !important;
+}
 
 /* Fix selectbox text color */
-[data-baseweb="select"] span { color: #1A3C40 !important; }
-[data-baseweb="select"] div[data-testid="stMarkdownContainer"] p { color: #1A3C40 !important; }
+[data-baseweb="select"] span { color: #1E293B !important; }
+[data-baseweb="select"] div[data-testid="stMarkdownContainer"] p { color: #1E293B !important; }
+[data-baseweb="select"] input { color: #1E293B !important; background-color: #FFFFFF !important; }
+
+
+
+/* Plotly charts — no border/shadow */
+[data-testid="stPlotlyChart"] {
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -670,28 +742,18 @@ with st.spinner("Loading US stocks..."):
     all_stocks_df = load_all_us_stocks()
     sp500_set = set(all_stocks_df[all_stocks_df["is_sp500"]]["ticker"].tolist())
 
-# Sidebar
+# Sidebar (matches Dash: Stock Selection, My Position, Refresh Data)
 with st.sidebar:
-    st.header("Filters")
+    st.markdown("""
+    <div style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;
+                font-size:18px;font-weight:700;color:#0F172A;letter-spacing:-0.02em;
+                margin-bottom:16px;padding-top:4px;">
+        Dashboard Controls
+    </div>
+    """, unsafe_allow_html=True)
 
-    # Sector filter
-    sectors = ["All Sectors"] + sorted(all_stocks_df["sector"].dropna().unique().tolist())
-    selected_sector = st.selectbox("Sector", sectors, index=0)
-
-    # Apply filters
-    filtered_df = all_stocks_df.copy()
-    if selected_sector != "All Sectors":
-        filtered_df = filtered_df[filtered_df["sector"] == selected_sector]
-
-    st.divider()
-    st.header("Stock Selection")
-
-    if filtered_df.empty:
-        st.warning("No stocks match the current filters.")
-        st.stop()
-
-    ticker_options = filtered_df["ticker"].tolist()
-    ticker_labels = [f"{row['ticker']} - {row['name']}" for _, row in filtered_df.iterrows()]
+    ticker_options = all_stocks_df["ticker"].tolist()
+    ticker_labels = [f"{row['ticker']} - {row['name']}" for _, row in all_stocks_df.iterrows()]
 
     # Default to AAPL if available, otherwise first stock
     default_idx = 0
@@ -699,70 +761,33 @@ with st.sidebar:
         default_idx = ticker_options.index("AAPL")
 
     selected_idx = st.selectbox(
-        "Choose a stock",
+        "Stock",
         range(len(ticker_options)),
         format_func=lambda i: ticker_labels[i],
         index=default_idx
     )
     selected = ticker_options[selected_idx]
 
-    # Show S&P 500 status
-    stock_row = filtered_df[filtered_df["ticker"] == selected].iloc[0]
-    if stock_row["is_sp500"]:
-        st.caption("S&P 500 Member")
-    else:
-        st.caption("Not in S&P 500")
-
-    st.divider()
-    st.header("Strategy")
-    selected_strategy = st.radio(
-        "Scoring Strategy",
-        options=["Volume+RSI", "Optimized Weights"],
-        index=0,
-        help="Volume+RSI = Paper 1 (EMA+ATV+RSI+RL). Optimized Weights = Paper 2 (5-factor scoring).",
-        captions=["Paper 1: EMA+ATV+RL", "Paper 2: Factor Weights"],
+    # Chart period — horizontal radio for compact look
+    period_options = ["1D", "5D", "1M", "6M", "YTD", "1Y", "5Y", "MAX"]
+    chart_period = st.selectbox(
+        "Chart Period",
+        period_options,
+        index=period_options.index("6M"),
     )
 
-    # Risk profile selector (for Paper 2 and Combined strategies)
-    risk_profile = "moderate"
-    if selected_strategy == "Optimized Weights":
-        risk_profile = st.selectbox(
-            "Risk Profile",
-            options=["conservative", "moderate", "aggressive"],
-            index=1,
-            format_func=lambda x: x.title(),
-            help="Conservative: heavy on beta + market cap. Moderate/Aggressive: P/B, ROE, momentum weighted."
-        )
-
-    # RL Agent controls (Paper 1)
-    rl_model = None
-    rl_prediction = None
-    if selected_strategy in ["Volume+RSI"]:
-        try:
-            import rl_agent
-            if rl_agent.is_available():
-                st.divider()
-                st.header("RL Agent")
-                if st.button("Retrain RL Agent", help="Retrain PPO model on current stock data (~10-30s)"):
-                    st.session_state["force_retrain_rl"] = True
-                st.caption("PPO agent acts as meta-decision layer on rule-based signals.")
-            else:
-                st.divider()
-                st.warning("⚠️ RL Agent unavailable — install `stable-baselines3` and `gymnasium` for full Paper 1 analysis.")
-        except ImportError:
-            st.divider()
-            st.warning("⚠️ RL Agent unavailable — install `stable-baselines3` and `gymnasium` for full Paper 1 analysis.")
+    st.divider()
 
     # Position tracker
-    st.divider()
-    st.header("My Position")
     owns_stock = st.toggle("I own this stock", value=False)
     cost_basis = None
     if owns_stock:
         cost_basis = st.number_input("Avg cost per share ($)", min_value=0.01, value=100.0, step=0.01)
 
     st.divider()
-    # Clear cache button
+
+    import datetime as _dt
+    st.caption(f"*Last updated: {_dt.datetime.now().strftime('%I:%M %p')}*")
     if st.button("Refresh Data", help="Clear cached data and reload fresh data"):
         st.cache_data.clear()
         st.rerun()
@@ -800,67 +825,45 @@ with st.spinner("Analyzing market conditions..."):
     # RSI value for RSI gate
     rsi_value = price_data["RSI"].iloc[-1] if "RSI" in price_data.columns else 50
 
-    # Load peer metrics for Paper 2 strategies
-    peer_metrics = None
-    fund_stock_sector = all_stocks_df[all_stocks_df["ticker"] == selected]["sector"].values
-    if len(fund_stock_sector) > 0:
-        current_sector = fund_stock_sector[0]
-        sector_peers = all_stocks_df[all_stocks_df["sector"] == current_sector]["ticker"].tolist()
-        sector_peers = [t for t in sector_peers if t != selected][:15]
-        if sector_peers:
-            peer_metrics = load_sector_peers_metrics(tuple(sector_peers + [selected]))
-
-    # Paper 2 fundamental score (with price_data for momentum factor)
-    fund_score_p2, fund_details_p2 = calculate_fundamental_score_paper2(
-        info, peer_metrics=peer_metrics, risk_profile=risk_profile, price_data=price_data
-    )
-
-    # Paper 1 signal details (always init, conditionally compute)
+    # Paper 1 signal details
     paper1_details = None
-    if selected_strategy == "Volume+RSI" and len(price_data) >= 50:
+    if len(price_data) >= 50:
         _, paper1_details = generate_paper1_signal(price_data)
 
-    # RL Agent (Paper 1) - always init rl_prediction here to override sidebar init
+    # RL Agent (auto-trains, no sidebar controls — matches Dash)
     rl_prediction = None
-    if selected_strategy == "Volume+RSI":
-        try:
-            import rl_agent
-            if rl_agent.is_available():
-                force_retrain = st.session_state.pop("force_retrain_rl", False)
-                with st.spinner("Loading RL agent..." if not force_retrain else "Training RL agent..."):
-                    model = rl_agent.get_ppo_agent(price_data, ticker=selected, force_retrain=force_retrain)
-                    if model is not None:
-                        rl_prediction = rl_agent.predict_action(model, price_data)
-        except ImportError:
-            pass
+    try:
+        import rl_agent
+        if rl_agent.is_available():
+            with st.spinner("Loading RL agent..."):
+                model = rl_agent.get_ppo_agent(price_data, ticker=selected)
+                if model is not None:
+                    rl_prediction = rl_agent.predict_action(model, price_data)
+    except Exception:
+        pass
 
 # =============================================================================
 # Dashboard recommendation (long-term horizon) + news + logo (shared by Dashboard & News tabs)
 # =============================================================================
 company_logo_url = load_company_logo(selected)
 
-if selected_strategy == "Volume+RSI":
-    dashboard_recommendation = generate_recommendation_paper1(
-        tech_score, fund_score_p2, volume_score, rsi_value,
-        market_regime, selected, info, time_horizon="long",
-        price_data=price_data, rl_prediction=rl_prediction,
-    )
-else:
-    dashboard_recommendation = generate_recommendation_paper2(
-        tech_score, fund_score_p2, market_regime, selected, info,
-        risk_profile="moderate", time_horizon="long",
-    )
+dashboard_recommendation = generate_recommendation_paper1(
+    tech_score, volume_score, rsi_value,
+    market_regime, selected, info, time_horizon="long",
+    price_data=price_data, rl_prediction=rl_prediction,
+)
 
 news_items = load_finnhub_news(selected)
 
 # =============================================================================
 # TABS - Render using modular tab files
 # =============================================================================
-dashboard_tab, analysis_tab, overview_tab, technical_tab, fundamentals_tab, news_tab, backtest_tab = st.tabs(
-    ["Dashboard", "Analysis", "Overview", "Technical", "Fundamentals", "News & Sentiment", "Backtest"]
+dashboard_tab, analysis_tab, technical_tab, fundamentals_tab, news_tab = st.tabs(
+    ["Dashboard", "Analysis", "Technical", "Fundamentals", "Recent News"]
 )
 
 with dashboard_tab:
+    # Use paper1_details from recommendation (includes rl_signal)
     dashboard.render(
         selected=selected,
         price_data=price_data,
@@ -871,17 +874,16 @@ with dashboard_tab:
         tech_details=tech_details,
         volume_score=volume_score,
         volume_details=volume_details,
-        fund_score_p2=fund_score_p2,
-        fund_details_p2=fund_details_p2,
         market_regime=market_regime,
         regime_metrics=regime_metrics,
         recommendation_data=dashboard_recommendation,
         rsi_value=rsi_value,
-        selected_strategy=selected_strategy,
         news_items=news_items,
         cost_basis=cost_basis,
-        paper1_details=paper1_details,
+        paper1_details=dashboard_recommendation.get("paper1_details", paper1_details),
         logo_url=company_logo_url,
+        is_sp500=selected in sp500_set,
+        chart_period=chart_period,
     )
 
 with analysis_tab:
@@ -894,32 +896,12 @@ with analysis_tab:
         market_regime=market_regime,
         regime_metrics=regime_metrics,
         last_row=last_row,
-        selected_strategy=selected_strategy,
         volume_score=volume_score,
         volume_details=volume_details,
         rsi_value=rsi_value,
-        risk_profile=risk_profile,
-        fund_score_p2=fund_score_p2,
-        fund_details_p2=fund_details_p2,
-        paper1_details=paper1_details,
+        paper1_details=dashboard_recommendation.get("paper1_details", paper1_details),
         rl_prediction=rl_prediction,
         cost_basis=cost_basis,
-    )
-
-with overview_tab:
-    overview.render(
-        selected=selected,
-        price_data=price_data,
-        info=info,
-        all_stocks_df=all_stocks_df,
-        filtered_df=filtered_df,
-        sector=sector,
-        industry=industry,
-        last_row=last_row,
-        change_pct=change_pct,
-        sp500_set=sp500_set,
-        load_industry_market_caps=load_industry_market_caps,
-        load_sector_peers_metrics=load_sector_peers_metrics,
     )
 
 with technical_tab:
@@ -930,9 +912,11 @@ with technical_tab:
         tech_score=tech_score,
         tech_details=tech_details,
         last_row=last_row,
-        selected_strategy=selected_strategy,
         volume_score=volume_score,
         volume_details=volume_details,
+        paper1_details=dashboard_recommendation.get("paper1_details", paper1_details),
+        rl_prediction=rl_prediction,
+        rsi_value=rsi_value,
     )
 
 with fundamentals_tab:
@@ -941,24 +925,10 @@ with fundamentals_tab:
         info=info,
         financials=financials,
         all_stocks_df=all_stocks_df,
-        filtered_df=filtered_df,
         price_data=price_data,
         load_sector_peers_metrics=load_sector_peers_metrics,
-        selected_strategy=selected_strategy,
-        fund_score_p2=fund_score_p2,
-        fund_details_p2=fund_details_p2,
-        risk_profile=risk_profile,
     )
 
 with news_tab:
     news.render(news_items=news_items)
-
-with backtest_tab:
-    backtest.render(
-        selected=selected,
-        price_data=price_data,
-        info=info,
-        market_regime=market_regime,
-        peer_metrics=peer_metrics,
-    )
 

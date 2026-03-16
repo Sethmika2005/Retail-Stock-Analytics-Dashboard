@@ -40,7 +40,22 @@
       "Bash(git -C /c/python/Retail-Stock-Analytics-Dashboard status)",
       "Bash(github \"C:/python/Retail-Stock-Analytics-Dashboard\")",
       "Bash(gh api:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "WebFetch(domain:www.tradingview.com)",
+      "Bash(mkdir:*)",
+      "Bash(mv:*)",
+      "Bash(cp:*)",
+      "Bash(mv dash_app:*)",
+      "Bash(rm:*)",
+      "Bash(ls C:/python/Retail-Stock-Analytics-Dashboard/*.pptx)",
+      "Bash(ls C:/python/Retail-Stock-Analytics-Dashboard/*.ppt)",
+      "Read(//c/Users/sethm/**)",
+      "Read(//c/Users/sethm/Downloads/**)",
+      "Bash(ls C:/python/Retail-Stock-Analytics-Dashboard/Error* 2>/dev/null; ls C:/python/Retail-Stock-Analytics-Dashboard/error* 2>/dev/null)",
+      "Bash(cd C:/python/Retail-Stock-Analytics-Dashboard && mkdir -p archive/streamlit_v1 archive/testing archive/presentations archive/docs archive/misc)",
+      "Bash(cd C:/python/Retail-Stock-Analytics-Dashboard && mv app.py archive/streamlit_v1/ && mv models.py archive/streamlit_v1/ && mv components.py archive/streamlit_v1/ && mv backtest.py archive/streamlit_v1/ && mv rl_agent.py archive/streamlit_v1/ && mv tabs/ archive/streamlit_v1/ && mv models_cache/ archive/streamlit_v1/ && echo \"Old Streamlit code moved\")",
+      "Bash(cd C:/python/Retail-Stock-Analytics-Dashboard && mv dashboard_layout.pptx archive/presentations/ && mv Example_Format.pptx archive/presentations/ && mv Format.pptx archive/presentations/ && mv export_dashboard_pptx.py archive/presentations/ && mv pptx_images/ archive/presentations/ && mv tab_screenshots/ archive/presentations/ && echo \"Presentations moved\")",
+      "Bash(cd C:/python/Retail-Stock-Analytics-Dashboard && mv \"6DATA007W_Final_Project_Report_Template.docx\" archive/docs/ && mv Slide_Content.txt archive/docs/ 2>/dev/null; mv Smart_Stock_Trading.pdf archive/docs/ && mv Oprimal_Weights.pdf archive/docs/ && echo \"Docs moved\")"
     ]
   }
 }

@@ -1,0 +1,11 @@
+dash
+dash-bootstrap-components
+plotly
+yfinance
+pandas
+numpy
+python-dotenv
+requests
+gymnasium
+stable-baselines3
+flask-caching

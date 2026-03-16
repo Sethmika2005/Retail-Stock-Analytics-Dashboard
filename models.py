@@ -10,21 +10,81 @@ import pandas as pd
 # =============================================================================
 
 POSITIVE_WORDS = {
-    "beat", "beats", "surge", "surges", "soar", "soars", "record",
-    "growth", "profit", "upgrade", "bull", "bullish", "strong", "tops",
+    # Earnings & performance
+    "beat", "beats", "beating", "exceeded", "exceeds", "topped", "tops", "topping",
+    "outperform", "outperforms", "outperformed", "outpacing",
+    "record", "record-breaking", "all-time",
+    # Growth & gains
+    "surge", "surges", "surging", "soar", "soars", "soaring",
+    "rally", "rallies", "rallying", "rebound", "rebounds", "rebounding",
+    "gain", "gains", "gaining", "rise", "rises", "rising", "climbs", "climbing",
+    "jump", "jumps", "jumping", "spike", "spikes", "spiking",
+    "growth", "growing", "grew", "expand", "expands", "expanding", "expansion",
+    "boom", "booming", "breakout", "acceleration", "accelerating",
+    # Positive sentiment
+    "profit", "profits", "profitable", "profitability",
+    "upgrade", "upgrades", "upgraded", "upbeat", "optimistic", "optimism",
+    "bull", "bullish", "buy", "overweight", "outperform",
+    "strong", "strength", "strengthens", "robust", "solid", "resilient",
+    "positive", "favorable", "favourable", "promising", "encouraging",
+    "confident", "confidence", "momentum", "tailwind", "tailwinds",
+    # Business events
+    "innovation", "innovative", "breakthrough", "launch", "launches", "launched",
+    "partnership", "acquisition", "deal", "wins", "win", "winning", "won",
+    "approval", "approved", "approves", "dividend", "buyback", "repurchase",
+    "recovery", "recovering", "recovered", "turnaround",
+    "revenue", "sales", "demand", "orders",
+    "milestone", "achievement", "success", "successful",
+    "raises", "raised", "hikes", "hiking", "boost", "boosts", "boosting",
+    "exceeding", "impressive", "stellar", "blockbuster", "blowout",
+    "highest", "peak", "upside", "upward",
 }
 
 NEGATIVE_WORDS = {
-    "miss", "misses", "drop", "drops", "plunge", "plunges", "cut",
-    "cuts", "downgrade", "bear", "bearish", "weak", "lawsuit", "decline",
+    # Earnings & performance
+    "miss", "misses", "missed", "missing", "disappoint", "disappoints", "disappointing",
+    "underperform", "underperforms", "underperformed", "underperforming",
+    "shortfall", "below", "worse", "worst",
+    # Declines & losses
+    "drop", "drops", "dropping", "dropped",
+    "plunge", "plunges", "plunging", "plunged",
+    "fall", "falls", "falling", "fell", "tumble", "tumbles", "tumbling",
+    "crash", "crashes", "crashing", "crashed", "collapse", "collapses", "collapsing",
+    "sink", "sinks", "sinking", "sank", "slide", "slides", "sliding", "slid",
+    "slump", "slumps", "slumping", "decline", "declines", "declining", "declined",
+    "loss", "losses", "losing", "lost", "deficit",
+    "selloff", "sell-off", "rout", "bloodbath", "wipeout",
+    "plummets", "plummeting", "nosedive", "freefall",
+    # Negative sentiment
+    "cut", "cuts", "cutting", "slash", "slashes", "slashing",
+    "downgrade", "downgrades", "downgraded", "sell", "underweight",
+    "bear", "bearish", "weak", "weakness", "weakens", "weaker", "weakening",
+    "negative", "unfavorable", "unfavourable", "pessimistic", "pessimism",
+    "concern", "concerns", "concerned", "worried", "worries", "worry", "fear", "fears",
+    "risk", "risks", "risky", "threat", "threatens", "threatening",
+    "volatile", "volatility", "uncertainty", "uncertain", "turbulence",
+    "headwind", "headwinds", "downturn", "recession", "recessionary",
+    # Business events
+    "lawsuit", "lawsuits", "sued", "sues", "litigation", "probe", "investigation",
+    "fraud", "scandal", "violation", "penalty", "penalties", "fine", "fined", "fines",
+    "layoff", "layoffs", "restructuring", "job-cuts", "downsizing",
+    "bankruptcy", "insolvent", "default", "defaults", "defaulted",
+    "recall", "recalls", "recalled", "warning", "warns", "warned",
+    "shutdown", "halt", "halts", "halted", "suspend", "suspends", "suspended",
+    "delay", "delays", "delayed", "setback", "obstacle",
+    "debt", "leverage", "overvalued", "bubble", "inflated",
+    "downside", "downward", "lowest", "bottom", "gutted",
+    "failure", "fails", "failed", "struggling", "struggle",
 }
 
 
 def classify_headline_sentiment(title):
     """Classify a headline as Positive, Negative, or Neutral based on keywords."""
-    words = set(title.lower().split())
-    pos = len(words & POSITIVE_WORDS)
-    neg = len(words & NEGATIVE_WORDS)
+    # Clean and tokenize — strip punctuation from each word
+    import re
+    tokens = set(re.findall(r"[a-z]+(?:-[a-z]+)*", title.lower()))
+    pos = len(tokens & POSITIVE_WORDS)
+    neg = len(tokens & NEGATIVE_WORDS)
     if pos > neg:
         return "Positive"
     if neg > pos:
@@ -35,36 +95,6 @@ def classify_headline_sentiment(title):
 # =============================================================================
 # RISK CLASSIFICATION
 # =============================================================================
-
-def classify_risk(df):
-    """Classify overall risk level based on volatility and RSI."""
-    returns = df["Close"].pct_change().dropna()
-    if returns.empty:
-        return "Unknown", "gray", []
-    vol = returns.tail(60).std() * np.sqrt(252)
-    rsi = df["RSI"].iloc[-1] if "RSI" in df.columns else 50
-    factors = []
-
-    if vol > 0.5:
-        level = "High"
-        color = "red"
-        factors.append("Elevated 60d volatility")
-    elif vol > 0.3:
-        level = "Medium"
-        color = "orange"
-        factors.append("Moderate 60d volatility")
-    else:
-        level = "Low"
-        color = "green"
-        factors.append("Stable 60d volatility")
-
-    if rsi > 70:
-        factors.append("RSI above 70 (overbought)")
-    elif rsi < 30:
-        factors.append("RSI below 30 (oversold)")
-
-    return level, color, factors
-
 
 # =============================================================================
 # MARKET REGIME DETECTION
@@ -196,62 +226,11 @@ def calculate_technical_score(df):
     return total, scores
 
 
-def calculate_risk_score(df):
-    """Calculate risk score (0-100, higher = less risky/better)."""
-    if df.empty:
-        return 50, {}
-
-    scores = {}
-    returns = df["Close"].pct_change().dropna()
-
-    vol_60d = returns.tail(60).std() * np.sqrt(252) if len(returns) >= 60 else returns.std() * np.sqrt(252)
-
-    vol_score = 25
-    if pd.notna(vol_60d):
-        if vol_60d < 0.20:
-            vol_score = 50
-        elif vol_60d < 0.30:
-            vol_score = 40
-        elif vol_60d < 0.40:
-            vol_score = 30
-        elif vol_60d < 0.50:
-            vol_score = 20
-        else:
-            vol_score = 10
-    scores["volatility"] = vol_score
-    scores["vol_60d"] = vol_60d
-
-    prices = df["Close"].tail(252)
-    rolling_max = prices.expanding().max()
-    drawdown = (prices - rolling_max) / rolling_max
-    max_drawdown = drawdown.min()
-
-    dd_score = 25
-    if pd.notna(max_drawdown):
-        if max_drawdown > -0.10:
-            dd_score = 50
-        elif max_drawdown > -0.20:
-            dd_score = 40
-        elif max_drawdown > -0.30:
-            dd_score = 30
-        elif max_drawdown > -0.40:
-            dd_score = 20
-        else:
-            dd_score = 10
-    scores["drawdown"] = dd_score
-    scores["max_drawdown"] = max_drawdown
-
-    total = vol_score + dd_score
-    scores["total"] = total
-
-    return total, scores
-
-
 # =============================================================================
 # RECOMMENDATION ENGINE
 # =============================================================================
 
-def generate_key_drivers(info, tech_score, fund_score, price_data, market_regime):
+def generate_key_drivers(info, tech_score, price_data, market_regime):
     """Generate 3 key drivers in plain English."""
     drivers = []
 
@@ -272,7 +251,11 @@ def generate_key_drivers(info, tech_score, fund_score, price_data, market_regime
     roe = info.get("returnOnEquity")
     growth = info.get("revenueGrowth")
 
-    if fund_score >= 65:
+    # Assess fundamentals from raw metrics
+    strong = (growth and growth > 0.15) or (roe and roe > 0.15) or (pe and pe < 20)
+    weak = (pe and pe > 30) or (roe and roe < 0.08)
+
+    if strong:
         if growth and growth > 0.15:
             drivers.append(f"Strong fundamentals with {growth*100:.0f}% revenue growth")
         elif roe and roe > 0.15:
@@ -281,13 +264,13 @@ def generate_key_drivers(info, tech_score, fund_score, price_data, market_regime
             drivers.append(f"Attractively valued at {pe:.1f}x earnings")
         else:
             drivers.append("Solid fundamentals support the investment thesis")
-    elif fund_score >= 40:
-        drivers.append("Fundamentals are acceptable but not compelling")
-    else:
+    elif weak:
         if pe and pe > 30:
             drivers.append(f"Valuation stretched at {pe:.1f}x earnings")
         else:
             drivers.append("Fundamental concerns about profitability or growth")
+    else:
+        drivers.append("Fundamentals are acceptable but not compelling")
 
     if market_regime in ["Bull"]:
         drivers.append("Favorable market environment supports risk-taking")
@@ -368,7 +351,7 @@ def generate_action_checklist(recommendation, info, price_data, atr_multiplier=2
     return actions
 
 
-def generate_bull_bear_case(info, tech_score, fund_score, price_data, market_regime):
+def generate_bull_bear_case(info, tech_score, price_data, market_regime):
     """Generate bull and bear case arguments."""
     bull_case = []
     bear_case = []
@@ -429,69 +412,6 @@ def generate_bull_bear_case(info, tech_score, fund_score, price_data, market_reg
         bear_case.append("Standard market and execution risks")
 
     return bull_case[:4], bear_case[:4]
-
-
-def generate_dashboard_narrative(recommendation_data, paper1_details, market_regime,
-                                  rsi_value, info, price_data, selected_strategy,
-                                  tech_score, volume_score, fund_score_p2):
-    """Generate a plain-English 4-sentence intelligence summary for the dashboard.
-
-    Sentences:
-    1. Headline: company + signal + confidence
-    2. Evidence: strategy-specific reasoning
-    3. RSI context
-    4. Market regime context
-    """
-    company = info.get("shortName", info.get("symbol", "This stock"))
-    rec = recommendation_data.get("recommendation", "HOLD")
-    confidence = recommendation_data.get("confidence", 50)
-
-    # Sentence 1 — Headline
-    s1 = f"{company} is showing a {rec} signal with {confidence}% confidence."
-
-    # Sentence 2 — Evidence (strategy-dependent)
-    if selected_strategy == "Volume+RSI":
-        if paper1_details and paper1_details.get("crossover_type") in ("golden_cross", "death_cross"):
-            cross_label = "bullish golden cross" if paper1_details["crossover_type"] == "golden_cross" else "bearish death cross"
-            if paper1_details.get("atv_confirmed"):
-                s2 = f"The short-term trend just triggered a {cross_label} confirmed by rising trading volume."
-            else:
-                s2 = f"A {cross_label} was detected, but trading volume did not confirm the move."
-        else:
-            if tech_score >= 65:
-                s2 = f"No crossover event today, but the technical picture is positive (score {tech_score}/100)."
-            elif tech_score >= 40:
-                s2 = f"No crossover event today and technicals are mixed (score {tech_score}/100)."
-            else:
-                s2 = f"No crossover event today and the technical setup is weak (score {tech_score}/100)."
-    else:
-        composite = recommendation_data.get("composite_score", 50)
-        s2 = f"The composite score combining technical ({tech_score}/100) and fundamental ({fund_score_p2:.0f}/100) analysis is {composite:.0f}/100."
-
-    # Sentence 3 — RSI context
-    if rsi_value is None or pd.isna(rsi_value):
-        rsi_value = 50
-    if rsi_value > 70:
-        s3 = f"RSI at {rsi_value:.0f} indicates overbought conditions — the price may be stretched."
-    elif rsi_value > 55:
-        s3 = f"RSI at {rsi_value:.0f} shows bullish momentum without being overextended."
-    elif rsi_value > 45:
-        s3 = f"RSI at {rsi_value:.0f} is neutral, suggesting no strong directional pressure."
-    elif rsi_value > 30:
-        s3 = f"RSI at {rsi_value:.0f} leans bearish, indicating weakening momentum."
-    else:
-        s3 = f"RSI at {rsi_value:.0f} signals oversold conditions — a bounce may be ahead."
-
-    # Sentence 4 — Market regime
-    regime_map = {
-        "Bull": "The broader market is in a bull regime, which supports risk-on positioning.",
-        "Bear": "The broader market is in a bear regime, suggesting a defensive stance.",
-        "High-Volatility": "Market volatility is elevated, so position sizing and risk management are key.",
-        "Sideways": "The market is range-bound, making stock-specific factors more important.",
-    }
-    s4 = regime_map.get(market_regime, "Market conditions are currently unclear.")
-
-    return f"{s1} {s2} {s3} {s4}"
 
 
 def generate_view_changers(recommendation, info, price_data):
@@ -664,7 +584,7 @@ def generate_paper1_signal(df, row_idx=-1):
         return "HOLD", details
 
 
-def generate_recommendation_paper1(tech_score, fund_score, volume_score, rsi_value,
+def generate_recommendation_paper1(tech_score, volume_score, rsi_value,
                                     market_regime, ticker, info, time_horizon="long",
                                     price_data=None, rl_prediction=None):
     """
@@ -1116,79 +1036,6 @@ def _absolute_mcap(market_cap):
         return 35
     else:
         return 15
-
-
-# Keep legacy absolute fallbacks for backward compat
-def _absolute_profitability(roe, profit_margin):
-    """Absolute profitability score (0-100) fallback."""
-    if roe is not None and profit_margin is not None:
-        if roe > 0.20 and profit_margin > 0.15:
-            return 100
-        elif roe > 0.15 and profit_margin > 0.10:
-            return 80
-        elif roe > 0.10 and profit_margin > 0.05:
-            return 60
-        elif roe > 0 and profit_margin > 0:
-            return 40
-        else:
-            return 20
-    return 50
-
-
-def _absolute_growth(rev_growth):
-    """Absolute growth score (0-100) fallback."""
-    if rev_growth is not None:
-        if rev_growth > 0.25:
-            return 100
-        elif rev_growth > 0.15:
-            return 80
-        elif rev_growth > 0.05:
-            return 60
-        elif rev_growth > 0:
-            return 40
-        else:
-            return 20
-    return 50
-
-
-def _absolute_leverage(debt_equity):
-    """Absolute leverage score (0-100) fallback."""
-    if debt_equity is not None:
-        if debt_equity < 30:
-            return 100
-        elif debt_equity < 50:
-            return 80
-        elif debt_equity < 100:
-            return 60
-        elif debt_equity < 150:
-            return 40
-        else:
-            return 20
-    return 50
-
-
-def _absolute_valuation(pe, peg):
-    """Absolute valuation score (0-100) fallback."""
-    if pe is not None and pe > 0:
-        if peg is not None and peg > 0:
-            if peg < 1:
-                return 100
-            elif peg < 1.5:
-                return 80
-            elif peg < 2:
-                return 60
-            else:
-                return 40
-        else:
-            if pe < 15:
-                return 80
-            elif pe < 25:
-                return 60
-            elif pe < 35:
-                return 40
-            else:
-                return 20
-    return 50
 
 
 def generate_recommendation_paper2(tech_score, fund_score, market_regime, ticker, info,

@@ -1,598 +1,711 @@
 # =============================================================================
-# FUNDAMENTALS TAB - Simplified with 4 key charts
+# FUNDAMENTALS TAB - "The Financial Health Story" — Charts with verdicts
 # =============================================================================
 
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import streamlit as st
-from components import format_large_number
 
-# Chart styling constants
-CHART_FONT_COLOR = "#1A3C40"
-CHART_AXIS_COLOR = "#37616A"
-LEGEND_FONT_COLOR = "#1A3C40"
+from models import calculate_fundamental_score_paper2
+
+# =============================================================================
+# DESIGN TOKENS
+# =============================================================================
+
+FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+BG = "#F4F7F9"
+CARD_BG = "#FFFFFF"
+BORDER = "#E8EDF2"
+TEAL = "#0097A7"
+CORAL = "#FF6B6B"
+HEADING = "#0F172A"
+TEXT_PRIMARY = "#1E293B"
+TEXT_SECONDARY = "#64748B"
+MUTED = "#94A3B8"
+SUCCESS = "#10B981"
+WARNING = "#F59E0B"
+DANGER = "#EF4444"
+GRID_COLOR = "#F1F5F9"
+SHADOW_SM = "0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)"
+TRACK_COLOR = "#F1F5F9"
+
+CARD_STYLE = (
+    "background:{bg};border-radius:14px;padding:20px;"
+    "box-shadow:0 1px 3px rgba(0,0,0,0.04),0 1px 2px rgba(0,0,0,0.02);"
+    "border:1px solid {border};margin-bottom:12px;"
+).format(bg=CARD_BG, border=BORDER)
+
+LABEL_CSS = (
+    "font-size:11px;text-transform:uppercase;font-weight:600;"
+    "letter-spacing:0.06em;color:{c};font-family:{f};margin:0;"
+).format(c=TEXT_SECONDARY, f=FONT)
 
 
-def render(selected, info, financials, all_stocks_df, filtered_df,
-           price_data, load_sector_peers_metrics,
-           selected_strategy="Volume+RSI", fund_score_p2=50, fund_details_p2=None, risk_profile="moderate"):
-    """Render the Fundamentals tab content."""
-    st.subheader("Fundamentals")
+# =============================================================================
+# SHARED HELPERS
+# =============================================================================
 
-    # =========================================================================
-    # FUNDAMENTAL SCORE BREAKDOWN
-    # =========================================================================
-    # Show percentile-based score when Paper 2 or Combined strategy is active
-    if fund_details_p2:
-        display_score = fund_score_p2
-        f_status = "success" if display_score >= 65 else "warning" if display_score >= 40 else "danger"
-        f_color = {"success": "#10B981", "warning": "#FF6B6B", "danger": "#FF6B6B"}.get(f_status, "#5A7D82")
-
-        score_col1, score_col2 = st.columns([1, 3])
-
-        with score_col1:
-            st.markdown(f"""
-            <div style="background: white; border: 1px solid #D0E8EA; border-radius: 8px; padding: 16px; text-align: center;">
-                <div style="font-size: 12px; color: #5A7D82; margin-bottom: 4px;">Fundamental Score (Percentile)</div>
-                <div style="font-size: 36px; font-weight: 700; color: {f_color};">{display_score:.0f}</div>
-                <div style="font-size: 12px; color: #5A7D82;">/100 | {risk_profile.title()}</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        with score_col2:
-            st.markdown("**5-Factor Score Breakdown** (vs sector peers)")
-
-            # Factor 1: P/B Ratio
-            pb_pctile = fund_details_p2.get("pb_pctile", 50)
-            pb_val = info.get("priceToBook")
-            pb_detail = f"P/B: {pb_val:.2f}" if pb_val else ""
-            if fund_details_p2.get("pb_unavailable"):
-                st.markdown(f"P/B Ratio: **N/A** (unavailable — using 4-factor model)")
-            else:
-                st.markdown(f"P/B Ratio: **{pb_pctile:.0f}/100** percentile {(' - ' + pb_detail) if pb_detail else ''}")
-                st.progress(min(1.0, pb_pctile / 100))
-
-            # Factor 2: ROE
-            roe_pctile = fund_details_p2.get("roe_pctile", fund_details_p2.get("profitability_pctile", 50))
-            roe_val = info.get("returnOnEquity")
-            roe_detail = f"ROE: {roe_val*100:.1f}%" if roe_val else ""
-            st.markdown(f"ROE: **{roe_pctile:.0f}/100** percentile {(' - ' + roe_detail) if roe_detail else ''}")
-            st.progress(min(1.0, roe_pctile / 100))
-
-            # Factor 3: Momentum
-            momentum_pctile = fund_details_p2.get("momentum_pctile", fund_details_p2.get("growth_pctile", 50))
-            monthly_ret = None
-            if price_data is not None and "Monthly_Return" in price_data.columns:
-                mr = price_data["Monthly_Return"].iloc[-1]
-                if pd.notna(mr):
-                    monthly_ret = mr
-            mom_detail = f"Monthly Return: {monthly_ret*100:.1f}%" if monthly_ret is not None else ""
-            if not mom_detail:
-                rev_growth = info.get("revenueGrowth")
-                mom_detail = f"Rev Growth: {rev_growth*100:.1f}%" if rev_growth else ""
-            st.markdown(f"Momentum: **{momentum_pctile:.0f}/100** percentile {(' - ' + mom_detail) if mom_detail else ''}")
-            st.progress(min(1.0, momentum_pctile / 100))
-
-            # Factor 4: Beta
-            beta_pctile = fund_details_p2.get("beta_pctile", fund_details_p2.get("leverage_pctile", 50))
-            beta_val = info.get("beta")
-            beta_detail = f"Beta: {beta_val:.2f}" if beta_val else ""
-            st.markdown(f"Beta: **{beta_pctile:.0f}/100** percentile {(' - ' + beta_detail) if beta_detail else ''}")
-            st.progress(min(1.0, beta_pctile / 100))
-
-            # Factor 5: Market Cap
-            mcap_pctile = fund_details_p2.get("market_cap_pctile", 50)
-            mcap_val = info.get("marketCap")
-            mcap_detail = ""
-            if mcap_val:
-                if mcap_val >= 1e12:
-                    mcap_detail = f"MCap: ${mcap_val/1e12:.2f}T"
-                elif mcap_val >= 1e9:
-                    mcap_detail = f"MCap: ${mcap_val/1e9:.1f}B"
-                else:
-                    mcap_detail = f"MCap: ${mcap_val/1e6:.0f}M"
-            st.markdown(f"Market Cap: **{mcap_pctile:.0f}/100** percentile {(' - ' + mcap_detail) if mcap_detail else ''}")
-            st.progress(min(1.0, mcap_pctile / 100))
-
-            bonus = fund_details_p2.get("interaction_bonus", 0)
-            if bonus > 0:
-                st.markdown(f"**Interaction Bonus: +{bonus} pts**")
-                interaction_details = fund_details_p2.get("interaction_details", {})
-                if interaction_details:
-                    top_interactions = sorted(interaction_details.items(), key=lambda x: abs(x[1]), reverse=True)[:3]
-                    for name, val in top_interactions:
-                        st.caption(f"{name}: {val:+.3f}")
-
-            n_factors = fund_details_p2.get("n_factors", 5)
-            if fund_details_p2.get("used_percentile"):
-                st.caption(f"Scores based on {n_factors}-factor percentile ranking vs sector peers")
-            else:
-                st.caption(f"Scores based on {n_factors}-factor absolute thresholds (insufficient peer data)")
-
-    st.markdown("---")
-
-    # =========================================================================
-    # PEER COMPARISON TOGGLE
-    # =========================================================================
-    show_peer_comparison = st.toggle(
-        "Compare with Industry Peers",
-        value=False,
-        help="Show industry averages on charts and comparison table"
+def _chart_layout(height=250):
+    """Standard plotly layout matching dashboard chart style."""
+    return dict(
+        height=height,
+        margin=dict(l=10, r=10, t=10, b=30),
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        hovermode="x unified",
+        font=dict(family=FONT, size=11, color=TEXT_SECONDARY),
+        legend=dict(
+            orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5,
+            font=dict(size=11, color=TEXT_PRIMARY),
+        ),
     )
 
-    # Load peer data
-    fund_stock_sector = all_stocks_df[all_stocks_df["ticker"] == selected]["sector"].values
-    if len(fund_stock_sector) > 0:
-        current_sector = fund_stock_sector[0]
-        fund_sector_peers = all_stocks_df[all_stocks_df["sector"] == current_sector]["ticker"].tolist()
-        fund_sector_peers = [t for t in fund_sector_peers if t != selected][:15]
-    else:
-        current_sector = "Unknown"
-        fund_sector_peers = filtered_df["ticker"].tolist()[:15]
 
-    peers_data = load_sector_peers_metrics(tuple(fund_sector_peers + [selected]))
-    peer_means = peers_data[peers_data["ticker"] != selected].drop(columns=["ticker"]).mean()
-
-    if show_peer_comparison:
-        st.caption(f"Comparing {selected} with {len(fund_sector_peers)} peers in **{current_sector}** sector")
-
-    # Get financial data
-    income_stmt = financials.get("income_stmt")
-    balance_sheet = financials.get("balance_sheet")
-    quarterly_income = financials.get("quarterly_income")
-    quarterly_balance = financials.get("quarterly_balance")
-
-    st.markdown("---")
-
-    # =========================================================================
-    # 1. PROFITABILITY CHART (Net Income columns + ROE line)
-    # =========================================================================
-    st.markdown("### Profitability")
-
-    prof_toggle_col1, prof_toggle_col2 = st.columns([3, 1])
-    with prof_toggle_col2:
-        prof_period = st.radio("Period", ["Annual", "Quarterly"], horizontal=True, key="prof_period", label_visibility="collapsed")
-
-    # Select data source
-    if prof_period == "Quarterly" and quarterly_income is not None and not quarterly_income.empty:
-        prof_data = quarterly_income.copy()
-        prof_dates = _get_quarterly_dates(prof_data)
-    elif income_stmt is not None and not income_stmt.empty:
-        prof_data = income_stmt.copy()
-        prof_dates = _get_annual_dates(prof_data)
-    else:
-        prof_data = None
-        prof_dates = []
-
-    if prof_data is not None and len(prof_dates) > 0:
-        # Find net income column
-        ni_col = _find_column(prof_data, ["Net Income", "NetIncome", "Net Income Common Stockholders"])
-
-        if ni_col:
-            prof_fig = make_subplots(specs=[[{"secondary_y": True}]])
-
-            ni_values = (prof_data[ni_col] / 1e9).tolist()
-
-            # Net Income bars
-            prof_fig.add_trace(
-                go.Bar(x=prof_dates, y=ni_values, name="Net Income ($B)", marker_color="#0097A7"),
-                secondary_y=False
-            )
-
-            # ROE line (current ROE as horizontal line since we don't have historical)
-            roe_val = info.get("returnOnEquity")
-            if roe_val:
-                roe_pct = roe_val * 100
-                prof_fig.add_trace(
-                    go.Scatter(
-                        x=prof_dates, y=[roe_pct] * len(prof_dates),
-                        name=f"ROE ({roe_pct:.1f}%)", mode='lines',
-                        line=dict(color="#FF6B6B", width=2, dash='dash')
-                    ),
-                    secondary_y=True
-                )
-
-                # Industry average ROE if comparison enabled
-                if show_peer_comparison and peer_means.get("roe"):
-                    peer_roe = peer_means.get("roe") * 100
-                    prof_fig.add_trace(
-                        go.Scatter(
-                            x=prof_dates, y=[peer_roe] * len(prof_dates),
-                            name=f"Industry ROE ({peer_roe:.1f}%)", mode='lines',
-                            line=dict(color="#80A4AA", width=2, dash='dot')
-                        ),
-                        secondary_y=True
-                    )
-
-            prof_fig.update_layout(
-                height=350, margin=dict(l=10, r=60, t=10, b=40),
-                font=dict(color=CHART_FONT_COLOR, family="Source Sans Pro, Arial, sans-serif", size=12),
-                plot_bgcolor='white', paper_bgcolor='white',
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(color=LEGEND_FONT_COLOR, size=12)),
-                hovermode="x unified", bargap=0.3
-            )
-            prof_fig.update_xaxes(showgrid=False, tickfont=dict(color=CHART_AXIS_COLOR, size=11))
-            prof_fig.update_yaxes(title_text="Net Income ($B)", ticksuffix=" B", secondary_y=False, showgrid=True, gridcolor='#D0E8EA', tickfont=dict(color=CHART_AXIS_COLOR, size=11), title_font=dict(color=CHART_AXIS_COLOR, size=12), rangemode="tozero")
-            prof_fig.update_yaxes(title_text="ROE %", ticksuffix="%", secondary_y=True, showgrid=False, tickfont=dict(color=CHART_AXIS_COLOR, size=11), title_font=dict(color=CHART_AXIS_COLOR, size=12))
-
-            st.plotly_chart(prof_fig, use_container_width=True, config={'scrollZoom': True})
-    else:
-        st.info("Profitability data not available.")
-
-    st.markdown("---")
-
-    # =========================================================================
-    # 2. GROWTH CHART (Revenue columns)
-    # =========================================================================
-    st.markdown("### Growth")
-
-    growth_toggle_col1, growth_toggle_col2 = st.columns([3, 1])
-    with growth_toggle_col2:
-        growth_period = st.radio("Period", ["Annual", "Quarterly"], horizontal=True, key="growth_period", label_visibility="collapsed")
-
-    # Select data source
-    if growth_period == "Quarterly" and quarterly_income is not None and not quarterly_income.empty:
-        growth_data = quarterly_income.copy()
-        growth_dates = _get_quarterly_dates(growth_data)
-    elif income_stmt is not None and not income_stmt.empty:
-        growth_data = income_stmt.copy()
-        growth_dates = _get_annual_dates(growth_data)
-    else:
-        growth_data = None
-        growth_dates = []
-
-    if growth_data is not None and len(growth_dates) > 0:
-        rev_col = _find_column(growth_data, ["Total Revenue", "TotalRevenue", "Revenue"])
-
-        if rev_col:
-            growth_fig = make_subplots(specs=[[{"secondary_y": True}]])
-
-            rev_values = (growth_data[rev_col] / 1e9).tolist()
-
-            # Revenue bars
-            growth_fig.add_trace(
-                go.Bar(x=growth_dates, y=rev_values, name="Revenue ($B)", marker_color="#0097A7"),
-                secondary_y=False
-            )
-
-            # Calculate period-over-period growth rate
-            raw_rev = growth_data[rev_col].tolist()
-            growth_rates = [None]  # First period has no prior period
-            for i in range(1, len(raw_rev)):
-                if raw_rev[i-1] and raw_rev[i-1] != 0:
-                    rate = ((raw_rev[i] - raw_rev[i-1]) / abs(raw_rev[i-1])) * 100
-                    growth_rates.append(rate)
-                else:
-                    growth_rates.append(None)
-
-            # Add growth rate line
-            growth_fig.add_trace(
-                go.Scatter(
-                    x=growth_dates, y=growth_rates,
-                    name="Growth Rate %", mode='lines+markers',
-                    line=dict(color="#FF6B6B", width=2),
-                    marker=dict(size=6, color="#FF6B6B"),
-                    connectgaps=True
-                ),
-                secondary_y=True
-            )
-
-            # Industry average revenue growth line when peer comparison is enabled
-            if show_peer_comparison and peer_means.get("rev_growth"):
-                peer_rev_growth = peer_means.get("rev_growth") * 100
-                growth_fig.add_trace(
-                    go.Scatter(
-                        x=growth_dates, y=[peer_rev_growth] * len(growth_dates),
-                        name=f"Industry Avg ({peer_rev_growth:.1f}%)", mode='lines',
-                        line=dict(color="#80A4AA", width=2, dash='dot')
-                    ),
-                    secondary_y=True
-                )
-
-            growth_fig.update_layout(
-                height=350, margin=dict(l=10, r=60, t=10, b=40),
-                font=dict(color=CHART_FONT_COLOR, family="Source Sans Pro, Arial, sans-serif", size=12),
-                plot_bgcolor='white', paper_bgcolor='white',
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(color=LEGEND_FONT_COLOR, size=12)),
-                hovermode="x unified", bargap=0.3
-            )
-            growth_fig.update_xaxes(showgrid=False, tickfont=dict(color=CHART_AXIS_COLOR, size=11))
-            growth_fig.update_yaxes(title_text="Revenue ($B)", ticksuffix=" B", secondary_y=False, showgrid=True, gridcolor='#D0E8EA', tickfont=dict(color=CHART_AXIS_COLOR, size=11), title_font=dict(color=CHART_AXIS_COLOR, size=12), rangemode="tozero")
-            growth_fig.update_yaxes(title_text="Growth %", ticksuffix="%", secondary_y=True, showgrid=False, tickfont=dict(color=CHART_AXIS_COLOR, size=11), title_font=dict(color=CHART_AXIS_COLOR, size=12))
-
-            st.plotly_chart(growth_fig, use_container_width=True)
-
-            # Show growth rate
-            rev_growth = info.get("revenueGrowth")
-            if rev_growth:
-                growth_col1, growth_col2 = st.columns(2)
-                with growth_col1:
-                    st.metric("Revenue Growth (YoY)", f"{rev_growth*100:.1f}%")
-                if show_peer_comparison and peer_means.get("rev_growth"):
-                    with growth_col2:
-                        st.metric("Industry Average", f"{peer_means.get('rev_growth')*100:.1f}%")
-    else:
-        st.info("Revenue data not available.")
-
-    st.markdown("---")
-
-    # =========================================================================
-    # 3. LEVERAGE CHART (Debt & Equity columns + D/E ratio line)
-    # =========================================================================
-    st.markdown("### Leverage")
-
-    lev_toggle_col1, lev_toggle_col2 = st.columns([3, 1])
-    with lev_toggle_col2:
-        lev_period = st.radio("Period", ["Annual", "Quarterly"], horizontal=True, key="lev_period", label_visibility="collapsed")
-
-    # Select data source
-    if lev_period == "Quarterly" and quarterly_balance is not None and not quarterly_balance.empty:
-        lev_data = quarterly_balance.copy()
-        lev_dates = _get_quarterly_dates(lev_data)
-    elif balance_sheet is not None and not balance_sheet.empty:
-        lev_data = balance_sheet.copy()
-        lev_dates = _get_annual_dates(lev_data)
-    else:
-        lev_data = None
-        lev_dates = []
-
-    if lev_data is not None and len(lev_dates) > 0:
-        debt_col = _find_column(lev_data, ["Total Debt", "TotalDebt", "Long Term Debt", "LongTermDebt"])
-        equity_col = _find_column(lev_data, ["Total Equity Gross Minority Interest", "Stockholders Equity", "StockholdersEquity", "Total Stockholders Equity", "Total Equity"])
-
-        if debt_col or equity_col:
-            lev_fig = make_subplots(specs=[[{"secondary_y": True}]])
-
-            if debt_col:
-                debt_values = (lev_data[debt_col] / 1e9).tolist()
-                lev_fig.add_trace(
-                    go.Bar(x=lev_dates, y=debt_values, name="Debt ($B)", marker_color="#FF6B6B", width=0.35, offset=-0.2),
-                    secondary_y=False
-                )
-
-            if equity_col:
-                equity_values = (lev_data[equity_col] / 1e9).tolist()
-                lev_fig.add_trace(
-                    go.Bar(x=lev_dates, y=equity_values, name="Equity ($B)", marker_color="#0097A7", width=0.35, offset=0.2),
-                    secondary_y=False
-                )
-
-            # D/E ratio line
-            de_val = info.get("debtToEquity")
-            if de_val:
-                lev_fig.add_trace(
-                    go.Scatter(
-                        x=lev_dates, y=[de_val] * len(lev_dates),
-                        name=f"D/E Ratio ({de_val:.1f})", mode='lines',
-                        line=dict(color="#FF6B6B", width=2, dash='dash')
-                    ),
-                    secondary_y=True
-                )
-
-                if show_peer_comparison and peer_means.get("de"):
-                    peer_de = peer_means.get("de")
-                    lev_fig.add_trace(
-                        go.Scatter(
-                            x=lev_dates, y=[peer_de] * len(lev_dates),
-                            name=f"Industry D/E ({peer_de:.1f})", mode='lines',
-                            line=dict(color="#80A4AA", width=2, dash='dot')
-                        ),
-                        secondary_y=True
-                    )
-
-            lev_fig.update_layout(
-                height=350, margin=dict(l=10, r=60, t=10, b=40),
-                font=dict(color=CHART_FONT_COLOR, family="Source Sans Pro, Arial, sans-serif", size=12),
-                plot_bgcolor='white', paper_bgcolor='white', barmode='group',
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(color=LEGEND_FONT_COLOR, size=12)),
-                hovermode="x unified", bargap=0.3
-            )
-            lev_fig.update_xaxes(showgrid=False, tickfont=dict(color=CHART_AXIS_COLOR, size=11))
-            lev_fig.update_yaxes(title_text="Amount ($B)", ticksuffix=" B", secondary_y=False, showgrid=True, gridcolor='#D0E8EA', tickfont=dict(color=CHART_AXIS_COLOR, size=11), title_font=dict(color=CHART_AXIS_COLOR, size=12), rangemode="tozero")
-            lev_fig.update_yaxes(title_text="D/E Ratio", secondary_y=True, showgrid=False, tickfont=dict(color=CHART_AXIS_COLOR, size=11), title_font=dict(color=CHART_AXIS_COLOR, size=12))
-
-            st.plotly_chart(lev_fig, use_container_width=True)
-    else:
-        st.info("Balance sheet data not available.")
-
-    st.markdown("---")
-
-    # =========================================================================
-    # 4. VALUATION CHART (P/E ratio line over time)
-    # =========================================================================
-    st.markdown("### Valuation")
-
-    val_toggle_col1, val_toggle_col2 = st.columns([3, 1])
-    with val_toggle_col2:
-        val_period = st.radio("Period", ["1Y", "2Y", "Max"], horizontal=True, key="val_period", label_visibility="collapsed")
-
-    eps = info.get("trailingEps")
-    if eps and eps > 0 and not price_data.empty:
-        # Filter price data by period
-        if val_period == "1Y":
-            val_price_data = price_data.tail(252)
-        elif val_period == "2Y":
-            val_price_data = price_data.tail(504)
-        else:
-            val_price_data = price_data
-
-        val_fig = go.Figure()
-
-        hist_pe = val_price_data["Close"] / eps
-        val_dates = val_price_data["Date"].tolist()
-        pe_values = hist_pe.tolist()
-
-        val_fig.add_trace(
-            go.Scatter(
-                x=val_dates, y=pe_values,
-                name="P/E Ratio", mode='lines',
-                line=dict(color="#0097A7", width=2),
-                fill='tozeroy', fillcolor='rgba(0, 151, 167, 0.1)'
-            )
-        )
-
-        # Average P/E line
-        avg_pe = hist_pe.mean()
-        val_fig.add_hline(
-            y=avg_pe, line=dict(color="#FF6B6B", dash="dash", width=1.5),
-            annotation_text=f"Avg: {avg_pe:.1f}", annotation_position="right"
-        )
-
-        # Industry P/E if comparison enabled
-        if show_peer_comparison and peer_means.get("pe"):
-            peer_pe = peer_means.get("pe")
-            val_fig.add_hline(
-                y=peer_pe, line=dict(color="#80A4AA", dash="dot", width=1.5),
-                annotation_text=f"Industry: {peer_pe:.1f}", annotation_position="left"
-            )
-
-        val_fig.update_layout(
-            height=350, margin=dict(l=10, r=10, t=10, b=40),
-            font=dict(color=CHART_FONT_COLOR, family="Source Sans Pro, Arial, sans-serif", size=12),
-            plot_bgcolor='white', paper_bgcolor='white',
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(color=LEGEND_FONT_COLOR, size=12)),
-            hovermode="x unified", showlegend=False
-        )
-        val_fig.update_xaxes(showgrid=False, tickfont=dict(color=CHART_AXIS_COLOR, size=11))
-        val_fig.update_yaxes(title_text="P/E Ratio", showgrid=True, gridcolor='#D0E8EA', tickfont=dict(color=CHART_AXIS_COLOR, size=11), title_font=dict(color=CHART_AXIS_COLOR, size=12))
-
-        st.plotly_chart(val_fig, use_container_width=True)
-
-        # Stats
-        current_pe = price_data["Close"].iloc[-1] / eps
-        val_col1, val_col2, val_col3 = st.columns(3)
-        with val_col1:
-            st.metric("Current P/E", f"{current_pe:.1f}")
-        with val_col2:
-            st.metric("Average P/E", f"{avg_pe:.1f}")
-        with val_col3:
-            if show_peer_comparison and peer_means.get("pe"):
-                st.metric("Industry P/E", f"{peer_means.get('pe'):.1f}")
-    else:
-        st.info("P/E data not available (requires positive EPS).")
-
-    # =========================================================================
-    # COMPARISON TABLE (shown when peer comparison is enabled)
-    # =========================================================================
-    if show_peer_comparison:
-        st.markdown("---")
-        st.markdown("### Comparison Summary")
-
-        # Get company values
-        company_pe = info.get("trailingPE")
-        company_peg = info.get("pegRatio")
-        company_roe = info.get("returnOnEquity")
-        company_margin = info.get("profitMargins")
-        company_growth = info.get("revenueGrowth")
-        company_de = info.get("debtToEquity")
-
-        # Build comparison data
-        comparison_data = []
-
-        # P/E Ratio (lower is better, unless negative)
-        if company_pe and peer_means.get("pe"):
-            favorable = "Favorable" if company_pe < peer_means.get("pe") else "Unfavorable"
-            comparison_data.append({
-                "Metric": "P/E Ratio",
-                "Company": f"{company_pe:.1f}",
-                "Industry": f"{peer_means.get('pe'):.1f}",
-                "Assessment": favorable
-            })
-
-        # PEG Ratio (lower is better)
-        if company_peg and peer_means.get("peg"):
-            favorable = "Favorable" if company_peg < peer_means.get("peg") else "Unfavorable"
-            comparison_data.append({
-                "Metric": "PEG Ratio",
-                "Company": f"{company_peg:.2f}",
-                "Industry": f"{peer_means.get('peg'):.2f}",
-                "Assessment": favorable
-            })
-
-        # ROE (higher is better)
-        if company_roe and peer_means.get("roe"):
-            favorable = "Favorable" if company_roe > peer_means.get("roe") else "Unfavorable"
-            comparison_data.append({
-                "Metric": "ROE",
-                "Company": f"{company_roe*100:.1f}%",
-                "Industry": f"{peer_means.get('roe')*100:.1f}%",
-                "Assessment": favorable
-            })
-
-        # Net Margin (higher is better)
-        if company_margin and peer_means.get("net_margin"):
-            favorable = "Favorable" if company_margin > peer_means.get("net_margin") else "Unfavorable"
-            comparison_data.append({
-                "Metric": "Net Margin",
-                "Company": f"{company_margin*100:.1f}%",
-                "Industry": f"{peer_means.get('net_margin')*100:.1f}%",
-                "Assessment": favorable
-            })
-
-        # Revenue Growth (higher is better)
-        if company_growth and peer_means.get("rev_growth"):
-            favorable = "Favorable" if company_growth > peer_means.get("rev_growth") else "Unfavorable"
-            comparison_data.append({
-                "Metric": "Revenue Growth",
-                "Company": f"{company_growth*100:.1f}%",
-                "Industry": f"{peer_means.get('rev_growth')*100:.1f}%",
-                "Assessment": favorable
-            })
-
-        # Debt/Equity (lower is generally better)
-        if company_de and peer_means.get("de"):
-            favorable = "Favorable" if company_de < peer_means.get("de") else "Unfavorable"
-            comparison_data.append({
-                "Metric": "Debt/Equity",
-                "Company": f"{company_de:.1f}",
-                "Industry": f"{peer_means.get('de'):.1f}",
-                "Assessment": favorable
-            })
-
-        if comparison_data:
-            df = pd.DataFrame(comparison_data)
-
-            # Style the dataframe
-            def highlight_assessment(val):
-                if val == "Favorable":
-                    return 'background-color: rgba(16, 185, 129, 0.2); color: #059669;'
-                elif val == "Unfavorable":
-                    return 'background-color: rgba(239, 68, 68, 0.2); color: #DC2626;'
-                return ''
-
-            styled_df = df.style.applymap(highlight_assessment, subset=['Assessment'])
-            st.dataframe(styled_df, use_container_width=True, hide_index=True)
-
-            # Summary
-            favorable_count = sum(1 for item in comparison_data if item["Assessment"] == "Favorable")
-            total_count = len(comparison_data)
-            st.caption(f"{selected} is favorable on {favorable_count} of {total_count} metrics compared to industry peers.")
-        else:
-            st.info("Insufficient data for comparison table.")
+def _chart_axes(fig, y_prefix=""):
+    """Apply standard axis styling."""
+    fig.update_xaxes(
+        showgrid=False, showline=True, linecolor=BORDER,
+        tickfont=dict(size=10, color=MUTED),
+    )
+    fig.update_yaxes(
+        showgrid=True, gridcolor=GRID_COLOR,
+        tickfont=dict(size=10, color=MUTED),
+        tickprefix=y_prefix,
+    )
+
+
+def _verdict_html(text, color):
+    """Pill-shaped verdict badge as HTML."""
+    return (
+        f'<span style="display:inline-block;padding:3px 14px;border-radius:20px;'
+        f'background:{color};color:white;font-size:11px;font-weight:700;'
+        f"font-family:{FONT};letter-spacing:0.04em;\">{text}</span>"
+    )
+
+
+def _progress_bar_html(label, value, color=TEAL):
+    """Progress bar matching Dash progress_bar component."""
+    pct = max(0, min(100, float(value)))
+    return (
+        f'<div style="margin-bottom:12px;">'
+        f'  <div style="display:flex;justify-content:space-between;margin-bottom:4px;">'
+        f'    <span style="font-family:{FONT};font-size:12px;color:{TEXT_SECONDARY};font-weight:450;">{label}</span>'
+        f'    <span style="font-weight:600;color:{TEXT_PRIMARY};font-family:{FONT};font-size:12px;">{value:.0f}</span>'
+        f'  </div>'
+        f'  <div style="background:{TRACK_COLOR};border-radius:6px;height:6px;overflow:hidden;">'
+        f'    <div style="width:{pct}%;height:100%;background:{color};border-radius:6px;"></div>'
+        f'  </div>'
+        f'</div>'
+    )
+
+
+def _score_color(score):
+    """Color based on score level."""
+    if score >= 60:
+        return SUCCESS
+    if score >= 40:
+        return WARNING
+    return CORAL
 
 
 def _find_column(df, possible_names):
-    """Find first matching column from list of possible names."""
+    """Find first matching column name from alternatives."""
     for name in possible_names:
         if name in df.columns:
             return name
     return None
 
 
-def _get_annual_dates(df):
-    """Get formatted annual dates from dataframe index."""
-    if hasattr(df.index, 'strftime'):
-        return df.index.strftime('%Y').tolist()
+def _get_dates(df):
+    """Extract year labels from DataFrame index."""
+    if hasattr(df.index, "strftime"):
+        return df.index.strftime("%Y").tolist()
     return [str(d)[:4] for d in df.index]
 
 
-def _get_quarterly_dates(df):
-    """Get formatted quarterly dates from dataframe index."""
-    dates = []
-    for d in df.index:
-        if hasattr(d, 'quarter'):
-            dates.append(f"Q{d.quarter} '{str(d.year)[2:]}")
+def _metric_color(value, good_threshold, ok_threshold, higher_is_better=True):
+    """Return green/amber/red based on thresholds."""
+    if value is None:
+        return MUTED
+    if higher_is_better:
+        if value >= good_threshold:
+            return SUCCESS
+        if value >= ok_threshold:
+            return WARNING
+        return CORAL
+    else:
+        if value <= good_threshold:
+            return SUCCESS
+        if value <= ok_threshold:
+            return WARNING
+        return CORAL
+
+
+def _metric_tag_html(lbl, value, color):
+    """Colored metric tag for the summary row."""
+    return (
+        f'<span style="display:inline-block;padding:4px 12px;background:#F8FAFB;border-radius:8px;margin-right:10px;margin-bottom:6px;">'
+        f'<span style="font-size:11px;font-weight:500;color:{MUTED};margin-right:6px;font-family:{FONT};">{lbl}</span>'
+        f'<span style="font-size:12px;font-weight:600;color:{color};font-family:{FONT};">{value}</span>'
+        f'</span>'
+    )
+
+
+def _fmt(val, suffix="", mult=1, decimals=1):
+    if val is None:
+        return "N/A"
+    return f"{val * mult:.{decimals}f}{suffix}"
+
+
+def _card_open():
+    return f'<div style="{CARD_STYLE}">'
+
+
+def _card_close():
+    return '</div>'
+
+
+def _label_html(text):
+    return f'<span style="{LABEL_CSS};display:inline-block;vertical-align:middle;margin-right:10px;">{text}</span>'
+
+
+def _explanation_html(text):
+    return (
+        f'<div style="font-size:11px;color:{MUTED};line-height:1.4;'
+        f'font-family:{FONT};padding:0px 16px 12px 16px;margin-top:-12px;">{text}</div>'
+    )
+
+
+def _chart_card_bg(height=350):
+    """Render a white rounded background box that content will sit on top of."""
+    return (
+        f'<div style="background:#FFFFFF;border:1px solid {BORDER};border-radius:14px;'
+        f'box-shadow:{SHADOW_SM};min-height:{height}px;margin-bottom:-{height - 10}px;"></div>'
+    )
+
+
+def _chart_card_header_html(title, verdict_text, verdict_color):
+    """Header HTML for chart card (title + verdict badge)."""
+    return (
+        f'<div style="padding:8px 16px 4px 16px;">'
+        f'{_label_html(title)}'
+        f'{_verdict_html(verdict_text, verdict_color)}'
+        f'</div>'
+    )
+
+
+def _chart_card_start(title, verdict_text, verdict_color):
+    """Open a chart card with label + verdict badge header."""
+    return (
+        f'{_card_open()}'
+        f'<div style="margin-bottom:10px;">'
+        f'{_label_html(title)}'
+        f'{_verdict_html(verdict_text, verdict_color)}'
+        f'</div>'
+    )
+
+
+def _chart_card_end(explanation):
+    """Close chart card with explanation text."""
+    return f'{_explanation_html(explanation)}{_card_close()}'
+
+
+def _not_available_card(title, message):
+    """Render a card showing data not available."""
+    st.markdown(
+        f'{_card_open()}'
+        f'{_label_html(title)}'
+        f'<div style="font-size:12px;color:{MUTED};font-family:{FONT};">{message}</div>'
+        f'{_card_close()}',
+        unsafe_allow_html=True,
+    )
+
+
+# =============================================================================
+# RENDER
+# =============================================================================
+
+def render(selected, info, financials, all_stocks_df, price_data, load_sector_peers_metrics):
+    income_stmt = financials.get("income_stmt")
+    balance_sheet = financials.get("balance_sheet")
+
+    # Drop rows where key financial columns are missing (avoids empty years on x-axis)
+    if income_stmt is not None and not income_stmt.empty:
+        key_cols = [c for c in income_stmt.columns if any(k in c for k in
+                    ["Net Income", "NetIncome", "Total Revenue", "TotalRevenue", "Revenue"])]
+        if key_cols:
+            income_stmt = income_stmt.dropna(subset=key_cols, how="all")
         else:
-            dates.append(str(d)[:7])
-    return dates
+            income_stmt = income_stmt.dropna(how="all")
+    if balance_sheet is not None and not balance_sheet.empty:
+        key_bs_cols = [c for c in balance_sheet.columns if any(k in c for k in
+                       ["Total Debt", "TotalDebt", "Total Assets", "TotalAssets",
+                        "Stockholders Equity", "StockholdersEquity"])]
+        if key_bs_cols:
+            balance_sheet = balance_sheet.dropna(subset=key_bs_cols, how="all")
+        else:
+            balance_sheet = balance_sheet.dropna(how="all")
+
+    # =========================================================================
+    # SECTION 1: FUNDAMENTAL SCORE (Paper 2)
+    # =========================================================================
+    try:
+        fund_score, fund_details = calculate_fundamental_score_paper2(info, price_data=price_data)
+    except Exception:
+        fund_score, fund_details = None, {}
+
+    if fund_score is not None:
+        if fund_score >= 65:
+            fund_verdict, fund_vcolor = "Strong", SUCCESS
+        elif fund_score >= 45:
+            fund_verdict, fund_vcolor = "Fair", WARNING
+        else:
+            fund_verdict, fund_vcolor = "Weak", CORAL
+
+        score_html = _card_open()
+        score_html += (
+            f'<div style="margin-bottom:12px;">'
+            f'{_label_html("FUNDAMENTAL SCORE")}'
+            f'{_verdict_html(fund_verdict, fund_vcolor)}'
+            f'</div>'
+        )
+        score_html += (
+            f'<div style="margin-bottom:12px;">'
+            f'<span style="font-size:32px;font-weight:700;color:{_score_color(fund_score)};font-family:{FONT};">'
+            f'{fund_score:.0f}</span>'
+            f'<span style="font-size:14px;font-weight:500;color:{MUTED};margin-left:2px;font-family:{FONT};">/100</span>'
+            f'</div>'
+        )
+
+        # Progress bars for 5 factors
+        pb_pctile = fund_details.get("pb_pctile", 50)
+        roe_pctile = fund_details.get("roe_pctile", 50)
+        momentum_pctile = fund_details.get("momentum_pctile", fund_details.get("growth_pctile", 50))
+        beta_pctile = fund_details.get("beta_pctile", fund_details.get("leverage_pctile", 50))
+        mcap_pctile = fund_details.get("market_cap_pctile", 50)
+
+        score_html += _progress_bar_html("P/B Percentile", pb_pctile, TEAL)
+        score_html += _progress_bar_html("ROE Percentile", roe_pctile, TEAL)
+        score_html += _progress_bar_html("Momentum Percentile", momentum_pctile, TEAL)
+        score_html += _progress_bar_html("Beta Percentile", beta_pctile, TEAL)
+        score_html += _progress_bar_html("Market Cap Percentile", mcap_pctile, TEAL)
+
+        # Interaction bonus note
+        interaction_bonus = fund_details.get("interaction_bonus", 0)
+        if interaction_bonus != 0:
+            score_html += (
+                f'<div style="font-size:11px;color:{MUTED};font-family:{FONT};margin-top:4px;">'
+                f'Interaction bonus: {interaction_bonus:+.1f} pts</div>'
+            )
+
+        score_html += _card_close()
+        st.markdown(score_html, unsafe_allow_html=True)
+    else:
+        _not_available_card("FUNDAMENTAL SCORE", "Fundamental score not available for this stock.")
+
+    st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
+
+    # =========================================================================
+    # SECTION 2: PROFITABILITY + REVENUE GROWTH (side by side)
+    # =========================================================================
+    prof_dates = _get_dates(income_stmt) if income_stmt is not None and not income_stmt.empty else []
+
+    col_prof, col_growth = st.columns(2)
+
+    # --- Profitability ---
+    with col_prof:
+        if income_stmt is not None and len(prof_dates) > 0:
+            ni_col = _find_column(income_stmt, ["Net Income", "NetIncome", "Net Income Common Stockholders"])
+            if ni_col:
+                fig = make_subplots(specs=[[{"secondary_y": True}]])
+                ni_values = (income_stmt[ni_col] / 1e9).tolist()
+                fig.add_trace(go.Bar(
+                    x=prof_dates, y=ni_values, name="Net Income ($B)",
+                    marker_color=TEAL,
+                ), secondary_y=False)
+
+                roe_val = info.get("returnOnEquity")
+                if roe_val is not None:
+                    roe_pct = roe_val * 100
+                    fig.add_trace(go.Scatter(
+                        x=prof_dates, y=[roe_pct] * len(prof_dates),
+                        name=f"ROE ({roe_pct:.1f}%)", mode="lines",
+                        line=dict(color=CORAL, width=2, dash="dash"),
+                    ), secondary_y=True)
+
+                # Verdict
+                latest_ni = ni_values[-1] if ni_values else 0
+                growing = len(ni_values) >= 2 and ni_values[-1] > ni_values[0]
+                if latest_ni > 0 and growing:
+                    prof_verdict, prof_color = "Profitable & Growing", SUCCESS
+                    prof_explain = f"Net income has grown over the period shown, reaching ${ni_values[-1]:.1f}B."
+                elif latest_ni > 0:
+                    prof_verdict, prof_color = "Profitable but Declining", WARNING
+                    prof_explain = f"The company is profitable at ${ni_values[-1]:.1f}B but income has declined over time."
+                else:
+                    prof_verdict, prof_color = "Unprofitable", CORAL
+                    prof_explain = f"Net income is negative at ${ni_values[-1]:.1f}B — the company is currently unprofitable."
+
+                if roe_val is not None:
+                    assess = "strong" if roe_val > 0.15 else "moderate" if roe_val > 0.10 else "weak"
+                    prof_explain += f" ROE of {roe_val * 100:.1f}% is {assess}."
+
+                fig.update_layout(**_chart_layout(250), showlegend=True, bargap=0.3)
+                _chart_axes(fig, y_prefix="$")
+                fig.update_yaxes(ticksuffix=" B", secondary_y=False, rangemode="tozero")
+                fig.update_yaxes(ticksuffix="%", secondary_y=True, showgrid=False)
+
+                st.markdown(_chart_card_bg(350), unsafe_allow_html=True)
+                st.markdown(_chart_card_header_html("PROFITABILITY", prof_verdict, prof_color), unsafe_allow_html=True)
+                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                st.markdown(_explanation_html(prof_explain), unsafe_allow_html=True)
+            else:
+                _not_available_card("PROFITABILITY", "Net income data not available.")
+        else:
+            _not_available_card("PROFITABILITY", "Profitability data not available.")
+
+    # --- Revenue Growth ---
+    with col_growth:
+        if income_stmt is not None and len(prof_dates) > 0:
+            rev_col = _find_column(income_stmt, ["Total Revenue", "TotalRevenue", "Revenue"])
+            if rev_col:
+                fig = go.Figure()
+                rev_values = (income_stmt[rev_col] / 1e9).tolist()
+                fig.add_trace(go.Bar(
+                    x=prof_dates, y=rev_values, name="Revenue ($B)",
+                    marker_color=TEAL,
+                ))
+
+                # Verdict
+                rev_growth = info.get("revenueGrowth")
+                if rev_growth is not None:
+                    rg_pct = rev_growth * 100
+                    if rev_growth > 0.15:
+                        growth_verdict, growth_color = "Strong Growth", SUCCESS
+                        growth_explain = f"Revenue is growing at {rg_pct:.1f}% year-over-year — well above market average."
+                    elif rev_growth > 0.05:
+                        growth_verdict, growth_color = "Moderate Growth", TEAL
+                        growth_explain = f"Revenue is growing at {rg_pct:.1f}% year-over-year — a steady pace."
+                    elif rev_growth > 0:
+                        growth_verdict, growth_color = "Slow Growth", WARNING
+                        growth_explain = f"Revenue is growing at just {rg_pct:.1f}% year-over-year — below average."
+                    else:
+                        growth_verdict, growth_color = "Declining", CORAL
+                        growth_explain = f"Revenue is declining at {rg_pct:.1f}% year-over-year."
+                else:
+                    growth_verdict, growth_color = "No Data", MUTED
+                    growth_explain = "Revenue growth rate not available from source."
+
+                fig.update_layout(**_chart_layout(250), showlegend=True, bargap=0.3)
+                _chart_axes(fig, y_prefix="$")
+                fig.update_yaxes(ticksuffix=" B", rangemode="tozero")
+
+                st.markdown(_chart_card_bg(350), unsafe_allow_html=True)
+                st.markdown(_chart_card_header_html("REVENUE GROWTH", growth_verdict, growth_color), unsafe_allow_html=True)
+                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                st.markdown(_explanation_html(growth_explain), unsafe_allow_html=True)
+            else:
+                _not_available_card("REVENUE GROWTH", "Revenue data not available.")
+        else:
+            _not_available_card("REVENUE GROWTH", "Revenue data not available.")
+
+    st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
+
+    # =========================================================================
+    # SECTION 3: LEVERAGE + VALUATION (side by side)
+    # =========================================================================
+    lev_dates = _get_dates(balance_sheet) if balance_sheet is not None and not balance_sheet.empty else []
+
+    col_lev, col_val = st.columns(2)
+
+    # --- Leverage ---
+    with col_lev:
+        if balance_sheet is not None and len(lev_dates) > 0:
+            debt_col = _find_column(balance_sheet, ["Total Debt", "TotalDebt", "Long Term Debt", "LongTermDebt"])
+            equity_col = _find_column(balance_sheet, [
+                "Total Equity Gross Minority Interest", "Stockholders Equity",
+                "StockholdersEquity", "Total Stockholders Equity", "Total Equity",
+            ])
+
+            if debt_col or equity_col:
+                fig = make_subplots(specs=[[{"secondary_y": True}]])
+                if debt_col:
+                    fig.add_trace(go.Bar(
+                        x=lev_dates, y=(balance_sheet[debt_col] / 1e9).tolist(),
+                        name="Debt ($B)", marker_color=CORAL, width=0.35, offset=-0.2,
+                    ), secondary_y=False)
+                if equity_col:
+                    fig.add_trace(go.Bar(
+                        x=lev_dates, y=(balance_sheet[equity_col] / 1e9).tolist(),
+                        name="Equity ($B)", marker_color=TEAL, width=0.35, offset=0.2,
+                    ), secondary_y=False)
+
+                de_val = info.get("debtToEquity")
+                if de_val is not None:
+                    fig.add_trace(go.Scatter(
+                        x=lev_dates, y=[de_val] * len(lev_dates),
+                        name=f"D/E ({de_val:.1f})", mode="lines",
+                        line=dict(color=CORAL, width=2, dash="dash"),
+                    ), secondary_y=True)
+
+                # Verdict
+                if de_val is not None:
+                    if de_val < 50:
+                        lev_verdict, lev_color = "Conservative", SUCCESS
+                        lev_explain = f"Debt-to-Equity of {de_val:.0f} is low — the company relies more on equity than debt financing."
+                    elif de_val < 100:
+                        lev_verdict, lev_color = "Moderate", WARNING
+                        lev_explain = f"Debt-to-Equity of {de_val:.0f} is moderate — a balanced mix of debt and equity financing."
+                    else:
+                        lev_verdict, lev_color = "High Leverage", CORAL
+                        lev_explain = f"Debt-to-Equity of {de_val:.0f} is high — the company carries significant debt relative to equity."
+                else:
+                    lev_verdict, lev_color = "No Data", MUTED
+                    lev_explain = "Debt-to-Equity ratio not available."
+
+                fig.update_layout(**_chart_layout(250), showlegend=True, barmode="group", bargap=0.3)
+                _chart_axes(fig, y_prefix="$")
+                fig.update_yaxes(ticksuffix=" B", secondary_y=False, rangemode="tozero")
+                fig.update_yaxes(secondary_y=True, showgrid=False)
+
+                st.markdown(_chart_card_bg(350), unsafe_allow_html=True)
+                st.markdown(_chart_card_header_html("LEVERAGE", lev_verdict, lev_color), unsafe_allow_html=True)
+                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                st.markdown(_explanation_html(lev_explain), unsafe_allow_html=True)
+            else:
+                _not_available_card("LEVERAGE", "Balance sheet data not available.")
+        else:
+            _not_available_card("LEVERAGE", "Balance sheet data not available.")
+
+    # --- Valuation (P/E History) ---
+    with col_val:
+        eps = info.get("trailingEps")
+        if eps is not None and eps > 0 and not price_data.empty:
+            val_data = price_data.tail(504).copy()
+            hist_pe = val_data["Close"] / eps
+            val_dates = val_data["Date"].tolist()
+
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=val_dates, y=hist_pe.tolist(), name="P/E Ratio", mode="lines",
+                line=dict(color=TEAL, width=2),
+                fill="tozeroy", fillcolor="rgba(0,151,167,0.08)",
+            ))
+            avg_pe = float(hist_pe.mean())
+            fig.add_hline(
+                y=avg_pe, line=dict(color=CORAL, dash="dash", width=1.5),
+                annotation_text=f"Avg: {avg_pe:.1f}", annotation_position="right",
+            )
+
+            current_pe = float(price_data["Close"].iloc[-1]) / eps
+
+            # Verdict
+            if current_pe < avg_pe * 0.8:
+                val_verdict, val_color = "Undervalued", SUCCESS
+                val_explain = f"Current P/E of {current_pe:.1f} is well below the {avg_pe:.1f} average — the stock may be undervalued relative to its history."
+            elif current_pe > avg_pe * 1.2:
+                val_verdict, val_color = "Premium", CORAL
+                val_explain = f"Current P/E of {current_pe:.1f} is above the {avg_pe:.1f} average — the stock is trading at a premium to its historical valuation."
+            else:
+                val_verdict, val_color = "Fair Value", TEAL
+                val_explain = f"Current P/E of {current_pe:.1f} is close to the {avg_pe:.1f} average — the stock appears fairly valued."
+
+            fig.update_layout(**_chart_layout(250), showlegend=False)
+            _chart_axes(fig)
+
+            st.markdown(_chart_card_bg(350), unsafe_allow_html=True)
+            st.markdown(_chart_card_header_html("VALUATION (P/E HISTORY)", val_verdict, val_color), unsafe_allow_html=True)
+            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            st.markdown(_explanation_html(val_explain), unsafe_allow_html=True)
+        else:
+            _not_available_card("VALUATION", "P/E data not available (requires positive trailing EPS).")
+
+    st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
+
+    # =========================================================================
+    # SECTION 4: KEY METRICS SUMMARY
+    # =========================================================================
+    pe = info.get("trailingPE")
+    peg = info.get("pegRatio")
+    pb = info.get("priceToBook")
+    roe = info.get("returnOnEquity")
+    profit_margin = info.get("profitMargins")
+    rev_growth_val = info.get("revenueGrowth")
+    beta = info.get("beta")
+
+    # Row 1: P/E, PEG, P/B
+    pe_color = _metric_color(pe, 20, 30, higher_is_better=False) if pe else MUTED
+    peg_color = _metric_color(peg, 1.0, 2.0, higher_is_better=False) if peg else MUTED
+    pb_color = _metric_color(pb, 3.0, 5.0, higher_is_better=False) if pb else MUTED
+
+    row1 = ""
+    row1 += _metric_tag_html("P/E", _fmt(pe, "", 1, 1), pe_color)
+    row1 += _metric_tag_html("PEG", _fmt(peg, "", 1, 2), peg_color)
+    row1 += _metric_tag_html("P/B", _fmt(pb, "", 1, 2), pb_color)
+
+    # Row 2: ROE, Profit Margin, Rev Growth, Beta
+    roe_color = _metric_color(roe, 0.15, 0.10) if roe else MUTED
+    pm_color = _metric_color(profit_margin, 0.15, 0.05) if profit_margin else MUTED
+    rg_color = _metric_color(rev_growth_val, 0.15, 0.05) if rev_growth_val else MUTED
+    beta_color = _metric_color(beta, 1.0, 1.5, higher_is_better=False) if beta else MUTED
+
+    row2 = ""
+    row2 += _metric_tag_html("ROE", _fmt(roe, "%", 100, 1), roe_color)
+    row2 += _metric_tag_html("Profit Margin", _fmt(profit_margin, "%", 100, 1), pm_color)
+    row2 += _metric_tag_html("Rev Growth", _fmt(rev_growth_val, "%", 100, 1), rg_color)
+    row2 += _metric_tag_html("Beta", _fmt(beta, "", 1, 2), beta_color)
+
+    metrics_html = (
+        f'{_card_open()}'
+        f'<div style="{LABEL_CSS};margin-bottom:10px;">KEY METRICS</div>'
+        f'<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;">{row1}</div>'
+        f'<div style="display:flex;gap:10px;flex-wrap:wrap;">{row2}</div>'
+        f'{_card_close()}'
+    )
+    st.markdown(metrics_html, unsafe_allow_html=True)
+
+    # =========================================================================
+    # SECTION 5: SECTOR PEER COMPARISON (toggle)
+    # =========================================================================
+    st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
+    show_peers = st.toggle("Compare with sector peers", value=False, key="fund_peer_toggle")
+
+    if show_peers:
+        # Resolve sector
+        stock_sector = info.get("sector", "")
+        if not stock_sector:
+            sector_match = all_stocks_df[all_stocks_df["ticker"] == selected]
+            if not sector_match.empty:
+                stock_sector = sector_match.iloc[0]["sector"]
+
+        if not stock_sector:
+            st.caption("Sector information not available for this stock.")
+        else:
+            # Get same-sector peers (max 8, excluding selected)
+            sector_peers = all_stocks_df[
+                (all_stocks_df["sector"] == stock_sector) & (all_stocks_df["ticker"] != selected)
+            ]["ticker"].tolist()[:8]
+
+            if len(sector_peers) < 3:
+                st.caption(f"Not enough sector peers for comparison (found {len(sector_peers)} in {stock_sector}).")
+            else:
+                with st.spinner("Loading peer data..."):
+                    peers_df = load_sector_peers_metrics(tuple(sector_peers))
+
+                # Selected stock's values
+                stock_pe = info.get("trailingPE")
+                stock_roe = info.get("returnOnEquity")
+                stock_margin = info.get("profitMargins")
+                stock_rev_growth = info.get("revenueGrowth")
+                stock_de = info.get("debtToEquity")
+
+                # Sector medians
+                median_pe = peers_df["pe"].dropna().median()
+                median_roe = peers_df["roe"].dropna().median()
+                median_margin = peers_df["net_margin"].dropna().median()
+                median_rev_growth = peers_df["rev_growth"].dropna().median()
+                median_de = peers_df["de"].dropna().median()
+
+                # Compare: count how many metrics the stock beats
+                comparisons = []
+                metrics_compare = [
+                    ("P/E Ratio", stock_pe, median_pe, False),       # lower is better
+                    ("ROE", stock_roe, median_roe, True),            # higher is better
+                    ("Net Margin", stock_margin, median_margin, True),
+                    ("Rev Growth", stock_rev_growth, median_rev_growth, True),
+                    ("Debt/Equity", stock_de, median_de, False),     # lower is better
+                ]
+
+                wins = 0
+                for label, stock_val, peer_val, higher_better in metrics_compare:
+                    if stock_val is not None and peer_val is not None and not pd.isna(peer_val):
+                        if higher_better:
+                            better = stock_val >= peer_val
+                        else:
+                            better = stock_val <= peer_val
+                        if better:
+                            wins += 1
+                        comparisons.append((label, stock_val, peer_val, higher_better, better))
+                    else:
+                        comparisons.append((label, stock_val, peer_val, higher_better, None))
+
+                # Verdict
+                if wins >= 4:
+                    peer_verdict, peer_vcolor = "Above Peers", SUCCESS
+                elif wins >= 2:
+                    peer_verdict, peer_vcolor = "In Line", TEAL
+                else:
+                    peer_verdict, peer_vcolor = "Below Peers", CORAL
+
+                # Format helpers
+                def _peer_fmt(val, is_pct=False):
+                    if val is None or (isinstance(val, float) and pd.isna(val)):
+                        return "\u2014"
+                    if is_pct:
+                        return f"{val * 100:.1f}%"
+                    return f"{val:.1f}"
+
+                # Build comparison card HTML
+                header_cells = ""
+                stock_cells = ""
+                peer_cells = ""
+
+                for label, stock_val, peer_val, higher_better, is_better in comparisons:
+                    is_pct = label in ("ROE", "Net Margin", "Rev Growth")
+
+                    # Color the stock value based on comparison
+                    if is_better is True:
+                        val_color = SUCCESS
+                    elif is_better is False:
+                        val_color = CORAL
+                    else:
+                        val_color = MUTED
+
+                    header_cells += (
+                        f'<div style="flex:1;text-align:center;">'
+                        f'<div style="font-size:11px;font-weight:600;color:{MUTED};'
+                        f'text-transform:uppercase;letter-spacing:0.04em;'
+                        f'font-family:{FONT};">{label}</div></div>'
+                    )
+                    stock_cells += (
+                        f'<div style="flex:1;text-align:center;">'
+                        f'<div style="font-size:15px;font-weight:600;color:{val_color};'
+                        f'font-family:{FONT};">{_peer_fmt(stock_val, is_pct)}</div></div>'
+                    )
+                    peer_cells += (
+                        f'<div style="flex:1;text-align:center;">'
+                        f'<div style="font-size:15px;font-weight:500;color:{TEXT_SECONDARY};'
+                        f'font-family:{FONT};">{_peer_fmt(peer_val, is_pct)}</div></div>'
+                    )
+
+                peer_card_html = f"""
+                <div style="background:#FFFFFF;border:1px solid {BORDER};border-radius:14px;
+                            box-shadow:{SHADOW_SM};padding:20px;">
+                    <div style="margin-bottom:14px;">
+                        <span style="{LABEL_CSS};display:inline-block;vertical-align:middle;
+                                     margin-right:10px;">SECTOR PEER COMPARISON</span>
+                        <span style="display:inline-block;padding:3px 14px;border-radius:20px;
+                                     background:{peer_vcolor};color:white;font-size:11px;font-weight:700;
+                                     font-family:{FONT};letter-spacing:0.04em;
+                                     vertical-align:middle;">{peer_verdict}</span>
+                    </div>
+                    <div style="display:flex;gap:4px;margin-bottom:6px;margin-left:55px;">{header_cells}</div>
+                    <div style="display:flex;gap:4px;align-items:center;margin-bottom:10px;">
+                        <div style="width:50px;flex-shrink:0;font-size:11px;font-weight:600;color:{TEAL};
+                                    font-family:{FONT};">{selected}</div>
+                        <div style="display:flex;gap:4px;flex:1;">{stock_cells}</div>
+                    </div>
+                    <div style="display:flex;gap:4px;align-items:center;margin-bottom:12px;">
+                        <div style="width:50px;flex-shrink:0;font-size:11px;font-weight:600;color:{MUTED};
+                                    font-family:{FONT};">Peers</div>
+                        <div style="display:flex;gap:4px;flex:1;">{peer_cells}</div>
+                    </div>
+                    <div style="font-size:11px;color:{MUTED};line-height:1.4;font-family:{FONT};">
+                        Compared against {len(sector_peers)} peers in {stock_sector}.
+                        {selected} scores above sector median on {wins} of {len(comparisons)} key metrics.
+                    </div>
+                </div>
+                """
+                st.markdown(peer_card_html, unsafe_allow_html=True)

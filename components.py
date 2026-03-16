@@ -2,16 +2,51 @@
 # COMPONENTS.PY - Reusable UI components for the dashboard
 # =============================================================================
 
+# =============================================================================
+# DESIGN TOKENS (mirrored from Dash app)
+# =============================================================================
+
+FONTS = {
+    "primary": "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+}
+
+COLORS = {
+    "background": "#F4F7F9",
+    "card": "#FFFFFF",
+    "border": "#E8EDF2",
+    "sidebar": "#F8FAFB",
+    "teal": "#0097A7",
+    "teal_dark": "#005662",
+    "coral": "#FF6B6B",
+    "heading": "#0F172A",
+    "text_primary": "#1E293B",
+    "text_secondary": "#64748B",
+    "success": "#10B981",
+    "warning": "#F59E0B",
+    "danger": "#F43F5E",
+    "danger_red": "#EF4444",
+    "info": "#0097A7",
+    "neutral": "#1E293B",
+    "muted": "#94A3B8",
+}
+
+SHADOWS = {
+    "sm": "0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02)",
+    "md": "0 4px 12px rgba(0, 0, 0, 0.05), 0 1px 4px rgba(0, 0, 0, 0.03)",
+}
+
+FONT = FONTS["primary"]
+
 
 def get_status_color(status_type):
     """Get the appropriate color for a status type."""
     colors = {
-        "success": "#10B981",  # Emerald - Bull/BUY/Low risk
-        "warning": "#F59E0B",  # Amber - Sideways/HOLD/Medium risk
-        "danger": "#F43F5E",   # Rose - Bear/SELL/High risk
-        "info": "#0097A7",     # Teal - Info accents
-        "neutral": "#1A3C40",  # Primary text (dark teal-charcoal)
-        "muted": "#5A7D82",    # Secondary text
+        "success": COLORS["success"],
+        "warning": COLORS["warning"],
+        "danger": COLORS["danger"],
+        "info": COLORS["info"],
+        "neutral": COLORS["neutral"],
+        "muted": COLORS["muted"],
     }
     return colors.get(status_type, colors["neutral"])
 
@@ -19,10 +54,10 @@ def get_status_color(status_type):
 def get_status_bg(status_type):
     """Get the appropriate background color for a status type."""
     bgs = {
-        "success": "rgba(16, 185, 129, 0.1)",
-        "warning": "rgba(245, 158, 11, 0.1)",
-        "danger": "#FFE4E6",
-        "info": "rgba(0, 151, 167, 0.1)",
+        "success": "rgba(16, 185, 129, 0.08)",
+        "warning": "rgba(245, 158, 11, 0.08)",
+        "danger": "rgba(244, 63, 94, 0.08)",
+        "info": "rgba(0, 151, 167, 0.08)",
         "neutral": "#FFFFFF",
     }
     return bgs.get(status_type, bgs["neutral"])
@@ -31,71 +66,74 @@ def get_status_bg(status_type):
 def render_metric_card(label, value, tooltip="", status="neutral", size="normal"):
     """Render a styled metric card with the new design system."""
     color = get_status_color(status)
-    bg = get_status_bg(status) if status != "neutral" else "#FFFFFF"
+    bg = get_status_bg(status) if status != "neutral" else COLORS["card"]
 
     if size == "large":
-        value_style = "font-family: 'Source Sans Pro', Arial, sans-serif; font-size: 42px; font-weight: 400;"
+        value_style = f"font-family: {FONT}; font-size: 28px; font-weight: 500;"
     elif size == "medium":
-        value_style = "font-family: 'Source Sans Pro', Arial, sans-serif; font-size: 32px; font-weight: 400;"
+        value_style = f"font-family: {FONT}; font-size: 22px; font-weight: 500;"
     else:
-        value_style = "font-family: 'Source Sans Pro', Arial, sans-serif; font-size: 24px; font-weight: 400;"
+        value_style = f"font-family: {FONT}; font-size: 18px; font-weight: 500;"
 
     return f"""
     <div style='
         text-align: center;
-        padding: 20px;
+        padding: 14px 16px;
         background: {bg};
-        border: 1px solid #D0E8EA;
-        border-radius: 10px;
-        box-shadow: 0px 2px 4px rgba(0, 151, 167, 0.08);
+        border: 1px solid {COLORS["border"]};
+        border-radius: 12px;
+        box-shadow: {SHADOWS["sm"]};
         cursor: help;
-        transition: all 300ms ease-in-out;
     ' title='{tooltip}'>
         <div style='
-            font-family: Source Sans Pro, Arial, sans-serif;
-            font-size: 12px;
-            font-weight: 500;
-            color: #5A7D82;
+            font-family: {FONT};
+            font-size: 11px;
+            font-weight: 600;
+            color: {COLORS["text_secondary"]};
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.06em;
             margin-bottom: 8px;
         '>{label}</div>
-        <div style='{value_style} color: {color};'>{value}</div>
+        <div style='{value_style} color: {color}; letter-spacing: -0.01em;'>{value}</div>
     </div>
     """
 
 
 def render_badge_card(label, value, icon="", tooltip="", status="neutral"):
-    """Render a large badge-style card (like market regime)."""
+    """Render a badge-style card with horizontal layout."""
     color = get_status_color(status)
-    bg = get_status_bg(status) if status != "neutral" else "#FFFFFF"
+    bg = get_status_bg(status) if status != "neutral" else COLORS["card"]
 
     return f"""
     <div style='
-        text-align: center;
-        padding: 24px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 16px;
         background: {bg};
-        border: 1px solid #D0E8EA;
+        border: 1px solid {COLORS["border"]};
         border-radius: 12px;
-        box-shadow: 0px 2px 4px rgba(0, 151, 167, 0.08);
+        box-shadow: {SHADOWS["sm"]};
         cursor: help;
     ' title='{tooltip}'>
-        <div style='font-size: 48px; margin-bottom: 8px;'>{icon}</div>
-        <div style='
-            font-family: Source Sans Pro, Arial, sans-serif;
-            font-size: 12px;
-            font-weight: 500;
-            color: #5A7D82;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 4px;
-        '>{label}</div>
-        <div style='
-            font-family: "Source Sans Pro", Arial, sans-serif;
-            font-size: 28px;
-            font-weight: 400;
-            color: {color};
-        '>{value}</div>
+        <div style='font-size: 22px; flex-shrink: 0;'>{icon}</div>
+        <div>
+            <div style='
+                font-family: {FONT};
+                font-size: 11px;
+                font-weight: 600;
+                color: {COLORS["text_secondary"]};
+                text-transform: uppercase;
+                letter-spacing: 0.06em;
+                margin-bottom: 2px;
+            '>{label}</div>
+            <div style='
+                font-family: {FONT};
+                font-size: 18px;
+                font-weight: 500;
+                color: {color};
+            '>{value}</div>
+        </div>
     </div>
     """
 
@@ -107,51 +145,31 @@ def render_compact_card(label, value, tooltip="", status="neutral"):
     return f"""
     <div style='
         text-align: center;
-        padding: 16px;
-        background: #FFFFFF;
-        border: 1px solid #D0E8EA;
-        border-radius: 8px;
-        box-shadow: 0px 2px 4px rgba(0, 151, 167, 0.08);
-        margin-bottom: 8px;
+        padding: 8px 12px;
+        background: {COLORS["card"]};
+        border: 1px solid {COLORS["border"]};
+        border-radius: 12px;
+        box-shadow: {SHADOWS["sm"]};
+        margin-bottom: 6px;
         cursor: help;
     ' title='{tooltip}'>
         <div style='
-            font-family: Source Sans Pro, Arial, sans-serif;
+            font-family: {FONT};
             font-size: 11px;
-            font-weight: 500;
-            color: #5A7D82;
+            font-weight: 600;
+            color: {COLORS["text_secondary"]};
             text-transform: uppercase;
-            letter-spacing: 0.04em;
-            margin-bottom: 6px;
+            letter-spacing: 0.06em;
+            margin-bottom: 4px;
         '>{label}</div>
         <div style='
-            font-family: "Source Sans Pro", Arial, sans-serif;
-            font-size: 22px;
-            font-weight: 400;
+            font-family: {FONT};
+            font-size: 17px;
+            font-weight: 500;
             color: {color};
         '>{value}</div>
     </div>
     """
-
-
-def format_large_number(value):
-    """Format large numbers with K, M, B, T suffixes."""
-    if value is None:
-        return "N/A"
-    try:
-        value = float(value)
-        if abs(value) >= 1e12:
-            return f"${value/1e12:.2f}T"
-        elif abs(value) >= 1e9:
-            return f"${value/1e9:.2f}B"
-        elif abs(value) >= 1e6:
-            return f"${value/1e6:.2f}M"
-        elif abs(value) >= 1e3:
-            return f"${value/1e3:.2f}K"
-        else:
-            return f"${value:.2f}"
-    except (ValueError, TypeError):
-        return "N/A"
 
 
 def format_mcap(val):
@@ -165,81 +183,47 @@ def format_mcap(val):
     return f"${val:,.0f}"
 
 
-def get_chart_layout_defaults():
-    """Return common chart layout settings with teal-themed fonts."""
-    CHART_FONT_COLOR = "#1A3C40"
-    CHART_AXIS_COLOR = "#37616A"
-    CHART_GRID_COLOR = "#D0E8EA"
-
-    return dict(
-        font=dict(color=CHART_FONT_COLOR, family="Source Sans Pro, Arial, sans-serif"),
-        title_font=dict(color=CHART_FONT_COLOR, size=14),
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)',
-        xaxis=dict(
-            tickfont=dict(color=CHART_AXIS_COLOR),
-            title=dict(font=dict(color=CHART_AXIS_COLOR)),
-            gridcolor=CHART_GRID_COLOR,
-            linecolor=CHART_GRID_COLOR,
-        ),
-        yaxis=dict(
-            tickfont=dict(color=CHART_AXIS_COLOR),
-            title=dict(font=dict(color=CHART_AXIS_COLOR)),
-            gridcolor=CHART_GRID_COLOR,
-            linecolor=CHART_GRID_COLOR,
-        ),
-        legend=dict(
-            font=dict(color=CHART_FONT_COLOR),
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="center",
-            x=0.5,
-        ),
-        hovermode="x unified",
-    )
-
-
 def render_hero_card(label, value, subtitle="", status="neutral"):
-    """Render a large gradient hero card for BUY/HOLD/SELL recommendations."""
+    """Render a gradient hero card for BUY/HOLD/SELL recommendations."""
     gradients = {
         "success": "linear-gradient(135deg, #0097A7 0%, #00BCD4 100%)",
         "warning": "linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)",
         "danger": "linear-gradient(135deg, #FF6B6B 0%, #F43F5E 100%)",
-        "neutral": "linear-gradient(135deg, #1A3C40 0%, #37616A 100%)",
+        "neutral": "linear-gradient(135deg, #334155 0%, #475569 100%)",
     }
     gradient = gradients.get(status, gradients["neutral"])
 
     return f"""
     <div style='
         text-align: center;
-        padding: 28px 20px;
+        padding: 16px 20px;
         background: {gradient};
         border-radius: 14px;
-        box-shadow: 0px 4px 16px rgba(0, 151, 167, 0.2);
+        box-shadow: {SHADOWS["md"]};
         cursor: help;
     ' title='{subtitle}'>
         <div style='
-            font-family: Source Sans Pro, Arial, sans-serif;
-            font-size: 12px;
+            font-family: {FONT};
+            font-size: 11px;
             font-weight: 600;
-            color: rgba(255,255,255,0.85);
+            color: rgba(255,255,255,0.8);
             text-transform: uppercase;
             letter-spacing: 0.08em;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         '>{label}</div>
         <div style='
-            font-family: "Source Sans Pro", Arial, sans-serif;
-            font-size: 48px;
+            font-family: {FONT};
+            font-size: 32px;
             font-weight: 700;
             color: #FFFFFF;
             line-height: 1.1;
+            letter-spacing: -0.02em;
         '>{value}</div>
         <div style='
-            font-family: Source Sans Pro, Arial, sans-serif;
+            font-family: {FONT};
             font-size: 11px;
-            color: rgba(255,255,255,0.7);
-            margin-top: 6px;
+            color: rgba(255,255,255,0.65);
+            margin-top: 4px;
         '>{subtitle}</div>
     </div>
     """
@@ -249,34 +233,63 @@ def render_accent_card(label, value, tooltip="", status="neutral", border_color=
     """Render an accent-bordered card for confidence/score metrics."""
     color = get_status_color(status)
     if border_color is None:
-        border_color = "#0097A7" if status in ("info", "neutral") else color
+        border_color = COLORS["teal"] if status in ("info", "neutral") else color
 
     return f"""
     <div style='
         text-align: center;
-        padding: 20px;
-        background: #FFFFFF;
-        border: 2px solid {border_color};
+        padding: 14px 16px;
+        background: {COLORS["card"]};
+        border: 1px solid {COLORS["border"]};
+        border-left: 3px solid {border_color};
         border-radius: 12px;
-        box-shadow: 0px 2px 8px rgba(0, 151, 167, 0.1);
+        box-shadow: {SHADOWS["sm"]};
         cursor: help;
-        transition: all 300ms ease-in-out;
     ' title='{tooltip}'>
         <div style='
-            font-family: Source Sans Pro, Arial, sans-serif;
-            font-size: 12px;
-            font-weight: 500;
-            color: #5A7D82;
+            font-family: {FONT};
+            font-size: 11px;
+            font-weight: 600;
+            color: {COLORS["text_secondary"]};
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 8px;
+            letter-spacing: 0.06em;
+            margin-bottom: 6px;
         '>{label}</div>
         <div style='
-            font-family: "Source Sans Pro", Arial, sans-serif;
-            font-size: 36px;
+            font-family: {FONT};
+            font-size: 22px;
             font-weight: 600;
             color: {color};
         '>{value}</div>
     </div>
     """
 
+
+def render_metrics_strip(metrics):
+    """Render a flat horizontal strip of label:value pairs (TradingView-style).
+
+    Parameters:
+        metrics: list of dicts with keys: label, value, color (optional), tooltip (optional)
+    """
+    items_html = ""
+    for i, m in enumerate(metrics):
+        label = m.get("label", "")
+        value = m.get("value", "")
+        color = m.get("color", COLORS["text_primary"])
+        tooltip = m.get("tooltip", "")
+        divider = f'<div style="width:1px;background:{COLORS["border"]};align-self:stretch;margin:0 12px;"></div>' if i > 0 else ""
+        items_html += f"""{divider}
+        <div style="flex:1;min-width:0;text-align:center;cursor:help;" title="{tooltip}">
+            <div style="font-family:{FONT};font-size:11px;font-weight:600;
+                        color:{COLORS["text_secondary"]};text-transform:uppercase;letter-spacing:0.06em;margin-bottom:2px;
+                        white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{label}</div>
+            <div style="font-family:{FONT};font-size:15px;font-weight:500;
+                        color:{color};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{value}</div>
+        </div>"""
+
+    return f"""
+    <div style="display:flex;align-items:center;background:{COLORS["card"]};border:1px solid {COLORS["border"]};
+                border-radius:12px;padding:10px 16px;box-shadow:{SHADOWS["sm"]};">
+        {items_html}
+    </div>
+    """

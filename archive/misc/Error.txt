@@ -1,0 +1,21 @@
+<div style="flex:1;min-width:0;text-align:center;cursor:help;" title="Positive sentiment headlines">
+    <div style="font-family:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;font-size:11px;font-weight:600;
+                color:#64748B;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:2px;
+                white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Positive</div>
+    <div style="font-family:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;font-size:15px;font-weight:500;
+                color:#10B981;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">1</div>
+</div><div style="width:1px;background:#E8EDF2;align-self:stretch;margin:0 12px;"></div>
+<div style="flex:1;min-width:0;text-align:center;cursor:help;" title="Neutral sentiment headlines">
+    <div style="font-family:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;font-size:11px;font-weight:600;
+                color:#64748B;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:2px;
+                white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Neutral</div>
+    <div style="font-family:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;font-size:15px;font-weight:500;
+                color:#1E293B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">14</div>
+</div><div style="width:1px;background:#E8EDF2;align-self:stretch;margin:0 12px;"></div>
+<div style="flex:1;min-width:0;text-align:center;cursor:help;" title="Negative sentiment headlines">
+    <div style="font-family:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;font-size:11px;font-weight:600;
+                color:#64748B;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:2px;
+                white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Negative</div>
+    <div style="font-family:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;font-size:15px;font-weight:500;
+                color:#F43F5E;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">0</div>
+</div>
