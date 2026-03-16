@@ -451,9 +451,9 @@ HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/
 FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY", "")
 if not FINNHUB_API_KEY:
     try:
-        FINNHUB_API_KEY = st.secrets.get("FINNHUB_API_KEY", "")
-    except Exception:
-        pass
+        FINNHUB_API_KEY = st.secrets["FINNHUB_API_KEY"]
+    except (KeyError, FileNotFoundError, AttributeError):
+        FINNHUB_API_KEY = ""
 
 
 @st.cache_data(ttl=86400)
