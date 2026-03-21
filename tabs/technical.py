@@ -195,7 +195,7 @@ def render(selected, price_data, info, tech_score, tech_details, last_row,
                         config={"displayModeBar": False})
     st.markdown(_chart_card_explanation(ema_explain), unsafe_allow_html=True)
 
-    st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:20px;'></div>", unsafe_allow_html=True)
 
     # --- Chart 2: Volume Confirmation ---
     vol_fig = go.Figure()
@@ -240,7 +240,7 @@ def render(selected, price_data, info, tech_score, tech_details, last_row,
                         config={"displayModeBar": False})
     st.markdown(_chart_card_explanation(vol_explain), unsafe_allow_html=True)
 
-    st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:20px;'></div>", unsafe_allow_html=True)
 
     # --- Chart 3: RSI Gate ---
     rsi_fig = go.Figure()
@@ -295,7 +295,7 @@ def render(selected, price_data, info, tech_score, tech_details, last_row,
                         config={"displayModeBar": False})
     st.markdown(_chart_card_explanation(rsi_explain), unsafe_allow_html=True)
 
-    st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:20px;'></div>", unsafe_allow_html=True)
 
     # =========================================================================
     # SECTION 2: SUPPORTING INDICATORS (MACD + Bollinger Bands side by side)
@@ -427,7 +427,7 @@ def render(selected, price_data, info, tech_score, tech_details, last_row,
                         config={"displayModeBar": False})
         st.markdown(_chart_card_explanation(bb_explain), unsafe_allow_html=True)
 
-    st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:20px;'></div>", unsafe_allow_html=True)
 
     # =========================================================================
     # SECTION 3: KEY LEVELS
@@ -486,7 +486,7 @@ def render(selected, price_data, info, tech_score, tech_details, last_row,
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:20px;'></div>", unsafe_allow_html=True)
 
     # =========================================================================
     # SECTION 4: AI MODEL LENS (conditional)
