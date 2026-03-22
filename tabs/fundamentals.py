@@ -515,6 +515,7 @@ def render(selected, info, financials, all_stocks_df, price_data, load_sector_pe
 
             fig.update_layout(**_chart_layout(250), showlegend=False)
             _chart_axes(fig)
+            fig.update_xaxes(type=None)
 
             st.markdown(_chart_card_bg(350), unsafe_allow_html=True)
             st.markdown(_chart_card_header_html("VALUATION (P/E HISTORY)", val_verdict, val_color), unsafe_allow_html=True)
