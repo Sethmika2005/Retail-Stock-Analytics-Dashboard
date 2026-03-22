@@ -26,7 +26,7 @@ EXPLAIN = (
 )
 BOX = (
     "background:#FFFFFF;border:1px solid #E8EDF2;border-radius:14px;"
-    "padding:18px 20px;"
+    "padding:18px 20px;height:100%;box-sizing:border-box;"
     "box-shadow:0 1px 3px rgba(0,0,0,0.04),0 1px 2px rgba(0,0,0,0.02);"
 )
 
@@ -264,7 +264,7 @@ def render(selected, price_data, info, last_row, change_pct,
     </div>
     """)
 
-    st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
 
     # =====================================================================
     # 2. CHART + PERIOD RETURNS
