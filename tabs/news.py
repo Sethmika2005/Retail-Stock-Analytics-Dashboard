@@ -67,10 +67,11 @@ def render(news_items):
         sentiment = classify_headline_sentiment(headline)
         border_color = sentiment_colors.get(sentiment, "#64748B")
 
-        summary_html = ""
         if summary:
             truncated = summary[:200] + "..." if len(summary) > 200 else summary
-            summary_html = f'<div style="font-size: 13px; color: #64748B; margin-top: 6px; line-height: 1.4;">{truncated}</div>'
+        else:
+            truncated = "No description available."
+        summary_html = f'<div style="font-size: 13px; color: #64748B; margin-top: 6px; line-height: 1.4; font-style: {"italic" if not summary else "normal"};">{truncated}</div>'
 
         st.markdown(f"""
         <div style="
