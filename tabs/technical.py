@@ -158,14 +158,14 @@ def render(selected, price_data, info, tech_score, tech_details, last_row,
     golden_pts, death_pts = _find_ema_crossovers(chart_data)
     for d, p in golden_pts:
         ema_fig.add_annotation(
-            x=d, y=float(p), text="\u2191 Golden", showarrow=True,
+            x=pd.Timestamp(d), y=float(p), text="\u2191 Golden", showarrow=True,
             arrowhead=2, arrowwidth=2, arrowcolor="#10B981",
             font=dict(size=9, color="#10B981"), bgcolor="white",
             bordercolor="#10B981", borderwidth=1, ax=0, ay=-30,
         )
     for d, p in death_pts:
         ema_fig.add_annotation(
-            x=d, y=float(p), text="\u2193 Death", showarrow=True,
+            x=pd.Timestamp(d), y=float(p), text="\u2193 Death", showarrow=True,
             arrowhead=2, arrowwidth=2, arrowcolor="#EF4444",
             font=dict(size=9, color="#EF4444"), bgcolor="white",
             bordercolor="#EF4444", borderwidth=1, ax=0, ay=30,
