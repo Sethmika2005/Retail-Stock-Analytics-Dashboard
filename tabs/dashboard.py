@@ -491,7 +491,7 @@ def render(selected, price_data, info, last_row, change_pct,
     # =====================================================================
     # 6. HEALTH CHECK + NEWS (side by side)
     # =====================================================================
-    hc_col, news_col = st.columns(2)
+    news_col, hc_col = st.columns(2)
 
     with hc_col:
         tech_label_text = "Strong" if tech_score >= 60 else "Weak" if tech_score < 40 else "Neutral"
