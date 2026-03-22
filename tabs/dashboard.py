@@ -238,7 +238,7 @@ def render(selected, price_data, info, last_row, change_pct,
     # =====================================================================
     st.html(f"""
     <div style="{CARD} padding:18px 24px;">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
             <div style="display:flex;align-items:center;">
                 {logo_html}
                 <div>
