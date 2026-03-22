@@ -248,16 +248,15 @@ def render(selected, price_data, info, last_row, change_pct,
                                  font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">{selected}</span>
                 </div>
             </div>
-            <div style="text-align:right;">
-                <div style="height:14px;"></div>
-                <div>
+            <div style="display:flex;align-items:center;gap:12px;">
+                <div style="text-align:right;">
                     <span style="font-size:28px;font-weight:700;color:#0F172A;letter-spacing:-0.02em;
                                  font-family:'Calibri','Segoe UI',sans-serif;">${current_price:.2f}</span>
                     <span style="font-size:14px;color:{change_color};font-weight:600;margin-left:8px;
                                  font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">{change_sign}{change_pct:.2f}%</span>
                 </div>
                 <div style="font-size:13px;font-weight:700;color:white;background:{rec_color};
-                            padding:5px 18px;border-radius:20px;display:inline-block;margin-top:6px;
+                            padding:5px 18px;border-radius:20px;
                             letter-spacing:0.04em;">{rec}</div>
             </div>
         </div>
