@@ -264,7 +264,7 @@ def render(selected, price_data, info, last_row, change_pct,
     </div>
     """)
 
-    st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:3px;'></div>", unsafe_allow_html=True)
 
     # =====================================================================
     # 2. CHART + PERIOD RETURNS
@@ -333,7 +333,7 @@ def render(selected, price_data, info, last_row, change_pct,
                 color:#64748B;line-height:1.6;padding:6px 4px 6px 20px;">{comment}</div>
     """, unsafe_allow_html=True)
 
-    st.markdown("<div style='height:40px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:45px;'></div>", unsafe_allow_html=True)
 
     # =====================================================================
     # 4. COMPANY INFO
