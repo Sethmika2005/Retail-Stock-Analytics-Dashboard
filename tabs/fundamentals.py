@@ -305,7 +305,7 @@ def render(selected, info, financials, all_stocks_df, price_data, load_sector_pe
     else:
         _not_available_card("FUNDAMENTAL SCORE", "Fundamental score not available for this stock.")
 
-    st.markdown('<div style="height:30px;"></div>', unsafe_allow_html=True)
+    st.markdown('<div style="height:20px;"></div>', unsafe_allow_html=True)
 
     # =========================================================================
     # SECTION 2: PROFITABILITY + REVENUE GROWTH (side by side)
