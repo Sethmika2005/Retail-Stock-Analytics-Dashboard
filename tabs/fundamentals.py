@@ -68,6 +68,7 @@ def _chart_axes(fig, y_prefix=""):
     fig.update_xaxes(
         showgrid=False, showline=True, linecolor=BORDER,
         tickfont=dict(size=10, color=MUTED),
+        type="category",
     )
     fig.update_yaxes(
         showgrid=True, gridcolor=GRID_COLOR,
