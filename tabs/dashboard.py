@@ -26,7 +26,7 @@ EXPLAIN = (
 )
 BOX = (
     "background:#FFFFFF;border:1px solid #E8EDF2;border-radius:14px;"
-    "padding:18px 20px;min-height:190px;box-sizing:border-box;"
+    "padding:18px 20px;"
     "box-shadow:0 1px 3px rgba(0,0,0,0.04),0 1px 2px rgba(0,0,0,0.02);"
 )
 
