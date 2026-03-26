@@ -653,6 +653,7 @@ def render(selected, info, financials, all_stocks_df, price_data, load_sector_pe
                 header_cells = ""
                 stock_cells = ""
                 peer_cells = ""
+                diff_cells = ""
 
                 for label, stock_val, peer_val, higher_better, is_better in comparisons:
                     is_pct = label in ("ROE", "Net Margin", "Rev Growth")
@@ -682,6 +683,27 @@ def render(selected, info, financials, all_stocks_df, price_data, load_sector_pe
                         f'font-family:{FONT};">{_peer_fmt(peer_val, is_pct)}</div></div>'
                     )
 
+                    # Difference row
+                    if stock_val is not None and peer_val is not None and not pd.isna(stock_val) and not pd.isna(peer_val):
+                        diff = stock_val - peer_val
+                        if is_pct:
+                            diff_txt = f"{'+' if diff >= 0 else ''}{diff * 100:.1f}pp"
+                        elif peer_val != 0:
+                            diff_pct = (diff / abs(peer_val)) * 100
+                            diff_txt = f"{'+' if diff_pct >= 0 else ''}{diff_pct:.0f}%"
+                        else:
+                            diff_txt = f"{'+' if diff >= 0 else ''}{diff:.1f}"
+                        diff_color = SUCCESS if is_better else CORAL if is_better is False else MUTED
+                    else:
+                        diff_txt = "\u2014"
+                        diff_color = MUTED
+
+                    diff_cells += (
+                        f'<div style="flex:1;text-align:center;">'
+                        f'<div style="font-size:12px;font-weight:600;color:{diff_color};'
+                        f'font-family:{FONT};">{diff_txt}</div></div>'
+                    )
+
                 peer_card_html = f"""
                 <div style="background:#FFFFFF;border:1px solid {BORDER};border-radius:14px;
                             box-shadow:{SHADOW_SM};padding:20px;">
@@ -699,10 +721,16 @@ def render(selected, info, financials, all_stocks_df, price_data, load_sector_pe
                                     font-family:{FONT};">{selected}</div>
                         <div style="display:flex;gap:4px;flex:1;">{stock_cells}</div>
                     </div>
-                    <div style="display:flex;gap:4px;align-items:center;margin-bottom:12px;">
+                    <div style="display:flex;gap:4px;align-items:center;margin-bottom:10px;">
                         <div style="width:50px;flex-shrink:0;font-size:11px;font-weight:600;color:{MUTED};
-                                    font-family:{FONT};">Peers</div>
+                                    font-family:{FONT};">Peers (Avg)</div>
                         <div style="display:flex;gap:4px;flex:1;">{peer_cells}</div>
+                    </div>
+                    <div style="display:flex;gap:4px;align-items:center;margin-bottom:12px;
+                                border-top:1px solid {BORDER};padding-top:8px;">
+                        <div style="width:50px;flex-shrink:0;font-size:11px;font-weight:600;color:{MUTED};
+                                    font-family:{FONT};">Diff</div>
+                        <div style="display:flex;gap:4px;flex:1;">{diff_cells}</div>
                     </div>
                     <div style="font-size:11px;color:{MUTED};line-height:1.4;font-family:{FONT};">
                         Compared against {len(sector_peers)} peers in {stock_sector}.
