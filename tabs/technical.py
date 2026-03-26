@@ -175,14 +175,14 @@ def render(selected, price_data, info, tech_score, tech_details, last_row,
     ct = paper1_details.get("crossover_type", "none")
     if ct == "golden_cross":
         ema_verdict, ema_color = "Golden Cross", "#10B981"
-        ema_explain = "EMA-20 has crossed above EMA-50 \u2014 short-term momentum is turning bullish. This is the primary buy trigger in the Paper 1 strategy."
+        ema_explain = "EMA (Exponential Moving Average) tracks the average price over a period, giving more weight to recent prices. The short-term EMA-20 has crossed above the longer-term EMA-50, indicating that recent price momentum is shifting upward."
     elif ct == "death_cross":
         ema_verdict, ema_color = "Death Cross", "#EF4444"
-        ema_explain = "EMA-20 has crossed below EMA-50 \u2014 short-term momentum is turning bearish. This is the primary sell trigger in the Paper 1 strategy."
+        ema_explain = "EMA (Exponential Moving Average) tracks the average price over a period, giving more weight to recent prices. The short-term EMA-20 has crossed below the longer-term EMA-50, indicating that recent price momentum is shifting downward."
     else:
         ema_verdict, ema_color = "No Crossover", "#94A3B8"
         trend = paper1_details.get("ema_trend", "neutral")
-        ema_explain = f"No EMA crossover event detected. Current EMA trend bias: {trend}. The system falls back to composite scoring."
+        ema_explain = f"EMA (Exponential Moving Average) tracks the average price over a period, giving more weight to recent prices. No crossover between EMA-20 and EMA-50 has occurred \u2014 the current trend bias is {trend}."
 
     ema_fig.update_layout(**_chart_layout(280), showlegend=True)
     _chart_axes(ema_fig, y_prefix="$")
@@ -221,13 +221,13 @@ def render(selected, price_data, info, tech_score, tech_details, last_row,
     if ct in ("golden_cross", "death_cross"):
         if atv_confirmed:
             vol_verdict, vol_color = "Volume Confirms", "#10B981"
-            vol_explain = "ATV slope is rising in the direction of the crossover \u2014 volume is confirming the trend signal."
+            vol_explain = "Volume measures how many shares are being traded. Rising volume alongside a price trend suggests stronger conviction behind the move \u2014 the current trend is supported by increasing trading activity."
         else:
             vol_verdict, vol_color = "Volume Diverging", "#F59E0B"
-            vol_explain = "ATV slope does not confirm the crossover \u2014 volume divergence weakens the signal."
+            vol_explain = "Volume measures how many shares are being traded. When volume does not rise alongside a price trend, it suggests weaker conviction \u2014 the current trend lacks strong trading activity to support it."
     else:
         vol_verdict, vol_color = "No Signal", "#94A3B8"
-        vol_explain = "No crossover to confirm. Volume is shown for context."
+        vol_explain = "Volume measures how many shares are being traded. No active trend signal to confirm \u2014 volume is displayed for reference."
 
     vol_fig.update_layout(**_chart_layout(280), showlegend=True)
     _chart_axes(vol_fig)
@@ -270,16 +270,16 @@ def render(selected, price_data, info, tech_score, tech_details, last_row,
     rsi_gate = paper1_details.get("rsi_gate", "n/a")
     if rsi_gate == "passed":
         rsi_verdict, rsi_vcolor = "Gate Passed", "#10B981"
-        rsi_explain = f"RSI at {rsi_safe:.0f} is within acceptable range. The signal is not blocked."
+        rsi_explain = f"RSI (Relative Strength Index) measures the speed of recent price changes on a scale of 0\u2013100. Currently at {rsi_safe:.0f}, this is within the normal range (30\u201370), meaning the stock is not showing signs of being excessively overbought or oversold."
     elif rsi_gate == "blocked_overbought":
         rsi_verdict, rsi_vcolor = "Blocked \u2014 Overbought", "#EF4444"
-        rsi_explain = f"RSI at {rsi_safe:.0f} exceeds 70 (overbought). Buy signal is blocked to prevent chasing."
+        rsi_explain = f"RSI (Relative Strength Index) measures the speed of recent price changes on a scale of 0\u2013100. Currently at {rsi_safe:.0f}, this is above 70, indicating the stock has risen rapidly and may be due for a pullback."
     elif rsi_gate == "blocked_oversold":
         rsi_verdict, rsi_vcolor = "Blocked \u2014 Oversold", "#EF4444"
-        rsi_explain = f"RSI at {rsi_safe:.0f} is below 30 (oversold). Sell signal is blocked to prevent panic selling."
+        rsi_explain = f"RSI (Relative Strength Index) measures the speed of recent price changes on a scale of 0\u2013100. Currently at {rsi_safe:.0f}, this is below 30, indicating the stock has fallen sharply and may be approaching a recovery point."
     else:
         rsi_verdict, rsi_vcolor = "No Gate Applied", "#94A3B8"
-        rsi_explain = f"RSI at {rsi_safe:.0f}. No crossover-based signal to gate."
+        rsi_explain = f"RSI (Relative Strength Index) measures the speed of recent price changes on a scale of 0\u2013100. Currently at {rsi_safe:.0f}, with no active signal to evaluate against."
 
     rsi_fig.update_layout(**_chart_layout(280), showlegend=False)
     rsi_fig.update_yaxes(range=[0, 100], showgrid=True, gridcolor="#F1F5F9",
@@ -329,10 +329,10 @@ def render(selected, price_data, info, tech_score, tech_details, last_row,
     macd_sig = float(chart_data["MACD_SIGNAL"].iloc[-1]) if "MACD_SIGNAL" in chart_data.columns else 0
     if macd_val > macd_sig:
         macd_verdict, macd_vcolor = "Bullish", "#10B981"
-        macd_explain = "MACD is above the signal line \u2014 momentum favours buyers."
+        macd_explain = "MACD (Moving Average Convergence Divergence) compares short-term and long-term price trends to gauge momentum. It is currently above its signal line, suggesting upward momentum is building."
     else:
         macd_verdict, macd_vcolor = "Bearish", "#FF6B6B"
-        macd_explain = "MACD is below the signal line \u2014 momentum favours sellers."
+        macd_explain = "MACD (Moving Average Convergence Divergence) compares short-term and long-term price trends to gauge momentum. It is currently below its signal line, suggesting downward momentum is building."
 
     macd_fig.update_layout(**_chart_layout(250), showlegend=True)
     _chart_axes(macd_fig)
@@ -396,13 +396,13 @@ def render(selected, price_data, info, tech_score, tech_details, last_row,
         pos = (curr - lower) / bb_range
         if pos > 0.85:
             bb_verdict, bb_vcolor = "Near Upper Band", "#F59E0B"
-            bb_explain = "Price is near the upper Bollinger Band \u2014 potential resistance or overbought condition."
+            bb_explain = "Bollinger Bands create a range around the average price based on volatility \u2014 the wider the bands, the more volatile the stock. Price is currently near the upper band, suggesting it may be stretched above its typical range."
         elif pos < 0.15:
             bb_verdict, bb_vcolor = "Near Lower Band", "#10B981"
-            bb_explain = "Price is near the lower Bollinger Band \u2014 potential support or oversold condition."
+            bb_explain = "Bollinger Bands create a range around the average price based on volatility \u2014 the wider the bands, the more volatile the stock. Price is currently near the lower band, suggesting it may be compressed below its typical range."
         else:
             bb_verdict, bb_vcolor = "Within Range", "#94A3B8"
-            bb_explain = "Price is within the Bollinger Bands \u2014 no extreme condition detected."
+            bb_explain = "Bollinger Bands create a range around the average price based on volatility \u2014 the wider the bands, the more volatile the stock. Price is currently within the bands, indicating normal trading conditions."
     else:
         bb_verdict, bb_vcolor = "No Data", "#94A3B8"
         bb_explain = "Bollinger Bands data not available."
