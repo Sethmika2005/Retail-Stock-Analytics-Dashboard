@@ -653,26 +653,23 @@ def render(selected, price_data, info, last_row, change_pct,
             )
 
         st.markdown(f"""
-        <div style="{CARD} border-left:4px solid {pnl_color};">
+        <div style="{CARD} padding:16px 20px;border-left:4px solid {pnl_color};">
             <div style="{LABEL}">My Position</div>
-            <div style="margin-top:4px;">
+            <div style="margin-top:6px;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">
                 <span style="font-size:12px;color:#64748B;">Avg Cost </span>
                 <span style="font-size:14px;font-weight:600;color:#1E293B;">${cost_basis:.2f}</span>
-                <span style="font-size:12px;color:#64748B;margin:0 4px;"> \u2192 Current </span>
+                <span style="font-size:12px;color:#64748B;margin:0 6px;">\u2192 Current</span>
                 <span style="font-size:14px;font-weight:600;color:#1E293B;">${current_price_pos:.2f}</span>
             </div>
-            <div style="margin-top:8px;">
-                <span style="font-size:13px;color:#1E293B;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">
-                    If you sold now, you would {action_word} approx. </span>
-                <span style="font-size:13px;font-weight:700;color:{pnl_color};
-                             font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">${abs(pnl_dollar):.2f}/share</span>
-                <span style="font-size:13px;font-weight:600;color:{pnl_color};
-                             font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;"> ({pnl_pct:+.1f}%)</span>
+            <div style="margin-top:10px;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">
+                <span style="font-size:13px;color:#1E293B;">If you sold now, you would {action_word} approx. </span>
+                <span style="font-size:13px;font-weight:700;color:{pnl_color};">${abs(pnl_dollar):.2f}/share</span>
+                <span style="font-size:13px;font-weight:600;color:{pnl_color};"> ({pnl_pct:+.1f}%)</span>
             </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">{examples_html}</div>
-            <div style="font-size:10px;color:#94A3B8;line-height:1.4;
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">{examples_html}</div>
+            <div style="font-size:10px;color:#94A3B8;line-height:1.5;
                         font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;
-                        margin-top:10px;font-style:italic;">
+                        margin-top:12px;font-style:italic;">
                 Based on your entered average cost. Actual P&amp;L depends on the number of shares held
                 and prices at which they were acquired. Does not account for fees, taxes, or dividends.
             </div>
