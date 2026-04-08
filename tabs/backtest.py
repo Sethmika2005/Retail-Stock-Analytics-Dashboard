@@ -63,7 +63,7 @@ def _run_and_display_backtest(
     """Execute backtest and display results."""
 
     # Prepare data: ensure indicators are computed
-    if "EMA_Cross_Signal" not in price_data.columns:
+    if "SMA_Cross_Signal" not in price_data.columns:
         bt_df = bt_compute_indicators(price_data)
     else:
         bt_df = price_data.copy()

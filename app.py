@@ -695,22 +695,22 @@ def compute_indicators(df):
     std60 = df["Close"].rolling(window=60).std()
     df["Z_SCORE_60"] = (df["Close"] - ma60) / std60
 
-    # EMA indicators (Paper 1)
-    df["EMA20"] = df["Close"].ewm(span=20, adjust=False).mean()
-    df["EMA50"] = df["Close"].ewm(span=50, adjust=False).mean()
+    # SMA indicators (Paper 1 — Kadia et al. use SMA crossover)
+    df["SMA20"] = df["Close"].rolling(window=20).mean()
+    df["SMA50"] = df["Close"].rolling(window=50).mean()
 
-    # EMA Cross Signal: +1 golden cross, -1 death cross, 0 otherwise
-    ema_cross = pd.Series(0, index=df.index)
+    # SMA Cross Signal: +1 golden cross, -1 death cross, 0 otherwise
+    sma_cross = pd.Series(0, index=df.index)
     if len(df) > 1:
-        ema20 = df["EMA20"].values
-        ema50 = df["EMA50"].values
+        sma20 = df["SMA20"].values
+        sma50 = df["SMA50"].values
         for i in range(1, len(df)):
-            if pd.notna(ema20[i]) and pd.notna(ema50[i]) and pd.notna(ema20[i-1]) and pd.notna(ema50[i-1]):
-                if ema20[i-1] <= ema50[i-1] and ema20[i] > ema50[i]:
-                    ema_cross.iloc[i] = 1  # Golden cross
-                elif ema20[i-1] >= ema50[i-1] and ema20[i] < ema50[i]:
-                    ema_cross.iloc[i] = -1  # Death cross
-    df["EMA_Cross_Signal"] = ema_cross
+            if pd.notna(sma20[i]) and pd.notna(sma50[i]) and pd.notna(sma20[i-1]) and pd.notna(sma50[i-1]):
+                if sma20[i-1] <= sma50[i-1] and sma20[i] > sma50[i]:
+                    sma_cross.iloc[i] = 1  # Golden cross
+                elif sma20[i-1] >= sma50[i-1] and sma20[i] < sma50[i]:
+                    sma_cross.iloc[i] = -1  # Death cross
+    df["SMA_Cross_Signal"] = sma_cross
 
     # Volume indicators
     if "Volume" in df.columns:
@@ -766,10 +766,10 @@ with st.sidebar:
     ticker_options = all_stocks_df["ticker"].tolist()
     ticker_labels = [f"{row['ticker']} - {row['name']}" for _, row in all_stocks_df.iterrows()]
 
-    # Default to AAPL if available, otherwise first stock
+    # Default to MSFT if available, otherwise first stock
     default_idx = 0
-    if "AAPL" in ticker_options:
-        default_idx = ticker_options.index("AAPL")
+    if "MSFT" in ticker_options:
+        default_idx = ticker_options.index("MSFT")
 
     selected_idx = st.selectbox(
         "Stock",

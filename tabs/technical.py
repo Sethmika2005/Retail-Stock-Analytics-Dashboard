@@ -99,21 +99,21 @@ def _chart_card_explanation(text):
     """
 
 
-def _find_ema_crossovers(df):
-    """Find EMA20/EMA50 crossover points (Paper 1)."""
-    if "EMA20" not in df.columns or "EMA50" not in df.columns:
+def _find_sma_crossovers(df):
+    """Find SMA20/SMA50 crossover points (Paper 1)."""
+    if "SMA20" not in df.columns or "SMA50" not in df.columns:
         return [], []
     golden, death = [], []
-    e20 = df["EMA20"].values
-    e50 = df["EMA50"].values
+    s20 = df["SMA20"].values
+    s50 = df["SMA50"].values
     dates = df["Date"].values
     prices = df["Close"].values
     for i in range(1, len(df)):
-        if pd.isna(e20[i]) or pd.isna(e50[i]) or pd.isna(e20[i - 1]) or pd.isna(e50[i - 1]):
+        if pd.isna(s20[i]) or pd.isna(s50[i]) or pd.isna(s20[i - 1]) or pd.isna(s50[i - 1]):
             continue
-        if e20[i - 1] <= e50[i - 1] and e20[i] > e50[i]:
+        if s20[i - 1] <= s50[i - 1] and s20[i] > s50[i]:
             golden.append((dates[i], prices[i]))
-        if e20[i - 1] >= e50[i - 1] and e20[i] < e50[i]:
+        if s20[i - 1] >= s50[i - 1] and s20[i] < s50[i]:
             death.append((dates[i], prices[i]))
     return golden, death
 
@@ -138,33 +138,33 @@ def render(selected, price_data, info, tech_score, tech_details, last_row,
     # SECTION 1: DECISION PIPELINE (3 stacked chart cards)
     # =========================================================================
 
-    # --- Chart 1: EMA Crossover ---
-    ema_fig = go.Figure()
-    ema_fig.add_trace(go.Scatter(
+    # --- Chart 1: SMA Crossover ---
+    sma_fig = go.Figure()
+    sma_fig.add_trace(go.Scatter(
         x=dates, y=chart_data["Close"].tolist(), name="Price",
         line=dict(color="#0F172A", width=2), mode="lines",
     ))
-    if "EMA20" in chart_data.columns:
-        ema_fig.add_trace(go.Scatter(
-            x=dates, y=chart_data["EMA20"].tolist(), name="EMA-20",
+    if "SMA20" in chart_data.columns:
+        sma_fig.add_trace(go.Scatter(
+            x=dates, y=chart_data["SMA20"].tolist(), name="SMA-20",
             line=dict(color="#0097A7", width=1.5), mode="lines",
         ))
-    if "EMA50" in chart_data.columns:
-        ema_fig.add_trace(go.Scatter(
-            x=dates, y=chart_data["EMA50"].tolist(), name="EMA-50",
+    if "SMA50" in chart_data.columns:
+        sma_fig.add_trace(go.Scatter(
+            x=dates, y=chart_data["SMA50"].tolist(), name="SMA-50",
             line=dict(color="#FF6B6B", width=1.5), mode="lines",
         ))
 
-    golden_pts, death_pts = _find_ema_crossovers(chart_data)
+    golden_pts, death_pts = _find_sma_crossovers(chart_data)
     for d, p in golden_pts:
-        ema_fig.add_annotation(
+        sma_fig.add_annotation(
             x=pd.Timestamp(d), y=float(p), text="\u2191 Golden", showarrow=True,
             arrowhead=2, arrowwidth=2, arrowcolor="#10B981",
             font=dict(size=9, color="#10B981"), bgcolor="white",
             bordercolor="#10B981", borderwidth=1, ax=0, ay=-30,
         )
     for d, p in death_pts:
-        ema_fig.add_annotation(
+        sma_fig.add_annotation(
             x=pd.Timestamp(d), y=float(p), text="\u2193 Death", showarrow=True,
             arrowhead=2, arrowwidth=2, arrowcolor="#EF4444",
             font=dict(size=9, color="#EF4444"), bgcolor="white",
@@ -174,26 +174,26 @@ def render(selected, price_data, info, tech_score, tech_details, last_row,
     # Verdict
     ct = paper1_details.get("crossover_type", "none")
     if ct == "golden_cross":
-        ema_verdict, ema_color = "Golden Cross", "#10B981"
-        ema_explain = "EMA (Exponential Moving Average) tracks the average price over a period, giving more weight to recent prices. The short-term EMA-20 has crossed above the longer-term EMA-50, indicating that recent price momentum is shifting upward."
+        sma_verdict, sma_color = "Golden Cross", "#10B981"
+        sma_explain = "SMA (Simple Moving Average) tracks the average closing price over a period. The short-term SMA-20 has crossed above the longer-term SMA-50, indicating that recent price momentum is shifting upward."
     elif ct == "death_cross":
-        ema_verdict, ema_color = "Death Cross", "#EF4444"
-        ema_explain = "EMA (Exponential Moving Average) tracks the average price over a period, giving more weight to recent prices. The short-term EMA-20 has crossed below the longer-term EMA-50, indicating that recent price momentum is shifting downward."
+        sma_verdict, sma_color = "Death Cross", "#EF4444"
+        sma_explain = "SMA (Simple Moving Average) tracks the average closing price over a period. The short-term SMA-20 has crossed below the longer-term SMA-50, indicating that recent price momentum is shifting downward."
     else:
-        ema_verdict, ema_color = "No Crossover", "#94A3B8"
-        trend = paper1_details.get("ema_trend", "neutral")
-        ema_explain = f"EMA (Exponential Moving Average) tracks the average price over a period, giving more weight to recent prices. No crossover between EMA-20 and EMA-50 has occurred \u2014 the current trend bias is {trend}."
+        sma_verdict, sma_color = "No Crossover", "#94A3B8"
+        trend = paper1_details.get("sma_trend", "neutral")
+        sma_explain = f"SMA (Simple Moving Average) tracks the average closing price over a period. No crossover between SMA-20 and SMA-50 has occurred \u2014 the current trend bias is {trend}."
 
-    ema_fig.update_layout(**_chart_layout(280), showlegend=True)
-    _chart_axes(ema_fig, y_prefix="$")
+    sma_fig.update_layout(**_chart_layout(280), showlegend=True)
+    _chart_axes(sma_fig, y_prefix="$")
 
     st.markdown(_chart_card_bg(380), unsafe_allow_html=True)
-    st.markdown(_chart_card_header("EMA CROSSOVER", ema_verdict, ema_color), unsafe_allow_html=True)
-    _, ema_c, _ = st.columns([0.2, 9.6, 0.2])
-    with ema_c:
-        st.plotly_chart(ema_fig, use_container_width=True, key="tech_ema_chart",
+    st.markdown(_chart_card_header("SMA CROSSOVER", sma_verdict, sma_color), unsafe_allow_html=True)
+    _, sma_c, _ = st.columns([0.2, 9.6, 0.2])
+    with sma_c:
+        st.plotly_chart(sma_fig, use_container_width=True, key="tech_sma_chart",
                         config={"displayModeBar": False})
-    st.markdown(_chart_card_explanation(ema_explain), unsafe_allow_html=True)
+    st.markdown(_chart_card_explanation(sma_explain), unsafe_allow_html=True)
 
     st.markdown("<div style='height:30px;'></div>", unsafe_allow_html=True)
 
@@ -499,7 +499,7 @@ def render(selected, price_data, info, tech_score, tech_details, last_row,
         rec_colors = {"BUY": "#10B981", "SELL": "#FF6B6B", "HOLD": "#F59E0B"}
         rl_color = rec_colors.get(rl_signal, "#F59E0B")
 
-        ema_signal_val = paper1_details.get("ema_cross_signal", 0)
+        sma_signal_val = paper1_details.get("sma_cross_signal", 0)
         atv_slope_val = paper1_details.get("atv_slope", 0)
         rsi_val = paper1_details.get("rsi", rsi_safe)
 
@@ -542,7 +542,7 @@ def render(selected, price_data, info, tech_score, tech_details, last_row,
             <div style="font-size:11px;color:#94A3B8;font-weight:600;text-transform:uppercase;
                         letter-spacing:0.04em;margin-bottom:6px;
                         font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">RL Input Features</div>
-            {_rl_row("EMA Signal", str(ema_signal_val))}
+            {_rl_row("SMA Signal", str(sma_signal_val))}
             {_rl_row("ATV Slope", f"{atv_slope_val:,.0f}")}
             {_rl_row("1-Day Return", f"{ret_1d:+.2f}%")}
             {_rl_row("5-Day Return", f"{ret_5d:+.2f}%")}

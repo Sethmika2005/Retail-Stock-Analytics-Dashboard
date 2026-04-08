@@ -93,8 +93,196 @@ def classify_headline_sentiment(title):
 
 
 # =============================================================================
-# RISK CLASSIFICATION
+# PIOTROSKI F-SCORE (Piotroski, 2000)
 # =============================================================================
+
+def _find_col(df, candidates):
+    """Find first matching column name from a list of candidates."""
+    if df is None or df.empty:
+        return None
+    for name in candidates:
+        if name in df.columns:
+            return name
+    return None
+
+
+def _safe_val(df, col_candidates, year_idx=-1):
+    """Safely extract a value from a DataFrame given column candidates and year index."""
+    if df is None or df.empty:
+        return None
+    col = _find_col(df, col_candidates)
+    if col is None:
+        return None
+    try:
+        val = df[col].iloc[year_idx]
+        if pd.notna(val):
+            return float(val)
+    except (IndexError, TypeError):
+        pass
+    return None
+
+
+def calculate_piotroski_fscore(income_stmt, balance_sheet, cashflow):
+    """
+    Calculate the Piotroski F-Score (0-9) based on 9 binary financial health tests.
+
+    Reference: Piotroski, J. D. (2000). "Value Investing: The Use of Historical
+    Financial Statement Information to Separate Winners from Losers."
+    Journal of Accounting Research, 38, 1-41.
+
+    Categories:
+      Profitability (4 points): ROA > 0, CFO > 0, ROA increasing, CFO > Net Income
+      Leverage/Liquidity (3 points): Debt ratio decreasing, Current ratio increasing, No dilution
+      Efficiency (2 points): Gross margin increasing, Asset turnover increasing
+
+    Args:
+        income_stmt: Annual income statement DataFrame (rows = years, ascending)
+        balance_sheet: Annual balance sheet DataFrame (rows = years, ascending)
+        cashflow: Annual cash flow statement DataFrame (rows = years, ascending)
+
+    Returns:
+        (total_score, details_dict) where details_dict has per-test results
+    """
+    details = {}
+    score = 0
+
+    # Need at least 2 years for year-over-year comparisons
+    has_two_years = (
+        income_stmt is not None and len(income_stmt) >= 2 and
+        balance_sheet is not None and len(balance_sheet) >= 2
+    )
+
+    # --- Current year values ---
+    net_income = _safe_val(income_stmt, ["Net Income", "NetIncome", "Net Income Common Stockholders"])
+    total_assets_curr = _safe_val(balance_sheet, ["Total Assets", "TotalAssets"])
+    total_assets_prev = _safe_val(balance_sheet, ["Total Assets", "TotalAssets"], -2) if has_two_years else None
+
+    cfo = _safe_val(cashflow, [
+        "Operating Cash Flow", "Cash Flow From Continuing Operating Activities",
+        "Total Cash From Operating Activities", "OperatingCashFlow",
+    ]) if cashflow is not None and not cashflow.empty else None
+
+    # --- PROFITABILITY (4 tests) ---
+
+    # Test 1: ROA > 0 (Net Income / Total Assets > 0)
+    roa_curr = None
+    if net_income is not None and total_assets_curr is not None and total_assets_curr > 0:
+        roa_curr = net_income / total_assets_curr
+    test1 = 1 if roa_curr is not None and roa_curr > 0 else 0
+    details["roa_positive"] = {"score": test1, "value": roa_curr}
+    score += test1
+
+    # Test 2: Operating Cash Flow > 0
+    test2 = 1 if cfo is not None and cfo > 0 else 0
+    details["cfo_positive"] = {"score": test2, "value": cfo}
+    score += test2
+
+    # Test 3: ROA increasing (ROA this year > ROA last year)
+    test3 = 0
+    roa_prev = None
+    if has_two_years and total_assets_prev is not None and total_assets_prev > 0:
+        ni_prev = _safe_val(income_stmt, ["Net Income", "NetIncome", "Net Income Common Stockholders"], -2)
+        if ni_prev is not None:
+            roa_prev = ni_prev / total_assets_prev
+            if roa_curr is not None and roa_prev is not None and roa_curr > roa_prev:
+                test3 = 1
+    details["roa_increasing"] = {"score": test3, "value_curr": roa_curr, "value_prev": roa_prev}
+    score += test3
+
+    # Test 4: Cash Flow > Net Income (accruals quality)
+    test4 = 0
+    if cfo is not None and net_income is not None and cfo > net_income:
+        test4 = 1
+    details["cfo_gt_net_income"] = {"score": test4, "cfo": cfo, "net_income": net_income}
+    score += test4
+
+    # --- LEVERAGE / LIQUIDITY (3 tests) ---
+
+    # Test 5: Long-term debt ratio decreasing
+    test5 = 0
+    lt_debt_curr = _safe_val(balance_sheet, ["Long Term Debt", "LongTermDebt", "Total Debt", "TotalDebt"])
+    if has_two_years:
+        lt_debt_prev = _safe_val(balance_sheet, ["Long Term Debt", "LongTermDebt", "Total Debt", "TotalDebt"], -2)
+        if lt_debt_curr is not None and lt_debt_prev is not None and total_assets_curr and total_assets_prev:
+            ratio_curr = lt_debt_curr / total_assets_curr
+            ratio_prev = lt_debt_prev / total_assets_prev
+            if ratio_curr <= ratio_prev:
+                test5 = 1
+        elif lt_debt_curr is None or lt_debt_curr == 0:
+            test5 = 1  # No debt is good
+    details["debt_decreasing"] = {"score": test5}
+    score += test5
+
+    # Test 6: Current ratio increasing
+    test6 = 0
+    ca_curr = _safe_val(balance_sheet, ["Current Assets", "CurrentAssets", "Total Current Assets"])
+    cl_curr = _safe_val(balance_sheet, ["Current Liabilities", "CurrentLiabilities", "Total Current Liabilities"])
+    if has_two_years:
+        ca_prev = _safe_val(balance_sheet, ["Current Assets", "CurrentAssets", "Total Current Assets"], -2)
+        cl_prev = _safe_val(balance_sheet, ["Current Liabilities", "CurrentLiabilities", "Total Current Liabilities"], -2)
+        if ca_curr and cl_curr and cl_curr > 0 and ca_prev and cl_prev and cl_prev > 0:
+            cr_curr = ca_curr / cl_curr
+            cr_prev = ca_prev / cl_prev
+            if cr_curr > cr_prev:
+                test6 = 1
+    details["current_ratio_increasing"] = {"score": test6}
+    score += test6
+
+    # Test 7: No new shares issued (dilution check)
+    test7 = 0
+    shares_curr = _safe_val(income_stmt, [
+        "Diluted Average Shares", "Basic Average Shares",
+        "Shares Issued", "ShareIssued", "Ordinary Shares Number",
+    ])
+    if has_two_years:
+        shares_prev = _safe_val(income_stmt, [
+            "Diluted Average Shares", "Basic Average Shares",
+            "Shares Issued", "ShareIssued", "Ordinary Shares Number",
+        ], -2)
+        if shares_curr is not None and shares_prev is not None and shares_curr <= shares_prev:
+            test7 = 1
+        elif shares_curr is None and shares_prev is None:
+            test7 = 1  # Can't determine, give benefit of doubt
+    details["no_dilution"] = {"score": test7}
+    score += test7
+
+    # --- EFFICIENCY (2 tests) ---
+
+    # Test 8: Gross margin increasing
+    test8 = 0
+    gp_curr = _safe_val(income_stmt, ["Gross Profit", "GrossProfit"])
+    rev_curr = _safe_val(income_stmt, ["Total Revenue", "TotalRevenue", "Revenue"])
+    if has_two_years and gp_curr is not None and rev_curr and rev_curr > 0:
+        gm_curr = gp_curr / rev_curr
+        gp_prev = _safe_val(income_stmt, ["Gross Profit", "GrossProfit"], -2)
+        rev_prev = _safe_val(income_stmt, ["Total Revenue", "TotalRevenue", "Revenue"], -2)
+        if gp_prev is not None and rev_prev and rev_prev > 0:
+            gm_prev = gp_prev / rev_prev
+            if gm_curr > gm_prev:
+                test8 = 1
+    details["gross_margin_increasing"] = {"score": test8}
+    score += test8
+
+    # Test 9: Asset turnover increasing
+    test9 = 0
+    if has_two_years and rev_curr is not None and total_assets_curr and total_assets_curr > 0:
+        at_curr = rev_curr / total_assets_curr
+        rev_prev_val = _safe_val(income_stmt, ["Total Revenue", "TotalRevenue", "Revenue"], -2)
+        if rev_prev_val is not None and total_assets_prev and total_assets_prev > 0:
+            at_prev = rev_prev_val / total_assets_prev
+            if at_curr > at_prev:
+                test9 = 1
+    details["asset_turnover_increasing"] = {"score": test9}
+    score += test9
+
+    # Summary by category
+    details["profitability"] = test1 + test2 + test3 + test4
+    details["leverage_liquidity"] = test5 + test6 + test7
+    details["efficiency"] = test8 + test9
+    details["total"] = score
+
+    return score, details
+
 
 # =============================================================================
 # MARKET REGIME DETECTION
@@ -505,7 +693,7 @@ def calculate_volume_score(df):
 
 def generate_paper1_signal(df, row_idx=-1):
     """
-    Generate Paper 1 signal faithfully: EMA20/50 crossover + ATV slope confirmation + RSI gate.
+    Generate Paper 1 signal faithfully: SMA20/50 crossover + ATV slope confirmation + RSI gate.
 
     Returns:
         signal: "BUY", "SELL", or "HOLD"
@@ -519,9 +707,9 @@ def generate_paper1_signal(df, row_idx=-1):
 
     details = {}
 
-    # 1. Check EMA Cross Signal at row_idx
-    ema_cross = df["EMA_Cross_Signal"].iloc[row_idx] if "EMA_Cross_Signal" in df.columns else 0
-    details["ema_cross_signal"] = int(ema_cross)
+    # 1. Check SMA Cross Signal at row_idx
+    sma_cross = df["SMA_Cross_Signal"].iloc[row_idx] if "SMA_Cross_Signal" in df.columns else 0
+    details["sma_cross_signal"] = int(sma_cross)
 
     # 2. Get ATV slope
     atv_slope = df["ATV_Slope"].iloc[row_idx] if "ATV_Slope" in df.columns and pd.notna(df["ATV_Slope"].iloc[row_idx]) else 0
@@ -531,8 +719,8 @@ def generate_paper1_signal(df, row_idx=-1):
     rsi = df["RSI"].iloc[row_idx] if "RSI" in df.columns and pd.notna(df["RSI"].iloc[row_idx]) else 50
     details["rsi"] = rsi
 
-    # Determine base signal from EMA crossover
-    if ema_cross == 1:
+    # Determine base signal from SMA crossover
+    if sma_cross == 1:
         # Golden cross detected
         details["crossover_type"] = "golden_cross"
         # Confirm with ATV slope > 0
@@ -550,11 +738,11 @@ def generate_paper1_signal(df, row_idx=-1):
             details["rsi_gate"] = "n/a"
             return "HOLD", details
 
-    elif ema_cross == -1:
+    elif sma_cross == -1:
         # Death cross detected
         details["crossover_type"] = "death_cross"
-        # Confirm with ATV slope < 0
-        atv_confirmed = atv_slope < 0
+        # Confirm with ATV slope > 0 (rising volume = big money exiting, confirms sell)
+        atv_confirmed = atv_slope > 0
         details["atv_confirmed"] = atv_confirmed
         if atv_confirmed:
             # RSI gate: block SELL if RSI < 30
@@ -569,17 +757,17 @@ def generate_paper1_signal(df, row_idx=-1):
             return "HOLD", details
 
     else:
-        # No crossover event — check current EMA position for trend bias
-        ema20 = df["EMA20"].iloc[row_idx] if "EMA20" in df.columns else None
-        ema50 = df["EMA50"].iloc[row_idx] if "EMA50" in df.columns else None
+        # No crossover event — check current SMA position for trend bias
+        sma20 = df["SMA20"].iloc[row_idx] if "SMA20" in df.columns else None
+        sma50 = df["SMA50"].iloc[row_idx] if "SMA50" in df.columns else None
         details["crossover_type"] = "none"
         details["atv_confirmed"] = False
         details["rsi_gate"] = "n/a"
 
-        if ema20 is not None and ema50 is not None and pd.notna(ema20) and pd.notna(ema50):
-            details["ema_trend"] = "bullish" if ema20 > ema50 else "bearish"
+        if sma20 is not None and sma50 is not None and pd.notna(sma20) and pd.notna(sma50):
+            details["sma_trend"] = "bullish" if sma20 > sma50 else "bearish"
         else:
-            details["ema_trend"] = "neutral"
+            details["sma_trend"] = "neutral"
 
         return "HOLD", details
 
@@ -588,8 +776,9 @@ def generate_recommendation_paper1(tech_score, volume_score, rsi_value,
                                     market_regime, ticker, info, time_horizon="long",
                                     price_data=None, rl_prediction=None):
     """
-    Generate recommendation using Paper 1 approach:
-    EMA crossover + ATV confirmation + RSI gate, with optional RL agent override.
+    Generate recommendation using Paper 1 approach (Kadia et al., 2025):
+    SMA20/50 crossover + ATV confirmation + RSI gate, with optional RL agent override.
+    No crossover = HOLD (pure Paper 1). RL can override when no crossover is active.
     """
     # Get Paper 1 rule-based signal
     paper1_signal = "HOLD"
@@ -601,55 +790,9 @@ def generate_recommendation_paper1(tech_score, volume_score, rsi_value,
     recommendation = paper1_signal
     confidence = 50
 
-    # If no crossover event, fall back to composite scoring
-    if paper1_details.get("crossover_type") == "none":
-        # Fallback composite: tech + volume weighted
-        if market_regime == "Bull":
-            base_weights = {"technical": 0.70, "volume": 0.30}
-        elif market_regime == "Bear":
-            base_weights = {"technical": 0.60, "volume": 0.40}
-        elif market_regime == "High-Volatility":
-            base_weights = {"technical": 0.55, "volume": 0.45}
-        else:
-            base_weights = {"technical": 0.65, "volume": 0.35}
-
-        if time_horizon == "short":
-            weights = {
-                "technical": min(0.80, base_weights["technical"] + 0.10),
-                "volume": max(0.20, base_weights["volume"] - 0.10),
-            }
-        else:
-            weights = {
-                "technical": max(0.50, base_weights["technical"] - 0.05),
-                "volume": min(0.50, base_weights["volume"] + 0.05),
-            }
-
-        w_total = sum(weights.values())
-        weights = {k: v / w_total for k, v in weights.items()}
-
-        composite = (
-            tech_score * weights["technical"] +
-            volume_score * weights["volume"]
-        )
-
-        if composite >= 65:
-            recommendation = "BUY"
-        elif composite >= 45:
-            recommendation = "HOLD"
-        else:
-            recommendation = "SELL"
-
-        # RSI gate on fallback
-        if recommendation == "BUY" and rsi_value is not None and rsi_value > 70:
-            recommendation = "HOLD"
-            paper1_details["rsi_gate"] = "blocked_overbought"
-        elif recommendation == "SELL" and rsi_value is not None and rsi_value < 30:
-            recommendation = "HOLD"
-            paper1_details["rsi_gate"] = "blocked_oversold"
-    else:
-        # Crossover-based signal: use simpler weights for composite display
-        weights = {"technical": 0.50, "volume": 0.50}
-        composite = (tech_score * 0.50 + volume_score * 0.50)
+    # Composite score for display purposes only (not used for decision)
+    composite = (tech_score * 0.50 + volume_score * 0.50)
+    weights = {"technical": 0.50, "volume": 0.50}
 
     # RL agent integration
     rl_agrees = None
@@ -661,7 +804,7 @@ def generate_recommendation_paper1(tech_score, volume_score, rsi_value,
         paper1_details["rl_agrees"] = rl_agrees
 
         if not rl_agrees and paper1_details.get("crossover_type") == "none":
-            # PPO overrides with lower confidence when no crossover event
+            # PPO overrides HOLD when no crossover event
             recommendation = rl_signal
             paper1_details["rl_override"] = True
 
@@ -676,38 +819,38 @@ def generate_recommendation_paper1(tech_score, volume_score, rsi_value,
         else:
             confidence = 45
     else:
-        # Fallback composite confidence
-        if composite >= 75 or composite <= 30:
-            confidence = min(95, 60 + abs(composite - 50))
-        elif composite >= 60 or composite <= 40:
-            confidence = min(80, 50 + abs(composite - 50))
+        # No crossover: base confidence is low (HOLD or RL override)
+        if paper1_details.get("rl_override"):
+            confidence = 55
+            if rl_agrees:
+                confidence = 65
         else:
-            confidence = max(30, 50 - abs(composite - 50))
+            confidence = 40
     confidence = int(confidence)
 
     rec_color = {"BUY": "green", "SELL": "red"}.get(recommendation, "orange")
 
     company_name = info.get("shortName", ticker)
     sector = info.get("sector", "N/A")
-    explanation = f"**Strategy: EMA + ATV + RL (Paper 1)**\n\n"
-    explanation += "**Approach:** EMA20/50 crossover with ATV slope confirmation and RSI gating.\n\n"
+    explanation = f"**Strategy: SMA + ATV + RL (Paper 1)**\n\n"
+    explanation += "**Approach:** SMA20/50 crossover with ATV slope confirmation and RSI gating.\n\n"
 
     crossover_type = paper1_details.get("crossover_type", "none")
     if crossover_type == "golden_cross":
-        explanation += "**Signal:** Golden Cross (EMA20 crossed above EMA50). "
+        explanation += "**Signal:** Golden Cross (SMA20 crossed above SMA50). "
         if paper1_details.get("atv_confirmed"):
             explanation += "ATV slope confirms rising volume. "
         else:
             explanation += "ATV slope does NOT confirm — signal weakened. "
     elif crossover_type == "death_cross":
-        explanation += "**Signal:** Death Cross (EMA20 crossed below EMA50). "
+        explanation += "**Signal:** Death Cross (SMA20 crossed below SMA50). "
         if paper1_details.get("atv_confirmed"):
-            explanation += "ATV slope confirms falling volume. "
+            explanation += "ATV slope confirms rising volume (big money exiting). "
         else:
-            explanation += "ATV slope does NOT confirm — signal weakened. "
+            explanation += "ATV slope does NOT confirm — low volume, signal weakened. "
     else:
-        ema_trend = paper1_details.get("ema_trend", "neutral")
-        explanation += f"**Signal:** No crossover event. EMA trend: {ema_trend}. Using composite fallback. "
+        sma_trend = paper1_details.get("sma_trend", "neutral")
+        explanation += f"**Signal:** No crossover event detected. SMA trend: {sma_trend}. Defaulting to HOLD. "
 
     rsi_gate = paper1_details.get("rsi_gate", "n/a")
     if rsi_gate == "blocked_overbought":
@@ -721,12 +864,11 @@ def generate_recommendation_paper1(tech_score, volume_score, rsi_value,
         if rl_agrees:
             explanation += "Agrees with rule-based signal (high confidence)."
         elif paper1_details.get("rl_override"):
-            explanation += "Overrides fallback signal (lower confidence)."
+            explanation += "Overrides HOLD — RL sees an opportunity the rules don't."
         else:
             explanation += "Disagrees with rule-based signal."
 
     explanation += f"\n\n**Market Context:** {market_regime} regime."
-    explanation += f"\n\n**Composite Score:** {composite:.0f}/100"
 
     return {
         "recommendation": recommendation,

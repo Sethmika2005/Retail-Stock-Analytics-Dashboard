@@ -74,21 +74,21 @@ def compute_indicators(df):
     std60 = df["Close"].rolling(window=60).std()
     df["Z_SCORE_60"] = (df["Close"] - ma60) / std60
 
-    # EMA indicators (Paper 1)
-    df["EMA20"] = df["Close"].ewm(span=20, adjust=False).mean()
-    df["EMA50"] = df["Close"].ewm(span=50, adjust=False).mean()
+    # SMA indicators (Paper 1 — Kadia et al. use SMA crossover)
+    df["SMA20"] = df["Close"].rolling(window=20).mean()
+    df["SMA50"] = df["Close"].rolling(window=50).mean()
 
-    ema_cross = pd.Series(0, index=df.index)
+    sma_cross = pd.Series(0, index=df.index)
     if len(df) > 1:
-        ema20 = df["EMA20"].values
-        ema50 = df["EMA50"].values
+        sma20 = df["SMA20"].values
+        sma50 = df["SMA50"].values
         for i in range(1, len(df)):
-            if pd.notna(ema20[i]) and pd.notna(ema50[i]) and pd.notna(ema20[i-1]) and pd.notna(ema50[i-1]):
-                if ema20[i-1] <= ema50[i-1] and ema20[i] > ema50[i]:
-                    ema_cross.iloc[i] = 1
-                elif ema20[i-1] >= ema50[i-1] and ema20[i] < ema50[i]:
-                    ema_cross.iloc[i] = -1
-    df["EMA_Cross_Signal"] = ema_cross
+            if pd.notna(sma20[i]) and pd.notna(sma50[i]) and pd.notna(sma20[i-1]) and pd.notna(sma50[i-1]):
+                if sma20[i-1] <= sma50[i-1] and sma20[i] > sma50[i]:
+                    sma_cross.iloc[i] = 1
+                elif sma20[i-1] >= sma50[i-1] and sma20[i] < sma50[i]:
+                    sma_cross.iloc[i] = -1
+    df["SMA_Cross_Signal"] = sma_cross
 
     # Volume indicators
     if "Volume" in df.columns:

@@ -52,17 +52,17 @@ def _build_narrative_html(rec, paper1_details, rsi_value, rl_prediction):
 
     # Crossover explanation
     if crossover == "golden_cross":
-        parts.append('<span> because EMA-20 crossed above EMA-50 (</span>')
+        parts.append('<span> because SMA-20 crossed above SMA-50 (</span>')
         parts.append('<span style="font-weight:700;color:#10B981;">Golden Cross</span>')
         parts.append('<span>)</span>')
     elif crossover == "death_cross":
-        parts.append('<span> because EMA-20 crossed below EMA-50 (</span>')
+        parts.append('<span> because SMA-20 crossed below SMA-50 (</span>')
         parts.append('<span style="font-weight:700;color:#FF6B6B;">Death Cross</span>')
         parts.append('<span>)</span>')
     else:
-        ema_trend = paper1_details.get("ema_trend", "neutral")
-        parts.append(f'<span>. No crossover event detected \u2014 EMA trend is </span>')
-        parts.append(f'<span style="font-weight:600;">{ema_trend}</span>')
+        sma_trend = paper1_details.get("sma_trend", "neutral")
+        parts.append(f'<span>. No crossover event detected \u2014 SMA trend is </span>')
+        parts.append(f'<span style="font-weight:600;">{sma_trend}</span>')
 
     # Volume confirmation
     if crossover in ("golden_cross", "death_cross"):

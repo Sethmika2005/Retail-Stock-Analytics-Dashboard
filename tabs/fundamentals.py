@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import streamlit as st
 
-from models import calculate_fundamental_score_paper2
+from models import calculate_piotroski_fscore
 
 # =============================================================================
 # DESIGN TOKENS
@@ -250,17 +250,18 @@ def render(selected, info, financials, all_stocks_df, price_data, load_sector_pe
             balance_sheet = balance_sheet.dropna(how="all")
 
     # =========================================================================
-    # SECTION 1: FUNDAMENTAL SCORE (Paper 2)
+    # SECTION 1: PIOTROSKI F-SCORE (Piotroski, 2000)
     # =========================================================================
+    cashflow = financials.get("cashflow")
     try:
-        fund_score, fund_details = calculate_fundamental_score_paper2(info, price_data=price_data)
+        fscore, fscore_details = calculate_piotroski_fscore(income_stmt, balance_sheet, cashflow)
     except Exception:
-        fund_score, fund_details = None, {}
+        fscore, fscore_details = None, {}
 
-    if fund_score is not None:
-        if fund_score >= 65:
+    if fscore is not None:
+        if fscore >= 7:
             fund_verdict, fund_vcolor = "Strong", SUCCESS
-        elif fund_score >= 45:
+        elif fscore >= 4:
             fund_verdict, fund_vcolor = "Fair", WARNING
         else:
             fund_verdict, fund_vcolor = "Weak", CORAL
@@ -268,43 +269,54 @@ def render(selected, info, financials, all_stocks_df, price_data, load_sector_pe
         score_html = _card_open()
         score_html += (
             f'<div style="margin-bottom:12px;">'
-            f'{_label_html("FUNDAMENTAL SCORE")}'
+            f'{_label_html("PIOTROSKI F-SCORE")}'
             f'{_verdict_html(fund_verdict, fund_vcolor)}'
             f'</div>'
         )
         score_html += (
             f'<div style="margin-bottom:12px;">'
-            f'<span style="font-size:32px;font-weight:700;color:{_score_color(fund_score)};font-family:{FONT};">'
-            f'{fund_score:.0f}</span>'
-            f'<span style="font-size:14px;font-weight:500;color:{MUTED};margin-left:2px;font-family:{FONT};">/100</span>'
+            f'<span style="font-size:32px;font-weight:700;color:{_score_color(fscore / 9 * 100)};font-family:{FONT};">'
+            f'{fscore}</span>'
+            f'<span style="font-size:14px;font-weight:500;color:{MUTED};margin-left:2px;font-family:{FONT};">/9</span>'
             f'</div>'
         )
 
-        # Progress bars for 5 factors
-        pb_pctile = fund_details.get("pb_pctile", 50)
-        roe_pctile = fund_details.get("roe_pctile", 50)
-        momentum_pctile = fund_details.get("momentum_pctile", fund_details.get("growth_pctile", 50))
-        beta_pctile = fund_details.get("beta_pctile", fund_details.get("leverage_pctile", 50))
-        mcap_pctile = fund_details.get("market_cap_pctile", 50)
+        # Category progress bars (out of max per category)
+        prof = fscore_details.get("profitability", 0)
+        lev = fscore_details.get("leverage_liquidity", 0)
+        eff = fscore_details.get("efficiency", 0)
 
-        score_html += _progress_bar_html("P/B Percentile", pb_pctile, TEAL)
-        score_html += _progress_bar_html("ROE Percentile", roe_pctile, TEAL)
-        score_html += _progress_bar_html("Momentum Percentile", momentum_pctile, TEAL)
-        score_html += _progress_bar_html("Beta Percentile", beta_pctile, TEAL)
-        score_html += _progress_bar_html("Market Cap Percentile", mcap_pctile, TEAL)
+        score_html += _progress_bar_html("Profitability", prof / 4 * 100, TEAL)
+        score_html += _progress_bar_html("Leverage & Liquidity", lev / 3 * 100, TEAL)
+        score_html += _progress_bar_html("Efficiency", eff / 2 * 100, TEAL)
 
-        # Interaction bonus note
-        interaction_bonus = fund_details.get("interaction_bonus", 0)
-        if interaction_bonus != 0:
-            score_html += (
-                f'<div style="font-size:11px;color:{MUTED};font-family:{FONT};margin-top:4px;">'
-                f'Interaction bonus: {interaction_bonus:+.1f} pts</div>'
-            )
+        # Individual test results
+        def _test_icon(detail_key):
+            d = fscore_details.get(detail_key, {})
+            passed = d.get("score", 0) == 1
+            icon = "\u2705" if passed else "\u274c"
+            return icon
+
+        tests_html = (
+            f'<div style="font-size:11px;color:{TEXT_SECONDARY};font-family:{FONT};'
+            f'line-height:2;margin-top:8px;">'
+            f'{_test_icon("roa_positive")} ROA positive &nbsp;&nbsp;'
+            f'{_test_icon("cfo_positive")} Cash flow positive &nbsp;&nbsp;'
+            f'{_test_icon("roa_increasing")} ROA increasing &nbsp;&nbsp;'
+            f'{_test_icon("cfo_gt_net_income")} Cash flow &gt; Net income<br>'
+            f'{_test_icon("debt_decreasing")} Debt ratio decreasing &nbsp;&nbsp;'
+            f'{_test_icon("current_ratio_increasing")} Current ratio increasing &nbsp;&nbsp;'
+            f'{_test_icon("no_dilution")} No share dilution<br>'
+            f'{_test_icon("gross_margin_increasing")} Gross margin increasing &nbsp;&nbsp;'
+            f'{_test_icon("asset_turnover_increasing")} Asset turnover increasing'
+            f'</div>'
+        )
+        score_html += tests_html
 
         score_html += _card_close()
         st.markdown(score_html, unsafe_allow_html=True)
     else:
-        _not_available_card("FUNDAMENTAL SCORE", "Fundamental score not available for this stock.")
+        _not_available_card("PIOTROSKI F-SCORE", "Financial statement data not available for this stock.")
 
     st.markdown('<div style="height:20px;"></div>', unsafe_allow_html=True)
 

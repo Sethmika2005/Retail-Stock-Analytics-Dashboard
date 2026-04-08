@@ -33,7 +33,7 @@ if RL_AVAILABLE:
         """
         Gymnasium environment for Paper 1 PPO agent.
 
-        State: [ema_cross_signal, atv_slope_normalized, 1d_return, 5d_return, rsi_normalized, rel_volume]
+        State: [sma_cross_signal, atv_slope_normalized, 1d_return, 5d_return, rsi_normalized, rel_volume]
         Actions: Discrete(3) -> buy(0), sell(1), hold(2)
         Reward: Rt = (Pt+1 - Pt)/Pt * (1 + beta * (Vt - V_avg)/V_avg)  (paper's Eq. 5)
         """
@@ -59,8 +59,8 @@ if RL_AVAILABLE:
             """Precompute normalized features for all timesteps."""
             df = self.df
 
-            # EMA cross signal (already -1, 0, 1)
-            self.ema_cross = df["EMA_Cross_Signal"].values.astype(np.float32) if "EMA_Cross_Signal" in df.columns else np.zeros(len(df), dtype=np.float32)
+            # SMA cross signal (already -1, 0, 1)
+            self.sma_cross = df["SMA_Cross_Signal"].values.astype(np.float32) if "SMA_Cross_Signal" in df.columns else np.zeros(len(df), dtype=np.float32)
 
             # ATV slope normalized (z-score)
             if "ATV_Slope" in df.columns:
@@ -107,7 +107,7 @@ if RL_AVAILABLE:
         def _get_obs(self):
             i = self.current_step
             return np.array([
-                self.ema_cross[i],
+                self.sma_cross[i],
                 self.atv_norm[i],
                 self.ret_1d[i],
                 self.ret_5d[i],
@@ -165,7 +165,7 @@ def train_ppo_agent(df, ticker="UNKNOWN", total_timesteps=50000):
     Train a PPO agent on historical data.
 
     Args:
-        df: DataFrame with computed indicators (EMA_Cross_Signal, ATV_Slope, RSI, etc.)
+        df: DataFrame with computed indicators (SMA_Cross_Signal, ATV_Slope, RSI, etc.)
         ticker: Ticker symbol for caching
         total_timesteps: Training duration
 
@@ -254,7 +254,7 @@ def predict_action(model, df, row_idx=-1):
     # Build observation
     row = df.iloc[row_idx]
 
-    ema_cross = float(row.get("EMA_Cross_Signal", 0) or 0)
+    sma_cross = float(row.get("SMA_Cross_Signal", 0) or 0)
 
     atv_slope = float(row.get("ATV_Slope", 0) or 0)
     if "ATV_Slope" in df.columns:
@@ -286,7 +286,7 @@ def predict_action(model, df, row_idx=-1):
     rel_vol = float(row.get("Rel_Volume", 1.0) or 1.0)
     rel_vol = min(rel_vol, 5.0)
 
-    obs = np.array([ema_cross, atv_norm, ret_1d, ret_5d, rsi_norm, rel_vol], dtype=np.float32)
+    obs = np.array([sma_cross, atv_norm, ret_1d, ret_5d, rsi_norm, rel_vol], dtype=np.float32)
 
     try:
         action, _ = model.predict(obs, deterministic=True)
