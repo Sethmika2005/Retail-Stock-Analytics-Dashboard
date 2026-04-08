@@ -430,66 +430,7 @@ def render(selected, price_data, info, tech_score, tech_details, last_row,
     st.markdown("<div style='height:30px;'></div>", unsafe_allow_html=True)
 
     # =========================================================================
-    # SECTION 3: KEY LEVELS
-    # =========================================================================
-    current_price = float(price_data["Close"].iloc[-1])
-    high_52w = float(price_data["High"].max())
-    low_52w = float(price_data["Low"].min())
-    price_range = high_52w - low_52w if high_52w != low_52w else 1
-    range_pct = (current_price - low_52w) / price_range * 100
-
-    sma50 = float(price_data["SMA50"].iloc[-1]) if "SMA50" in price_data.columns and pd.notna(price_data["SMA50"].iloc[-1]) else None
-    sma200 = float(price_data["SMA200"].iloc[-1]) if "SMA200" in price_data.columns and pd.notna(price_data["SMA200"].iloc[-1]) else None
-
-    support_tag = ""
-    if sma50 is not None:
-        support_tag = (
-            f'<div style="display:inline-block;padding:4px 12px;background:#F8FAFB;border-radius:8px;">'
-            f'<span style="font-size:11px;font-weight:500;color:#94A3B8;margin-right:6px;'
-            f'font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">Support (SMA50)</span>'
-            f'<span style="font-size:12px;font-weight:600;color:#10B981;'
-            f'font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">${sma50:.2f}</span></div>'
-        )
-    resistance_tag = ""
-    if sma200 is not None:
-        resistance_tag = (
-            f'<div style="display:inline-block;padding:4px 12px;background:#F8FAFB;border-radius:8px;">'
-            f'<span style="font-size:11px;font-weight:500;color:#94A3B8;margin-right:6px;'
-            f'font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">Resistance (SMA200)</span>'
-            f'<span style="font-size:12px;font-weight:600;color:#FF6B6B;'
-            f'font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">${sma200:.2f}</span></div>'
-        )
-
-    bar_width = max(2, min(98, range_pct))
-
-    st.markdown(f"""
-    <div style="{CARD}">
-        <div style="{LABEL} margin-bottom:10px;">Key Levels</div>
-        <div style="margin-bottom:14px;">
-            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-                <span style="font-size:11px;color:#94A3B8;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">
-                    52W Low ${low_52w:.2f}</span>
-                <span style="font-size:11px;color:#94A3B8;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">
-                    52W High ${high_52w:.2f}</span>
-            </div>
-            <div style="background:#F1F5F9;border-radius:6px;height:8px;overflow:hidden;">
-                <div style="width:{bar_width:.0f}%;height:100%;background:#0097A7;border-radius:6px;position:relative;"></div>
-            </div>
-            <div style="font-size:11px;color:#64748B;margin-top:4px;
-                        font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">
-                Current: ${current_price:.2f} ({range_pct:.0f}% of range)</div>
-        </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
-            {support_tag}
-            {resistance_tag}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown("<div style='height:30px;'></div>", unsafe_allow_html=True)
-
-    # =========================================================================
-    # SECTION 4: AI MODEL LENS (conditional)
+    # SECTION 3: AI MODEL LENS (conditional)
     # =========================================================================
     if rl_prediction is not None:
         rl_action_map = {0: "BUY", 1: "SELL", 2: "HOLD"}
@@ -536,12 +477,31 @@ def render(selected, price_data, info, tech_score, tech_details, last_row,
                 f'font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">{val}</span></div>'
             )
 
+        sma20 = float(price_data["SMA20"].iloc[-1]) if "SMA20" in price_data.columns and pd.notna(price_data["SMA20"].iloc[-1]) else None
+        sma50_val = float(price_data["SMA50"].iloc[-1]) if "SMA50" in price_data.columns and pd.notna(price_data["SMA50"].iloc[-1]) else None
+
+        sma20_tag = ""
+        if sma20 is not None:
+            sma20_tag = (
+                f'<div style="display:inline-block;padding:4px 12px;background:#F8FAFB;border-radius:8px;">'
+                f'<span style="font-size:11px;font-weight:500;color:#94A3B8;margin-right:6px;'
+                f'font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">SMA 20</span>'
+                f'<span style="font-size:12px;font-weight:600;color:#0097A7;'
+                f'font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">${sma20:.2f}</span></div>'
+            )
+        sma50_tag = ""
+        if sma50_val is not None:
+            sma50_tag = (
+                f'<div style="display:inline-block;padding:4px 12px;background:#F8FAFB;border-radius:8px;">'
+                f'<span style="font-size:11px;font-weight:500;color:#94A3B8;margin-right:6px;'
+                f'font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">SMA 50</span>'
+                f'<span style="font-size:12px;font-weight:600;color:#0097A7;'
+                f'font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">${sma50_val:.2f}</span></div>'
+            )
+
         st.markdown(f"""
         <div style="{CARD}">
-            <div style="{LABEL} margin-bottom:10px;">AI Model Lens (PPO Agent)</div>
-            <div style="font-size:11px;color:#94A3B8;font-weight:600;text-transform:uppercase;
-                        letter-spacing:0.04em;margin-bottom:6px;
-                        font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">RL Input Features</div>
+            <div style="{LABEL} margin-bottom:10px;">What the AI Model Sees</div>
             {_rl_row("SMA Signal", str(sma_signal_val))}
             {_rl_row("ATV Slope", f"{atv_slope_val:,.0f}")}
             {_rl_row("1-Day Return", f"{ret_1d:+.2f}%")}
@@ -554,11 +514,15 @@ def render(selected, price_data, info, tech_score, tech_details, last_row,
                              font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">Action: </span>
                 {_verdict_badge_html(rl_signal, rl_color)}
             </div>
-            <div>
+            <div style="margin-bottom:14px;">
                 <span style="font-size:12px;color:#64748B;font-weight:500;margin-right:8px;
                              font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">vs Rule-Based: </span>
                 <span style="font-size:12px;font-weight:700;color:{agree_color};
                              font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">{agree_text}</span>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                {sma20_tag}
+                {sma50_tag}
             </div>
         </div>
         """, unsafe_allow_html=True)
