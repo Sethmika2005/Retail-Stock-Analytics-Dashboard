@@ -614,7 +614,10 @@ def render(selected, info, financials, all_stocks_df, price_data, load_sector_pe
                 # Load peer F-Scores
                 peer_fscores_df = None
                 if load_peer_fscores is not None:
-                    peer_fscores_df = load_peer_fscores(tuple(sector_peers))
+                    try:
+                        peer_fscores_df = load_peer_fscores(tuple(sector_peers))
+                    except Exception:
+                        peer_fscores_df = None
 
             # Selected stock's values
             stock_pe = info.get("trailingPE")
@@ -637,10 +640,14 @@ def render(selected, info, financials, all_stocks_df, price_data, load_sector_pe
             median_lev = None
             median_eff = None
             if peer_fscores_df is not None and not peer_fscores_df.empty:
-                median_fscore = peer_fscores_df["fscore"].dropna().median()
-                median_prof = peer_fscores_df["profitability"].dropna().median()
-                median_lev = peer_fscores_df["leverage"].dropna().median()
-                median_eff = peer_fscores_df["efficiency"].dropna().median()
+                _fs = peer_fscores_df["fscore"].dropna()
+                median_fscore = float(_fs.median()) if len(_fs) > 0 else None
+                _pr = peer_fscores_df["profitability"].dropna()
+                median_prof = float(_pr.median()) if len(_pr) > 0 else None
+                _lv = peer_fscores_df["leverage"].dropna()
+                median_lev = float(_lv.median()) if len(_lv) > 0 else None
+                _ef = peer_fscores_df["efficiency"].dropna()
+                median_eff = float(_ef.median()) if len(_ef) > 0 else None
 
             # Compare: count how many metrics the stock beats
             comparisons = []
