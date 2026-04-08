@@ -654,6 +654,41 @@ def load_sector_peers_metrics(tickers: tuple):
 
 
 @st.cache_data(ttl=3600)
+def load_peer_fscores(tickers: tuple):
+    """Load Piotroski F-Scores for sector peers."""
+    rows = []
+    for symbol in list(tickers):
+        try:
+            stock = yf.Ticker(symbol)
+            inc = stock.income_stmt
+            if inc is not None and not inc.empty:
+                inc = inc.T.sort_index()
+            bs = stock.balance_sheet
+            if bs is not None and not bs.empty:
+                bs = bs.T.sort_index()
+            cf = stock.cashflow
+            if cf is not None and not cf.empty:
+                cf = cf.T.sort_index()
+            score, details = calculate_piotroski_fscore(inc, bs, cf)
+            rows.append({
+                "ticker": symbol,
+                "fscore": score,
+                "profitability": details.get("profitability"),
+                "leverage": details.get("leverage_liquidity"),
+                "efficiency": details.get("efficiency"),
+            })
+        except Exception:
+            rows.append({
+                "ticker": symbol,
+                "fscore": None,
+                "profitability": None,
+                "leverage": None,
+                "efficiency": None,
+            })
+    return pd.DataFrame(rows)
+
+
+@st.cache_data(ttl=3600)
 def load_market_data():
     """Load S&P 500 and VIX data for market regime detection."""
     sp500 = yf.Ticker("^GSPC").history(period="2y", interval="1d", auto_adjust=False)
@@ -940,6 +975,7 @@ with fundamentals_tab:
         all_stocks_df=all_stocks_df,
         price_data=price_data,
         load_sector_peers_metrics=load_sector_peers_metrics,
+        load_peer_fscores=load_peer_fscores,
     )
 
 with news_tab:

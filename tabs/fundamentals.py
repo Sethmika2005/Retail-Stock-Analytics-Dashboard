@@ -228,7 +228,7 @@ def _not_available_card(title, message):
 # RENDER
 # =============================================================================
 
-def render(selected, info, financials, all_stocks_df, price_data, load_sector_peers_metrics):
+def render(selected, info, financials, all_stocks_df, price_data, load_sector_peers_metrics, load_peer_fscores=None):
     income_stmt = financials.get("income_stmt")
     balance_sheet = financials.get("balance_sheet")
 
@@ -611,6 +611,10 @@ def render(selected, info, financials, all_stocks_df, price_data, load_sector_pe
         else:
             with st.spinner("Loading peer data..."):
                 peers_df = load_sector_peers_metrics(tuple(sector_peers))
+                # Load peer F-Scores
+                peer_fscores_df = None
+                if load_peer_fscores is not None:
+                    peer_fscores_df = load_peer_fscores(tuple(sector_peers))
 
             # Selected stock's values
             stock_pe = info.get("trailingPE")
@@ -626,6 +630,18 @@ def render(selected, info, financials, all_stocks_df, price_data, load_sector_pe
             median_rev_growth = peers_df["rev_growth"].dropna().median()
             median_de = peers_df["de"].dropna().median()
 
+            # F-Score peer median
+            stock_fscore_val = fscore  # from Section 1
+            median_fscore = None
+            median_prof = None
+            median_lev = None
+            median_eff = None
+            if peer_fscores_df is not None and not peer_fscores_df.empty:
+                median_fscore = peer_fscores_df["fscore"].dropna().median()
+                median_prof = peer_fscores_df["profitability"].dropna().median()
+                median_lev = peer_fscores_df["leverage"].dropna().median()
+                median_eff = peer_fscores_df["efficiency"].dropna().median()
+
             # Compare: count how many metrics the stock beats
             comparisons = []
             metrics_compare = [
@@ -634,6 +650,7 @@ def render(selected, info, financials, all_stocks_df, price_data, load_sector_pe
                 ("Net Margin", stock_margin, median_margin, True),
                 ("Rev Growth", stock_rev_growth, median_rev_growth, True),
                 ("Debt/Equity", stock_de, median_de, False),     # lower is better
+                ("F-Score", stock_fscore_val, median_fscore, True),  # higher is better
             ]
 
             wins = 0
@@ -650,17 +667,19 @@ def render(selected, info, financials, all_stocks_df, price_data, load_sector_pe
                     comparisons.append((label, stock_val, peer_val, higher_better, None))
 
             # Verdict
-            if wins >= 4:
+            if wins >= 5:
                 peer_verdict, peer_vcolor = "Above Peers", SUCCESS
-            elif wins >= 2:
+            elif wins >= 3:
                 peer_verdict, peer_vcolor = "In Line", TEAL
             else:
                 peer_verdict, peer_vcolor = "Below Peers", CORAL
 
             # Format helpers
-            def _peer_fmt(val, is_pct=False):
+            def _peer_fmt(val, is_pct=False, is_score=False):
                 if val is None or (isinstance(val, float) and pd.isna(val)):
                     return "\u2014"
+                if is_score:
+                    return f"{val:.0f}/9"
                 if is_pct:
                     return f"{val * 100:.1f}%"
                 return f"{val:.1f}"
@@ -673,6 +692,7 @@ def render(selected, info, financials, all_stocks_df, price_data, load_sector_pe
 
             for label, stock_val, peer_val, higher_better, is_better in comparisons:
                 is_pct = label in ("ROE", "Net Margin", "Rev Growth")
+                is_score = label == "F-Score"
 
                 # Color the stock value based on comparison
                 if is_better is True:
@@ -691,18 +711,20 @@ def render(selected, info, financials, all_stocks_df, price_data, load_sector_pe
                 stock_cells += (
                     f'<div style="flex:1;text-align:center;">'
                     f'<div style="font-size:15px;font-weight:600;color:{val_color};'
-                    f'font-family:{FONT};">{_peer_fmt(stock_val, is_pct)}</div></div>'
+                    f'font-family:{FONT};">{_peer_fmt(stock_val, is_pct, is_score)}</div></div>'
                 )
                 peer_cells += (
                     f'<div style="flex:1;text-align:center;">'
                     f'<div style="font-size:15px;font-weight:500;color:{TEXT_SECONDARY};'
-                    f'font-family:{FONT};">{_peer_fmt(peer_val, is_pct)}</div></div>'
+                    f'font-family:{FONT};">{_peer_fmt(peer_val, is_pct, is_score)}</div></div>'
                 )
 
                 # Difference row
                 if stock_val is not None and peer_val is not None and not pd.isna(stock_val) and not pd.isna(peer_val):
                     diff = stock_val - peer_val
-                    if is_pct:
+                    if is_score:
+                        diff_txt = f"{'+' if diff >= 0 else ''}{diff:.0f}"
+                    elif is_pct:
                         diff_txt = f"{'+' if diff >= 0 else ''}{diff * 100:.1f}pp"
                     elif peer_val != 0:
                         diff_pct = (diff / abs(peer_val)) * 100
@@ -718,6 +740,48 @@ def render(selected, info, financials, all_stocks_df, price_data, load_sector_pe
                     f'<div style="flex:1;text-align:center;">'
                     f'<div style="font-size:12px;font-weight:600;color:{diff_color};'
                     f'font-family:{FONT};">{diff_txt}</div></div>'
+                )
+
+            # F-Score category breakdown HTML
+            fscore_breakdown_html = ""
+            if (stock_fscore_val is not None and fscore_details
+                    and median_prof is not None):
+                stock_prof = fscore_details.get("profitability", 0)
+                stock_lev = fscore_details.get("leverage_liquidity", 0)
+                stock_eff = fscore_details.get("efficiency", 0)
+
+                categories = [
+                    ("Profitability", stock_prof, 4, median_prof),
+                    ("Leverage", stock_lev, 3, median_lev),
+                    ("Efficiency", stock_eff, 2, median_eff),
+                ]
+
+                cat_cells = ""
+                for cat_name, s_val, max_val, p_med in categories:
+                    s_better = s_val >= p_med if p_med is not None else None
+                    s_color = SUCCESS if s_better else CORAL if s_better is False else MUTED
+                    p_color = TEXT_SECONDARY
+                    cat_cells += (
+                        f'<div style="flex:1;text-align:center;">'
+                        f'<div style="font-size:10px;font-weight:600;color:{MUTED};'
+                        f'text-transform:uppercase;letter-spacing:0.04em;'
+                        f'font-family:{FONT};margin-bottom:4px;">{cat_name}</div>'
+                        f'<div style="font-family:{FONT};">'
+                        f'<span style="font-size:14px;font-weight:600;color:{s_color};">'
+                        f'{s_val}/{max_val}</span>'
+                        f'<span style="font-size:11px;color:{MUTED};margin:0 4px;">vs</span>'
+                        f'<span style="font-size:14px;font-weight:500;color:{p_color};">'
+                        f'{p_med:.0f}/{max_val}</span>'
+                        f'</div></div>'
+                    )
+
+                fscore_breakdown_html = (
+                    f'<div style="border-top:1px solid {BORDER};padding-top:12px;margin-top:4px;">'
+                    f'<div style="font-size:10px;font-weight:600;color:{MUTED};'
+                    f'text-transform:uppercase;letter-spacing:0.06em;'
+                    f'font-family:{FONT};margin-bottom:8px;">F-Score Breakdown vs Peers</div>'
+                    f'<div style="display:flex;gap:4px;">{cat_cells}</div>'
+                    f'</div>'
                 )
 
             peer_card_html = f"""
@@ -748,7 +812,8 @@ def render(selected, info, financials, all_stocks_df, price_data, load_sector_pe
                                 font-family:{FONT};">Diff</div>
                     <div style="display:flex;gap:4px;flex:1;">{diff_cells}</div>
                 </div>
-                <div style="font-size:11px;color:{MUTED};line-height:1.4;font-family:{FONT};">
+                {fscore_breakdown_html}
+                <div style="font-size:11px;color:{MUTED};line-height:1.4;font-family:{FONT};margin-top:12px;">
                     Compared against {len(sector_peers)} peers in {stock_sector}.
                     {selected} scores above sector median on {wins} of {len(comparisons)} key metrics.
                 </div>
