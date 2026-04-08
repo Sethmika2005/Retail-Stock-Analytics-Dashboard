@@ -26,6 +26,7 @@ from models import (
     generate_recommendation_paper1,
     generate_paper1_signal,
     classify_headline_sentiment,
+    calculate_piotroski_fscore,
 )
 from components import (
     get_status_color,
@@ -813,6 +814,14 @@ with st.spinner("Loading data..."):
     info = load_fundamentals(selected)
     financials = load_financial_statements(selected)
 
+try:
+    _fs = financials
+    piotroski_score, _ = calculate_piotroski_fscore(
+        _fs.get("income_stmt"), _fs.get("balance_sheet"), _fs.get("cashflow")
+    )
+except Exception:
+    piotroski_score = None
+
 if price_data.empty:
     st.error("No price data available for this ticker. Try another selection or wait a moment if rate limited.")
     st.stop()
@@ -905,6 +914,7 @@ with dashboard_tab:
         logo_url=company_logo_url,
         is_sp500=selected in sp500_set,
         chart_period=chart_period,
+        piotroski_score=piotroski_score,
     )
 
 with analysis_tab:

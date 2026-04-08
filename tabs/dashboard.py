@@ -211,7 +211,7 @@ def render(selected, price_data, info, last_row, change_pct,
            market_regime, regime_metrics,
            recommendation_data, rsi_value,
            news_items, cost_basis, paper1_details,
-           logo_url="", is_sp500=False, chart_period="6M"):
+           logo_url="", is_sp500=False, chart_period="6M", piotroski_score=None):
 
     rec = recommendation_data.get("recommendation", "HOLD")
     confidence = recommendation_data.get("confidence", 50)
@@ -527,26 +527,69 @@ def render(selected, price_data, info, last_row, change_pct,
     news_col, hc_col = st.columns(2)
 
     with hc_col:
-        tech_label_text = "Strong" if tech_score >= 60 else "Weak" if tech_score < 40 else "Neutral"
-        vol_label_text = "Strong" if volume_score >= 60 else "Weak" if volume_score < 40 else "Neutral"
         rsi_zone = "Overbought" if rsi_safe > 70 else "Oversold" if rsi_safe < 30 else "Neutral"
         rsi_bar_color = "#FF6B6B" if rsi_safe > 70 or rsi_safe < 30 else "#0097A7"
+
+        # Price vs SMA50
+        current_price = float(price_data["Close"].iloc[-1])
+        sma50_hc = float(price_data["SMA50"].iloc[-1]) if "SMA50" in price_data.columns and pd.notna(price_data["SMA50"].iloc[-1]) else None
+        if sma50_hc is not None:
+            pct_vs_sma50 = (current_price - sma50_hc) / sma50_hc * 100
+            pct_sign = "+" if pct_vs_sma50 >= 0 else ""
+            pct_color = "#10B981" if pct_vs_sma50 >= 0 else "#FF6B6B"
+            pct_label = "above" if pct_vs_sma50 >= 0 else "below"
+            sma50_row = (
+                f'<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #E8EDF2;">'
+                f'<span style="font-size:12px;color:#64748B;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">Price vs SMA50</span>'
+                f'<span style="font-size:12px;font-weight:700;color:{pct_color};font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">'
+                f'{pct_sign}{pct_vs_sma50:.1f}% {pct_label}</span></div>'
+            )
+        else:
+            sma50_row = ""
+
+        # Relative Volume
+        rel_vol_hc = float(price_data["Rel_Volume"].iloc[-1]) if "Rel_Volume" in price_data.columns and pd.notna(price_data["Rel_Volume"].iloc[-1]) else None
+        if rel_vol_hc is not None:
+            if rel_vol_hc >= 2.0:
+                rv_label, rv_color = "High Activity", "#10B981"
+            elif rel_vol_hc >= 0.8:
+                rv_label, rv_color = "Normal Activity", "#0097A7"
+            else:
+                rv_label, rv_color = "Low Activity", "#F59E0B"
+            rel_vol_row = (
+                f'<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #E8EDF2;">'
+                f'<span style="font-size:12px;color:#64748B;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">Relative Volume</span>'
+                f'<span style="font-size:12px;font-weight:700;color:{rv_color};font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">'
+                f'{rel_vol_hc:.2f}x \u2014 {rv_label}</span></div>'
+            )
+        else:
+            rel_vol_row = ""
+
+        # Piotroski F-Score bar
+        if piotroski_score is not None:
+            fs_bar_val = int(piotroski_score / 9 * 100)
+            fs_color = "#10B981" if piotroski_score >= 7 else "#F59E0B" if piotroski_score >= 4 else "#FF6B6B"
+            fs_label = "Strong" if piotroski_score >= 7 else "Moderate" if piotroski_score >= 4 else "Weak"
+            fscore_bar = _progress_bar(f"Piotroski F-Score \u2014 {piotroski_score}/9 ({fs_label})", fs_bar_val, fs_color)
+        else:
+            fscore_bar = ""
+
+        bars_html = _progress_bar(f"RSI Momentum \u2014 {rsi_zone}", rsi_safe, rsi_bar_color)
+        bars_html += fscore_bar
 
         fund_snip = _fund_snippet(info)
         bull_case, bear_case = generate_bull_bear_case(info, tech_score, price_data, market_regime)
         bull_pt = bull_case[0] if bull_case else "Potential for mean reversion"
         bear_pt = bear_case[0] if bear_case else "Standard market risk"
 
-        bars_html = _progress_bar(f"Technical Indicators \u2014 {tech_label_text}", tech_score, "#0097A7")
-        bars_html += _progress_bar(f"Volume Strength \u2014 {vol_label_text}", volume_score, "#0097A7")
-        bars_html += _progress_bar(f"RSI Momentum \u2014 {rsi_zone}", rsi_safe, rsi_bar_color)
-
         st.markdown(f"""
         <div style="{CARD} padding:16px 20px;">
             <div style="{LABEL}">Health Check</div>
             {bars_html}
+            {sma50_row}
+            {rel_vol_row}
             <div style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;
-                        color:#64748B;line-height:1.5;margin-top:4px;">{fund_snip}</div>
+                        color:#64748B;line-height:1.5;margin-top:8px;">{fund_snip}</div>
             <div style="margin-top:14px;display:flex;gap:10px;">
                 <div style="flex:1;border-left:3px solid #10B981;padding:6px 10px;font-size:12px;color:#1E293B;
                             line-height:1.4;border-radius:0 6px 6px 0;background:rgba(16,185,129,0.04);
