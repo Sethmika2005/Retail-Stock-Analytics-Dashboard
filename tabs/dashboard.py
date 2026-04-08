@@ -628,3 +628,53 @@ def render(selected, price_data, info, last_row, change_pct,
             {news_html}
         </div>
         """, unsafe_allow_html=True)
+
+    # =========================================================================
+    # 7. MY POSITION (conditional)
+    # =========================================================================
+    if cost_basis is not None:
+        st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
+        current_price_pos = float(price_data["Close"].iloc[-1])
+        pnl_pct = (current_price_pos - cost_basis) / cost_basis * 100
+        pnl_dollar = current_price_pos - cost_basis
+        is_profit = pnl_pct >= 0
+        pnl_color = "#10B981" if is_profit else "#EF4444"
+        pnl_label = "profit" if is_profit else "loss"
+        action_word = "gain" if is_profit else "lose"
+
+        examples_html = ""
+        for qty in [10, 50, 100]:
+            total_pnl = pnl_dollar * qty
+            examples_html += (
+                f'<span style="display:inline-block;padding:3px 10px;background:#F8FAFB;'
+                f'border-radius:8px;font-size:11px;font-weight:500;color:{pnl_color};'
+                f'font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">'
+                f'{qty} shares = ${abs(total_pnl):,.2f} {pnl_label}</span>'
+            )
+
+        st.markdown(f"""
+        <div style="{CARD} border-left:4px solid {pnl_color};">
+            <div style="{LABEL}">My Position</div>
+            <div style="margin-top:4px;">
+                <span style="font-size:12px;color:#64748B;">Avg Cost </span>
+                <span style="font-size:14px;font-weight:600;color:#1E293B;">${cost_basis:.2f}</span>
+                <span style="font-size:12px;color:#64748B;margin:0 4px;"> \u2192 Current </span>
+                <span style="font-size:14px;font-weight:600;color:#1E293B;">${current_price_pos:.2f}</span>
+            </div>
+            <div style="margin-top:8px;">
+                <span style="font-size:13px;color:#1E293B;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">
+                    If you sold now, you would {action_word} approx. </span>
+                <span style="font-size:13px;font-weight:700;color:{pnl_color};
+                             font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">${abs(pnl_dollar):.2f}/share</span>
+                <span style="font-size:13px;font-weight:600;color:{pnl_color};
+                             font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;"> ({pnl_pct:+.1f}%)</span>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">{examples_html}</div>
+            <div style="font-size:10px;color:#94A3B8;line-height:1.4;
+                        font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;
+                        margin-top:10px;font-style:italic;">
+                Based on your entered average cost. Actual P&amp;L depends on the number of shares held
+                and prices at which they were acquired. Does not account for fees, taxes, or dividends.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)

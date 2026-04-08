@@ -39,7 +39,7 @@ from components import (
     render_metrics_strip,
     format_mcap,
 )
-from tabs import dashboard, analysis, technical, fundamentals, news
+from tabs import dashboard, technical, fundamentals, news
 
 # =============================================================================
 # PAGE CONFIG
@@ -888,8 +888,8 @@ news_items = load_finnhub_news(selected)
 # =============================================================================
 # TABS - Render using modular tab files
 # =============================================================================
-dashboard_tab, analysis_tab, technical_tab, fundamentals_tab, news_tab = st.tabs(
-    ["Dashboard", "Analysis", "Technical", "Fundamentals", "Recent News"]
+dashboard_tab, technical_tab, fundamentals_tab, news_tab = st.tabs(
+    ["Dashboard", "Technical", "Fundamentals", "Recent News"]
 )
 
 with dashboard_tab:
@@ -915,24 +915,6 @@ with dashboard_tab:
         is_sp500=selected in sp500_set,
         chart_period=chart_period,
         piotroski_score=piotroski_score,
-    )
-
-with analysis_tab:
-    analysis.render(
-        selected=selected,
-        price_data=price_data,
-        info=info,
-        tech_score=tech_score,
-        tech_details=tech_details,
-        market_regime=market_regime,
-        regime_metrics=regime_metrics,
-        last_row=last_row,
-        volume_score=volume_score,
-        volume_details=volume_details,
-        rsi_value=rsi_value,
-        paper1_details=dashboard_recommendation.get("paper1_details", paper1_details),
-        rl_prediction=rl_prediction,
-        cost_basis=cost_basis,
     )
 
 with technical_tab:
