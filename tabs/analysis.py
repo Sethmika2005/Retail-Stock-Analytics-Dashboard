@@ -8,7 +8,7 @@ import streamlit as st
 from components import COLORS, FONTS, SHADOWS, get_status_color
 from models import (
     generate_recommendation_paper1,
-    generate_key_drivers, generate_key_risk, generate_bull_bear_case,
+    generate_bull_bear_case,
     generate_action_checklist, generate_view_changers,
 )
 
@@ -105,29 +105,6 @@ def _build_narrative_html(rec, paper1_details, rsi_value, rl_prediction):
     return "".join(parts)
 
 
-def _score_color(score):
-    """Color based on score level."""
-    if score >= 60:
-        return "#10B981"
-    if score >= 40:
-        return "#F59E0B"
-    return "#FF6B6B"
-
-
-def _progress_bar(label_text, score, color):
-    """HTML progress bar."""
-    pct = max(0, min(100, score))
-    return (
-        f'<div style="margin-bottom:10px;">'
-        f'<div style="display:flex;justify-content:space-between;'
-        f'font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;'
-        f'font-size:12px;color:#64748B;margin-bottom:3px;">'
-        f'<span>{label_text}</span><span style="font-weight:600;color:#1E293B;">{pct:.0f}</span></div>'
-        f'<div style="background:#F1F5F9;border-radius:4px;height:6px;overflow:hidden;">'
-        f'<div style="width:{pct}%;height:100%;background:{color};border-radius:4px;"></div>'
-        f'</div></div>'
-    )
-
 
 # =============================================================================
 # RENDER
@@ -213,115 +190,7 @@ def render(selected, price_data, info, tech_score, tech_details,
     st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
 
     # =========================================================================
-    # 3. KEY DRIVERS + PRIMARY RISK
-    # =========================================================================
-    key_drivers = generate_key_drivers(info, tech_score, price_data, market_regime)
-    key_risk = generate_key_risk(info, price_data)
-
-    drivers_html = ""
-    for d in key_drivers:
-        drivers_html += (
-            f'<div style="display:flex;align-items:baseline;margin-bottom:8px;">'
-            f'<span style="color:#0097A7;margin-right:8px;font-size:8px;">\u25cf</span>'
-            f'<span style="font-size:12.5px;color:#1E293B;line-height:1.5;'
-            f'font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">{d}</span></div>'
-        )
-
-    drv_col, risk_col = st.columns([2, 1])
-
-    with drv_col:
-        st.markdown(f"""
-        <div style="{CARD}">
-            <div style="{LABEL}">Key Drivers</div>
-            {drivers_html}
-        </div>
-        """, unsafe_allow_html=True)
-
-    with risk_col:
-        st.markdown(f"""
-        <div style="{CARD}">
-            <div style="{LABEL}">Primary Risk</div>
-            <div style="font-size:12.5px;color:#1E293B;line-height:1.5;
-                        font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;
-                        padding:10px 12px;background:rgba(245,158,11,0.06);
-                        border-left:3px solid #F59E0B;border-radius:0 6px 6px 0;">
-                {key_risk}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
-
-    # =========================================================================
-    # 4. SCORE BREAKDOWN
-    # =========================================================================
-    trend_v = tech_details.get("trend", 0)
-    rsi_v = tech_details.get("rsi", 0)
-    macd_v = tech_details.get("macd", 0)
-
-    trend_pct = (float(trend_v) / 40 * 100) if trend_v != "N/A" else 0
-    rsi_pct = (float(rsi_v) / 30 * 100) if rsi_v != "N/A" else 0
-    macd_pct = (float(macd_v) / 30 * 100) if macd_v != "N/A" else 0
-
-    tech_bars = _progress_bar("Overall", tech_score, _score_color(tech_score))
-    tech_bars += _progress_bar(f"Trend ({trend_v}/40)", trend_pct, "#0097A7")
-    tech_bars += _progress_bar(f"RSI ({rsi_v}/30)", rsi_pct, "#0097A7")
-    tech_bars += _progress_bar(f"MACD ({macd_v}/30)", macd_pct, "#0097A7")
-
-    # Volume sub-scores
-    vol_details = (volume_details or {}).get("details", {})
-    align_score = vol_details.get("alignment_score", 0)
-    rel_vol_score = vol_details.get("rel_volume_score", 0)
-    confirms = (volume_details or {}).get("volume_confirms_trend", False)
-
-    align_pct = (float(align_score) / 50 * 100) if align_score else 0
-    rel_pct = (float(rel_vol_score) / 50 * 100) if rel_vol_score else 0
-
-    vol_bars = _progress_bar("Overall", volume_score, _score_color(volume_score))
-    vol_bars += _progress_bar(f"Alignment ({align_score:.0f}/50)", align_pct, "#0097A7")
-    vol_bars += _progress_bar(f"Rel Volume ({rel_vol_score:.0f}/50)", rel_pct, "#0097A7")
-
-    confirms_color = "#10B981" if confirms else "#F59E0B"
-    confirms_text = "Yes" if confirms else "No"
-
-    tech_col, vol_col = st.columns(2)
-
-    with tech_col:
-        st.markdown(f"""
-        <div style="{CARD}">
-            <div style="{LABEL}">Technical Score</div>
-            <div style="margin-bottom:12px;">
-                <span style="font-size:32px;font-weight:700;color:{_score_color(tech_score)};
-                             font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">{tech_score}</span>
-                <span style="font-size:14px;font-weight:500;color:#94A3B8;margin-left:2px;">/100</span>
-            </div>
-            {tech_bars}
-        </div>
-        """, unsafe_allow_html=True)
-
-    with vol_col:
-        st.markdown(f"""
-        <div style="{CARD}">
-            <div style="{LABEL}">Volume Score</div>
-            <div style="margin-bottom:12px;">
-                <span style="font-size:32px;font-weight:700;color:{_score_color(volume_score)};
-                             font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">{volume_score}</span>
-                <span style="font-size:14px;font-weight:500;color:#94A3B8;margin-left:2px;">/100</span>
-            </div>
-            {vol_bars}
-            <div style="margin-top:4px;">
-                <span style="font-size:12px;color:#64748B;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">
-                    Confirms Trend: </span>
-                <span style="font-size:12px;font-weight:600;color:{confirms_color};
-                             font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">{confirms_text}</span>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
-
-    # =========================================================================
-    # 5. ACTION CHECKLIST + VIEW CHANGERS
+    # 3. ACTION CHECKLIST + VIEW CHANGERS
     # =========================================================================
     action_items = generate_action_checklist(rec, info, price_data)
     view_changers = generate_view_changers(rec, info, price_data)
@@ -363,7 +232,7 @@ def render(selected, price_data, info, tech_score, tech_details,
         """, unsafe_allow_html=True)
 
     # =========================================================================
-    # 6. POSITION P&L (conditional)
+    # 4. POSITION P&L (conditional)
     # =========================================================================
     if cost_basis is not None:
         st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
