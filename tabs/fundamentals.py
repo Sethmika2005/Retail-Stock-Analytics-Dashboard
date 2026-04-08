@@ -291,24 +291,30 @@ def render(selected, info, financials, all_stocks_df, price_data, load_sector_pe
         score_html += _progress_bar_html("Efficiency", eff / 2 * 100, TEAL)
 
         # Individual test results
-        def _test_icon(detail_key):
+        def _test_badge(detail_key, label):
             d = fscore_details.get(detail_key, {})
             passed = d.get("score", 0) == 1
-            icon = "\u2705" if passed else "\u274c"
-            return icon
+            bg = "rgba(16,185,129,0.1)" if passed else "rgba(255,107,107,0.1)"
+            color = SUCCESS if passed else CORAL
+            dot = "●"
+            return (
+                f'<span style="display:inline-flex;align-items:center;gap:4px;'
+                f'padding:3px 8px;border-radius:6px;background:{bg};'
+                f'font-size:11px;font-weight:500;color:{color};font-family:{FONT};">'
+                f'{dot} {label}</span>'
+            )
 
         tests_html = (
-            f'<div style="font-size:11px;color:{TEXT_SECONDARY};font-family:{FONT};'
-            f'line-height:2;margin-top:8px;">'
-            f'{_test_icon("roa_positive")} ROA positive &nbsp;&nbsp;'
-            f'{_test_icon("cfo_positive")} Cash flow positive &nbsp;&nbsp;'
-            f'{_test_icon("roa_increasing")} ROA increasing &nbsp;&nbsp;'
-            f'{_test_icon("cfo_gt_net_income")} Cash flow &gt; Net income<br>'
-            f'{_test_icon("debt_decreasing")} Debt ratio decreasing &nbsp;&nbsp;'
-            f'{_test_icon("current_ratio_increasing")} Current ratio increasing &nbsp;&nbsp;'
-            f'{_test_icon("no_dilution")} No share dilution<br>'
-            f'{_test_icon("gross_margin_increasing")} Gross margin increasing &nbsp;&nbsp;'
-            f'{_test_icon("asset_turnover_increasing")} Asset turnover increasing'
+            f'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;">'
+            f'{_test_badge("roa_positive", "ROA Positive")}'
+            f'{_test_badge("cfo_positive", "Cash Flow Positive")}'
+            f'{_test_badge("roa_increasing", "ROA Increasing")}'
+            f'{_test_badge("cfo_gt_net_income", "CFO > Net Income")}'
+            f'{_test_badge("debt_decreasing", "Debt Decreasing")}'
+            f'{_test_badge("current_ratio_increasing", "Current Ratio Up")}'
+            f'{_test_badge("no_dilution", "No Dilution")}'
+            f'{_test_badge("gross_margin_increasing", "Gross Margin Up")}'
+            f'{_test_badge("asset_turnover_increasing", "Asset Turnover Up")}'
             f'</div>'
         )
         score_html += tests_html
@@ -581,173 +587,171 @@ def render(selected, info, financials, all_stocks_df, price_data, load_sector_pe
     st.markdown(metrics_html, unsafe_allow_html=True)
 
     # =========================================================================
-    # SECTION 5: SECTOR PEER COMPARISON (toggle)
+    # SECTION 5: SECTOR PEER COMPARISON
     # =========================================================================
     st.markdown('<div style="height:30px;"></div>', unsafe_allow_html=True)
-    show_peers = st.toggle("Compare with sector peers", value=False, key="fund_peer_toggle")
 
-    if show_peers:
-        # Resolve sector
-        stock_sector = info.get("sector", "")
-        if not stock_sector:
-            sector_match = all_stocks_df[all_stocks_df["ticker"] == selected]
-            if not sector_match.empty:
-                stock_sector = sector_match.iloc[0]["sector"]
+    # Resolve sector
+    stock_sector = info.get("sector", "")
+    if not stock_sector:
+        sector_match = all_stocks_df[all_stocks_df["ticker"] == selected]
+        if not sector_match.empty:
+            stock_sector = sector_match.iloc[0]["sector"]
 
-        if not stock_sector:
-            st.caption("Sector information not available for this stock.")
+    if not stock_sector:
+        st.caption("Sector information not available for this stock.")
+    else:
+        # Get same-sector peers (max 8, excluding selected)
+        sector_peers = all_stocks_df[
+            (all_stocks_df["sector"] == stock_sector) & (all_stocks_df["ticker"] != selected)
+        ]["ticker"].tolist()[:8]
+
+        if len(sector_peers) < 3:
+            st.caption(f"Not enough sector peers for comparison (found {len(sector_peers)} in {stock_sector}).")
         else:
-            # Get same-sector peers (max 8, excluding selected)
-            sector_peers = all_stocks_df[
-                (all_stocks_df["sector"] == stock_sector) & (all_stocks_df["ticker"] != selected)
-            ]["ticker"].tolist()[:8]
+            with st.spinner("Loading peer data..."):
+                peers_df = load_sector_peers_metrics(tuple(sector_peers))
 
-            if len(sector_peers) < 3:
-                st.caption(f"Not enough sector peers for comparison (found {len(sector_peers)} in {stock_sector}).")
-            else:
-                with st.spinner("Loading peer data..."):
-                    peers_df = load_sector_peers_metrics(tuple(sector_peers))
+            # Selected stock's values
+            stock_pe = info.get("trailingPE")
+            stock_roe = info.get("returnOnEquity")
+            stock_margin = info.get("profitMargins")
+            stock_rev_growth = info.get("revenueGrowth")
+            stock_de = info.get("debtToEquity")
 
-                # Selected stock's values
-                stock_pe = info.get("trailingPE")
-                stock_roe = info.get("returnOnEquity")
-                stock_margin = info.get("profitMargins")
-                stock_rev_growth = info.get("revenueGrowth")
-                stock_de = info.get("debtToEquity")
+            # Sector medians
+            median_pe = peers_df["pe"].dropna().median()
+            median_roe = peers_df["roe"].dropna().median()
+            median_margin = peers_df["net_margin"].dropna().median()
+            median_rev_growth = peers_df["rev_growth"].dropna().median()
+            median_de = peers_df["de"].dropna().median()
 
-                # Sector medians
-                median_pe = peers_df["pe"].dropna().median()
-                median_roe = peers_df["roe"].dropna().median()
-                median_margin = peers_df["net_margin"].dropna().median()
-                median_rev_growth = peers_df["rev_growth"].dropna().median()
-                median_de = peers_df["de"].dropna().median()
+            # Compare: count how many metrics the stock beats
+            comparisons = []
+            metrics_compare = [
+                ("P/E Ratio", stock_pe, median_pe, False),       # lower is better
+                ("ROE", stock_roe, median_roe, True),            # higher is better
+                ("Net Margin", stock_margin, median_margin, True),
+                ("Rev Growth", stock_rev_growth, median_rev_growth, True),
+                ("Debt/Equity", stock_de, median_de, False),     # lower is better
+            ]
 
-                # Compare: count how many metrics the stock beats
-                comparisons = []
-                metrics_compare = [
-                    ("P/E Ratio", stock_pe, median_pe, False),       # lower is better
-                    ("ROE", stock_roe, median_roe, True),            # higher is better
-                    ("Net Margin", stock_margin, median_margin, True),
-                    ("Rev Growth", stock_rev_growth, median_rev_growth, True),
-                    ("Debt/Equity", stock_de, median_de, False),     # lower is better
-                ]
-
-                wins = 0
-                for label, stock_val, peer_val, higher_better in metrics_compare:
-                    if stock_val is not None and peer_val is not None and not pd.isna(peer_val):
-                        if higher_better:
-                            better = stock_val >= peer_val
-                        else:
-                            better = stock_val <= peer_val
-                        if better:
-                            wins += 1
-                        comparisons.append((label, stock_val, peer_val, higher_better, better))
+            wins = 0
+            for label, stock_val, peer_val, higher_better in metrics_compare:
+                if stock_val is not None and peer_val is not None and not pd.isna(peer_val):
+                    if higher_better:
+                        better = stock_val >= peer_val
                     else:
-                        comparisons.append((label, stock_val, peer_val, higher_better, None))
-
-                # Verdict
-                if wins >= 4:
-                    peer_verdict, peer_vcolor = "Above Peers", SUCCESS
-                elif wins >= 2:
-                    peer_verdict, peer_vcolor = "In Line", TEAL
+                        better = stock_val <= peer_val
+                    if better:
+                        wins += 1
+                    comparisons.append((label, stock_val, peer_val, higher_better, better))
                 else:
-                    peer_verdict, peer_vcolor = "Below Peers", CORAL
+                    comparisons.append((label, stock_val, peer_val, higher_better, None))
 
-                # Format helpers
-                def _peer_fmt(val, is_pct=False):
-                    if val is None or (isinstance(val, float) and pd.isna(val)):
-                        return "\u2014"
+            # Verdict
+            if wins >= 4:
+                peer_verdict, peer_vcolor = "Above Peers", SUCCESS
+            elif wins >= 2:
+                peer_verdict, peer_vcolor = "In Line", TEAL
+            else:
+                peer_verdict, peer_vcolor = "Below Peers", CORAL
+
+            # Format helpers
+            def _peer_fmt(val, is_pct=False):
+                if val is None or (isinstance(val, float) and pd.isna(val)):
+                    return "\u2014"
+                if is_pct:
+                    return f"{val * 100:.1f}%"
+                return f"{val:.1f}"
+
+            # Build comparison card HTML
+            header_cells = ""
+            stock_cells = ""
+            peer_cells = ""
+            diff_cells = ""
+
+            for label, stock_val, peer_val, higher_better, is_better in comparisons:
+                is_pct = label in ("ROE", "Net Margin", "Rev Growth")
+
+                # Color the stock value based on comparison
+                if is_better is True:
+                    val_color = SUCCESS
+                elif is_better is False:
+                    val_color = CORAL
+                else:
+                    val_color = MUTED
+
+                header_cells += (
+                    f'<div style="flex:1;text-align:center;">'
+                    f'<div style="font-size:11px;font-weight:600;color:{MUTED};'
+                    f'text-transform:uppercase;letter-spacing:0.04em;'
+                    f'font-family:{FONT};">{label}</div></div>'
+                )
+                stock_cells += (
+                    f'<div style="flex:1;text-align:center;">'
+                    f'<div style="font-size:15px;font-weight:600;color:{val_color};'
+                    f'font-family:{FONT};">{_peer_fmt(stock_val, is_pct)}</div></div>'
+                )
+                peer_cells += (
+                    f'<div style="flex:1;text-align:center;">'
+                    f'<div style="font-size:15px;font-weight:500;color:{TEXT_SECONDARY};'
+                    f'font-family:{FONT};">{_peer_fmt(peer_val, is_pct)}</div></div>'
+                )
+
+                # Difference row
+                if stock_val is not None and peer_val is not None and not pd.isna(stock_val) and not pd.isna(peer_val):
+                    diff = stock_val - peer_val
                     if is_pct:
-                        return f"{val * 100:.1f}%"
-                    return f"{val:.1f}"
-
-                # Build comparison card HTML
-                header_cells = ""
-                stock_cells = ""
-                peer_cells = ""
-                diff_cells = ""
-
-                for label, stock_val, peer_val, higher_better, is_better in comparisons:
-                    is_pct = label in ("ROE", "Net Margin", "Rev Growth")
-
-                    # Color the stock value based on comparison
-                    if is_better is True:
-                        val_color = SUCCESS
-                    elif is_better is False:
-                        val_color = CORAL
+                        diff_txt = f"{'+' if diff >= 0 else ''}{diff * 100:.1f}pp"
+                    elif peer_val != 0:
+                        diff_pct = (diff / abs(peer_val)) * 100
+                        diff_txt = f"{'+' if diff_pct >= 0 else ''}{diff_pct:.0f}%"
                     else:
-                        val_color = MUTED
+                        diff_txt = f"{'+' if diff >= 0 else ''}{diff:.1f}"
+                    diff_color = SUCCESS if is_better else CORAL if is_better is False else MUTED
+                else:
+                    diff_txt = "\u2014"
+                    diff_color = MUTED
 
-                    header_cells += (
-                        f'<div style="flex:1;text-align:center;">'
-                        f'<div style="font-size:11px;font-weight:600;color:{MUTED};'
-                        f'text-transform:uppercase;letter-spacing:0.04em;'
-                        f'font-family:{FONT};">{label}</div></div>'
-                    )
-                    stock_cells += (
-                        f'<div style="flex:1;text-align:center;">'
-                        f'<div style="font-size:15px;font-weight:600;color:{val_color};'
-                        f'font-family:{FONT};">{_peer_fmt(stock_val, is_pct)}</div></div>'
-                    )
-                    peer_cells += (
-                        f'<div style="flex:1;text-align:center;">'
-                        f'<div style="font-size:15px;font-weight:500;color:{TEXT_SECONDARY};'
-                        f'font-family:{FONT};">{_peer_fmt(peer_val, is_pct)}</div></div>'
-                    )
+                diff_cells += (
+                    f'<div style="flex:1;text-align:center;">'
+                    f'<div style="font-size:12px;font-weight:600;color:{diff_color};'
+                    f'font-family:{FONT};">{diff_txt}</div></div>'
+                )
 
-                    # Difference row
-                    if stock_val is not None and peer_val is not None and not pd.isna(stock_val) and not pd.isna(peer_val):
-                        diff = stock_val - peer_val
-                        if is_pct:
-                            diff_txt = f"{'+' if diff >= 0 else ''}{diff * 100:.1f}pp"
-                        elif peer_val != 0:
-                            diff_pct = (diff / abs(peer_val)) * 100
-                            diff_txt = f"{'+' if diff_pct >= 0 else ''}{diff_pct:.0f}%"
-                        else:
-                            diff_txt = f"{'+' if diff >= 0 else ''}{diff:.1f}"
-                        diff_color = SUCCESS if is_better else CORAL if is_better is False else MUTED
-                    else:
-                        diff_txt = "\u2014"
-                        diff_color = MUTED
-
-                    diff_cells += (
-                        f'<div style="flex:1;text-align:center;">'
-                        f'<div style="font-size:12px;font-weight:600;color:{diff_color};'
-                        f'font-family:{FONT};">{diff_txt}</div></div>'
-                    )
-
-                peer_card_html = f"""
-                <div style="background:#FFFFFF;border:1px solid {BORDER};border-radius:14px;
-                            box-shadow:{SHADOW_SM};padding:20px;">
-                    <div style="margin-bottom:14px;">
-                        <span style="{LABEL_CSS};display:inline-block;vertical-align:middle;
-                                     margin-right:10px;">SECTOR PEER COMPARISON</span>
-                        <span style="display:inline-block;padding:3px 14px;border-radius:20px;
-                                     background:{peer_vcolor};color:white;font-size:11px;font-weight:700;
-                                     font-family:{FONT};letter-spacing:0.04em;
-                                     vertical-align:middle;">{peer_verdict}</span>
-                    </div>
-                    <div style="display:flex;gap:4px;margin-bottom:6px;margin-left:55px;">{header_cells}</div>
-                    <div style="display:flex;gap:4px;align-items:center;margin-bottom:10px;">
-                        <div style="width:50px;flex-shrink:0;font-size:11px;font-weight:600;color:{TEAL};
-                                    font-family:{FONT};">{selected}</div>
-                        <div style="display:flex;gap:4px;flex:1;">{stock_cells}</div>
-                    </div>
-                    <div style="display:flex;gap:4px;align-items:center;margin-bottom:10px;">
-                        <div style="width:50px;flex-shrink:0;font-size:11px;font-weight:600;color:{MUTED};
-                                    font-family:{FONT};">Peers (Avg)</div>
-                        <div style="display:flex;gap:4px;flex:1;">{peer_cells}</div>
-                    </div>
-                    <div style="display:flex;gap:4px;align-items:center;margin-bottom:12px;
-                                border-top:1px solid {BORDER};padding-top:8px;">
-                        <div style="width:50px;flex-shrink:0;font-size:11px;font-weight:600;color:{MUTED};
-                                    font-family:{FONT};">Diff</div>
-                        <div style="display:flex;gap:4px;flex:1;">{diff_cells}</div>
-                    </div>
-                    <div style="font-size:11px;color:{MUTED};line-height:1.4;font-family:{FONT};">
-                        Compared against {len(sector_peers)} peers in {stock_sector}.
-                        {selected} scores above sector median on {wins} of {len(comparisons)} key metrics.
-                    </div>
+            peer_card_html = f"""
+            <div style="background:#FFFFFF;border:1px solid {BORDER};border-radius:14px;
+                        box-shadow:{SHADOW_SM};padding:20px;">
+                <div style="margin-bottom:14px;">
+                    <span style="{LABEL_CSS};display:inline-block;vertical-align:middle;
+                                 margin-right:10px;">SECTOR PEER COMPARISON</span>
+                    <span style="display:inline-block;padding:3px 14px;border-radius:20px;
+                                 background:{peer_vcolor};color:white;font-size:11px;font-weight:700;
+                                 font-family:{FONT};letter-spacing:0.04em;
+                                 vertical-align:middle;">{peer_verdict}</span>
                 </div>
-                """
-                st.markdown(peer_card_html, unsafe_allow_html=True)
+                <div style="display:flex;gap:4px;margin-bottom:6px;margin-left:55px;">{header_cells}</div>
+                <div style="display:flex;gap:4px;align-items:center;margin-bottom:10px;">
+                    <div style="width:50px;flex-shrink:0;font-size:11px;font-weight:600;color:{TEAL};
+                                font-family:{FONT};">{selected}</div>
+                    <div style="display:flex;gap:4px;flex:1;">{stock_cells}</div>
+                </div>
+                <div style="display:flex;gap:4px;align-items:center;margin-bottom:10px;">
+                    <div style="width:50px;flex-shrink:0;font-size:11px;font-weight:600;color:{MUTED};
+                                font-family:{FONT};">Peers (Avg)</div>
+                    <div style="display:flex;gap:4px;flex:1;">{peer_cells}</div>
+                </div>
+                <div style="display:flex;gap:4px;align-items:center;margin-bottom:12px;
+                            border-top:1px solid {BORDER};padding-top:8px;">
+                    <div style="width:50px;flex-shrink:0;font-size:11px;font-weight:600;color:{MUTED};
+                                font-family:{FONT};">Diff</div>
+                    <div style="display:flex;gap:4px;flex:1;">{diff_cells}</div>
+                </div>
+                <div style="font-size:11px;color:{MUTED};line-height:1.4;font-family:{FONT};">
+                    Compared against {len(sector_peers)} peers in {stock_sector}.
+                    {selected} scores above sector median on {wins} of {len(comparisons)} key metrics.
+                </div>
+            </div>
+            """
+            st.markdown(peer_card_html, unsafe_allow_html=True)
