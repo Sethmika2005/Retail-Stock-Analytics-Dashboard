@@ -10,8 +10,12 @@ Usage as module:
 """
 
 import argparse
+import os
 import sys
 import warnings
+
+# Add parent dir so we can import models/rl_agent
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import numpy as np
 import pandas as pd
@@ -19,12 +23,12 @@ import yfinance as yf
 
 from models import (
     calculate_volume_score,
+    compute_indicators,
     detect_market_regime,
     generate_recommendation_paper1,
     generate_paper1_signal,
 )
 
-# RL agent - graceful import
 try:
     import rl_agent
     RL_AVAILABLE = rl_agent.is_available()
@@ -34,90 +38,7 @@ except (ImportError, OSError):
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 
-# =============================================================================
-# INDICATORS (mirrors app.py compute_indicators)
-# =============================================================================
-
-def compute_indicators(df):
-    """Compute technical indicators (mirrors app.py compute_indicators)."""
-    df = df.copy()
-    df["SMA20"] = df["Close"].rolling(window=20).mean()
-    df["SMA50"] = df["Close"].rolling(window=50).mean()
-    df["SMA200"] = df["Close"].rolling(window=200).mean()
-    rolling_20 = df["Close"].rolling(window=20)
-    df["BB_MID"] = rolling_20.mean()
-    df["BB_UPPER"] = df["BB_MID"] + 2 * rolling_20.std()
-    df["BB_LOWER"] = df["BB_MID"] - 2 * rolling_20.std()
-
-    delta = df["Close"].diff()
-    gain = delta.where(delta > 0, 0.0)
-    loss = -delta.where(delta < 0, 0.0)
-    avg_gain = gain.rolling(window=14).mean()
-    avg_loss = loss.rolling(window=14).mean()
-    rs = avg_gain / avg_loss
-    df["RSI"] = 100 - (100 / (1 + rs))
-
-    ema12 = df["Close"].ewm(span=12, adjust=False).mean()
-    ema26 = df["Close"].ewm(span=26, adjust=False).mean()
-    df["MACD"] = ema12 - ema26
-    df["MACD_SIGNAL"] = df["MACD"].ewm(span=9, adjust=False).mean()
-    df["MACD_HIST"] = df["MACD"] - df["MACD_SIGNAL"]
-
-    high_low = df["High"] - df["Low"]
-    high_close = (df["High"] - df["Close"].shift()).abs()
-    low_close = (df["Low"] - df["Close"].shift()).abs()
-    tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
-    df["ATR"] = tr.rolling(window=14).mean()
-
-    ma60 = df["Close"].rolling(window=60).mean()
-    std60 = df["Close"].rolling(window=60).std()
-    df["Z_SCORE_60"] = (df["Close"] - ma60) / std60
-
-    # SMA indicators (Paper 1 — Kadia et al. use SMA crossover)
-    df["SMA20"] = df["Close"].rolling(window=20).mean()
-    df["SMA50"] = df["Close"].rolling(window=50).mean()
-
-    sma_cross = pd.Series(0, index=df.index)
-    if len(df) > 1:
-        sma20 = df["SMA20"].values
-        sma50 = df["SMA50"].values
-        for i in range(1, len(df)):
-            if pd.notna(sma20[i]) and pd.notna(sma50[i]) and pd.notna(sma20[i-1]) and pd.notna(sma50[i-1]):
-                if sma20[i-1] <= sma50[i-1] and sma20[i] > sma50[i]:
-                    sma_cross.iloc[i] = 1
-                elif sma20[i-1] >= sma50[i-1] and sma20[i] < sma50[i]:
-                    sma_cross.iloc[i] = -1
-    df["SMA_Cross_Signal"] = sma_cross
-
-    # Volume indicators
-    if "Volume" in df.columns:
-        df["Volume_SMA20"] = df["Volume"].rolling(window=20).mean()
-        df["Volume_SMA50"] = df["Volume"].rolling(window=50).mean()
-        df["Rel_Volume"] = df["Volume"] / df["Volume_SMA20"]
-        vol_sma = df["Volume_SMA20"]
-        slope = vol_sma.rolling(window=10).apply(
-            lambda x: np.polyfit(range(len(x)), x, 1)[0] if len(x) == 10 and x.notna().all() else 0,
-            raw=False,
-        )
-        df["Volume_Slope"] = slope
-
-        df["ATV_20"] = df["Volume"].rolling(window=20).mean()
-        atv_sma = df["ATV_20"]
-        atv_slope = atv_sma.rolling(window=10).apply(
-            lambda x: np.polyfit(range(len(x)), x, 1)[0] if len(x) == 10 and x.notna().all() else 0,
-            raw=False,
-        )
-        df["ATV_Slope"] = atv_slope
-
-    # Monthly return
-    df["Monthly_Return"] = df["Close"].pct_change(periods=22)
-
-    return df
-
-
-# =============================================================================
-# SIMULATION ENGINE
-# =============================================================================
+# compute_indicators is now imported from models.py
 
 def simulate_strategy(df, strategy_fn, initial_capital=10000):
     """

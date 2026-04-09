@@ -1,16 +1,12 @@
-# =============================================================================
-# RL_AGENT.PY - PPO Reinforcement Learning Agent for Paper 1
-# =============================================================================
-# Gymnasium environment + PPO training pipeline with model caching.
-# Gracefully degrades if stable-baselines3 is not installed.
-# =============================================================================
+# RL agent — PPO for Paper 1 signal enhancement
+# Gymnasium env + training pipeline with model caching
+# Degrades gracefully if stable-baselines3 not installed
 
 import os
 import hashlib
 import numpy as np
 import pandas as pd
 
-# Graceful import guard
 RL_AVAILABLE = False
 try:
     import gymnasium as gym
@@ -24,19 +20,9 @@ except (ImportError, OSError):
 CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models_cache")
 
 
-# =============================================================================
-# GYMNASIUM ENVIRONMENT
-# =============================================================================
-
 if RL_AVAILABLE:
     class StockTradingEnv(gym.Env):
-        """
-        Gymnasium environment for Paper 1 PPO agent.
-
-        State: [sma_cross_signal, atv_slope_normalized, 1d_return, 5d_return, rsi_normalized, rel_volume]
-        Actions: Discrete(3) -> buy(0), sell(1), hold(2)
-        Reward: Rt = (Pt+1 - Pt)/Pt * (1 + beta * (Vt - V_avg)/V_avg)  (paper's Eq. 5)
-        """
+        """6D state, 3 actions (buy/sell/hold). Reward per Paper 1 Eq. 5."""
         metadata = {"render_modes": []}
 
         def __init__(self, df, beta=0.5):
@@ -56,7 +42,6 @@ if RL_AVAILABLE:
             self._precompute()
 
         def _precompute(self):
-            """Precompute normalized features for all timesteps."""
             df = self.df
 
             # SMA cross signal (already -1, 0, 1)
@@ -150,39 +135,17 @@ if RL_AVAILABLE:
             return obs, float(reward), terminated, truncated, {}
 
 
-# =============================================================================
-# TRAINING PIPELINE
-# =============================================================================
-
 def _get_cache_key(ticker, data_len):
-    """Generate a cache key based on ticker and data length."""
     raw = f"{ticker}_{data_len}"
     return hashlib.md5(raw.encode()).hexdigest()[:12]
 
 
 def train_ppo_agent(df, ticker="UNKNOWN", total_timesteps=50000):
-    """
-    Train a PPO agent on historical data.
-
-    Args:
-        df: DataFrame with computed indicators (SMA_Cross_Signal, ATV_Slope, RSI, etc.)
-        ticker: Ticker symbol for caching
-        total_timesteps: Training duration
-
-    Returns:
-        model: Trained PPO model, or None if RL not available
-    """
+    """Train PPO on historical data. Returns model or None."""
     if not RL_AVAILABLE:
         return None
 
-    # 80/10/10 split
-    n = len(df)
-    train_end = int(n * 0.8)
-    val_end = int(n * 0.9)
-
-    train_df = df.iloc[:train_end].copy()
-    # val_df = df.iloc[train_end:val_end].copy()  # reserved for validation
-    # test_df = df.iloc[val_end:].copy()  # reserved for testing
+    train_df = df.iloc[:int(len(df) * 0.8)].copy()
 
     if len(train_df) < 100:
         return None
@@ -206,12 +169,7 @@ def train_ppo_agent(df, ticker="UNKNOWN", total_timesteps=50000):
 
 
 def get_ppo_agent(df, ticker="UNKNOWN", force_retrain=False):
-    """
-    Get a PPO agent, using cache if available.
-
-    Returns:
-        model: PPO model or None
-    """
+    """Load cached PPO model or train a new one."""
     if not RL_AVAILABLE:
         return None
 
@@ -219,7 +177,6 @@ def get_ppo_agent(df, ticker="UNKNOWN", force_retrain=False):
     cache_key = _get_cache_key(ticker, len(df))
     cache_path = os.path.join(CACHE_DIR, f"ppo_{cache_key}")
 
-    # Try loading from cache
     if not force_retrain and os.path.exists(cache_path + ".zip"):
         try:
             model = PPO.load(cache_path)
@@ -227,7 +184,6 @@ def get_ppo_agent(df, ticker="UNKNOWN", force_retrain=False):
         except Exception:
             pass
 
-    # Train new model
     model = train_ppo_agent(df, ticker)
     if model is not None:
         try:
@@ -239,19 +195,13 @@ def get_ppo_agent(df, ticker="UNKNOWN", force_retrain=False):
 
 
 def predict_action(model, df, row_idx=-1):
-    """
-    Get PPO agent's action prediction for a given state.
-
-    Returns:
-        action: 0=buy, 1=sell, 2=hold, or None if model unavailable
-    """
+    """Get PPO action for latest state. Returns 0=buy, 1=sell, 2=hold, or None."""
     if model is None or not RL_AVAILABLE:
         return None
 
     if row_idx < 0:
         row_idx = len(df) + row_idx
 
-    # Build observation
     row = df.iloc[row_idx]
 
     sma_cross = float(row.get("SMA_Cross_Signal", 0) or 0)
@@ -266,14 +216,12 @@ def predict_action(model, df, row_idx=-1):
     else:
         atv_norm = 0.0
 
-    # 1-day return
     if row_idx > 0:
         prev_close = df["Close"].iloc[row_idx - 1]
         ret_1d = (row["Close"] - prev_close) / prev_close if prev_close != 0 else 0
     else:
         ret_1d = 0.0
 
-    # 5-day return
     if row_idx >= 5:
         close_5d_ago = df["Close"].iloc[row_idx - 5]
         ret_5d = (row["Close"] - close_5d_ago) / close_5d_ago if close_5d_ago != 0 else 0
@@ -296,5 +244,4 @@ def predict_action(model, df, row_idx=-1):
 
 
 def is_available():
-    """Check if RL dependencies are installed."""
     return RL_AVAILABLE

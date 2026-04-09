@@ -15,13 +15,19 @@ Usage:
     python testing_accuracy.py
 """
 
+import os
+import sys
 import warnings
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import numpy as np
 import pandas as pd
 import yfinance as yf
 
 from models import (
     calculate_volume_score,
+    compute_indicators,
     detect_market_regime,
     generate_paper1_signal,
     generate_recommendation_paper1,
@@ -41,81 +47,7 @@ PERIOD = "5y"          # historical data window
 HOLD_DAYS = [5, 10, 20]  # evaluate outcome after N trading days
 
 
-# ── Indicator computation (mirrors backtest.py / app.py) ─────────────────────
-def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
-    df = df.copy()
-    df["SMA20"] = df["Close"].rolling(20).mean()
-    df["SMA50"] = df["Close"].rolling(50).mean()
-    df["SMA200"] = df["Close"].rolling(200).mean()
-
-    rolling_20 = df["Close"].rolling(20)
-    df["BB_MID"] = rolling_20.mean()
-    df["BB_UPPER"] = df["BB_MID"] + 2 * rolling_20.std()
-    df["BB_LOWER"] = df["BB_MID"] - 2 * rolling_20.std()
-
-    delta = df["Close"].diff()
-    gain = delta.where(delta > 0, 0.0)
-    loss = -delta.where(delta < 0, 0.0)
-    avg_gain = gain.rolling(14).mean()
-    avg_loss = loss.rolling(14).mean()
-    rs = avg_gain / avg_loss
-    df["RSI"] = 100 - (100 / (1 + rs))
-
-    ema12 = df["Close"].ewm(span=12, adjust=False).mean()
-    ema26 = df["Close"].ewm(span=26, adjust=False).mean()
-    df["MACD"] = ema12 - ema26
-    df["MACD_SIGNAL"] = df["MACD"].ewm(span=9, adjust=False).mean()
-    df["MACD_HIST"] = df["MACD"] - df["MACD_SIGNAL"]
-
-    high_low = df["High"] - df["Low"]
-    high_close = (df["High"] - df["Close"].shift()).abs()
-    low_close = (df["Low"] - df["Close"].shift()).abs()
-    tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
-    df["ATR"] = tr.rolling(14).mean()
-
-    ma60 = df["Close"].rolling(60).mean()
-    std60 = df["Close"].rolling(60).std()
-    df["Z_SCORE_60"] = (df["Close"] - ma60) / std60
-
-    # SMA indicators (Paper 1 — Kadia et al. use SMA crossover)
-    df["SMA20"] = df["Close"].rolling(window=20).mean()
-    df["SMA50"] = df["Close"].rolling(window=50).mean()
-
-    sma_cross = pd.Series(0, index=df.index)
-    if len(df) > 1:
-        sma20 = df["SMA20"].values
-        sma50 = df["SMA50"].values
-        for i in range(1, len(df)):
-            if (pd.notna(sma20[i]) and pd.notna(sma50[i])
-                    and pd.notna(sma20[i - 1]) and pd.notna(sma50[i - 1])):
-                if sma20[i - 1] <= sma50[i - 1] and sma20[i] > sma50[i]:
-                    sma_cross.iloc[i] = 1   # golden cross
-                elif sma20[i - 1] >= sma50[i - 1] and sma20[i] < sma50[i]:
-                    sma_cross.iloc[i] = -1  # death cross
-    df["SMA_Cross_Signal"] = sma_cross
-
-    if "Volume" in df.columns:
-        df["Volume_SMA20"] = df["Volume"].rolling(20).mean()
-        df["Volume_SMA50"] = df["Volume"].rolling(50).mean()
-        df["Rel_Volume"] = df["Volume"] / df["Volume_SMA20"]
-        vol_sma = df["Volume_SMA20"]
-        slope = vol_sma.rolling(10).apply(
-            lambda x: np.polyfit(range(len(x)), x, 1)[0]
-            if len(x) == 10 and x.notna().all() else 0,
-            raw=False,
-        )
-        df["Volume_Slope"] = slope
-        df["ATV_20"] = df["Volume"].rolling(20).mean()
-        atv_sma = df["ATV_20"]
-        atv_slope = atv_sma.rolling(10).apply(
-            lambda x: np.polyfit(range(len(x)), x, 1)[0]
-            if len(x) == 10 and x.notna().all() else 0,
-            raw=False,
-        )
-        df["ATV_Slope"] = atv_slope
-
-    df["Monthly_Return"] = df["Close"].pct_change(periods=22)
-    return df
+# compute_indicators is now imported from models.py
 
 
 def _flatten_columns(raw):

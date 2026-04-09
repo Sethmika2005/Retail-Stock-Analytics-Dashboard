@@ -1,13 +1,8 @@
-# =============================================================================
-# MODELS.PY - Scoring algorithms, sentiment analysis, and recommendation engine
-# =============================================================================
+# Models — scoring algorithms, technical indicators, and recommendation engine
 
+import re
 import numpy as np
 import pandas as pd
-
-# =============================================================================
-# SENTIMENT ANALYSIS
-# =============================================================================
 
 POSITIVE_WORDS = {
     # Earnings & performance
@@ -79,9 +74,7 @@ NEGATIVE_WORDS = {
 
 
 def classify_headline_sentiment(title):
-    """Classify a headline as Positive, Negative, or Neutral based on keywords."""
-    # Clean and tokenize — strip punctuation from each word
-    import re
+    """Classify a headline as Positive, Negative, or Neutral via keyword matching."""
     tokens = set(re.findall(r"[a-z]+(?:-[a-z]+)*", title.lower()))
     pos = len(tokens & POSITIVE_WORDS)
     neg = len(tokens & NEGATIVE_WORDS)
@@ -92,12 +85,8 @@ def classify_headline_sentiment(title):
     return "Neutral"
 
 
-# =============================================================================
-# PIOTROSKI F-SCORE (Piotroski, 2000)
-# =============================================================================
-
 def _find_col(df, candidates):
-    """Find first matching column name from a list of candidates."""
+    """Find first matching column name from candidates."""
     if df is None or df.empty:
         return None
     for name in candidates:
@@ -107,7 +96,7 @@ def _find_col(df, candidates):
 
 
 def _safe_val(df, col_candidates, year_idx=-1):
-    """Safely extract a value from a DataFrame given column candidates and year index."""
+    """Extract a numeric value from df given column name candidates and row index."""
     if df is None or df.empty:
         return None
     col = _find_col(df, col_candidates)
@@ -123,36 +112,15 @@ def _safe_val(df, col_candidates, year_idx=-1):
 
 
 def calculate_piotroski_fscore(income_stmt, balance_sheet, cashflow):
-    """
-    Calculate the Piotroski F-Score (0-9) based on 9 binary financial health tests.
-
-    Reference: Piotroski, J. D. (2000). "Value Investing: The Use of Historical
-    Financial Statement Information to Separate Winners from Losers."
-    Journal of Accounting Research, 38, 1-41.
-
-    Categories:
-      Profitability (4 points): ROA > 0, CFO > 0, ROA increasing, CFO > Net Income
-      Leverage/Liquidity (3 points): Debt ratio decreasing, Current ratio increasing, No dilution
-      Efficiency (2 points): Gross margin increasing, Asset turnover increasing
-
-    Args:
-        income_stmt: Annual income statement DataFrame (rows = years, ascending)
-        balance_sheet: Annual balance sheet DataFrame (rows = years, ascending)
-        cashflow: Annual cash flow statement DataFrame (rows = years, ascending)
-
-    Returns:
-        (total_score, details_dict) where details_dict has per-test results
-    """
+    """Piotroski F-Score (0-9): 4 profitability + 3 leverage + 2 efficiency tests."""
     details = {}
     score = 0
 
-    # Need at least 2 years for year-over-year comparisons
     has_two_years = (
         income_stmt is not None and len(income_stmt) >= 2 and
         balance_sheet is not None and len(balance_sheet) >= 2
     )
 
-    # --- Current year values ---
     net_income = _safe_val(income_stmt, ["Net Income", "NetIncome", "Net Income Common Stockholders"])
     total_assets_curr = _safe_val(balance_sheet, ["Total Assets", "TotalAssets"])
     total_assets_prev = _safe_val(balance_sheet, ["Total Assets", "TotalAssets"], -2) if has_two_years else None
@@ -162,9 +130,7 @@ def calculate_piotroski_fscore(income_stmt, balance_sheet, cashflow):
         "Total Cash From Operating Activities", "OperatingCashFlow",
     ]) if cashflow is not None and not cashflow.empty else None
 
-    # --- PROFITABILITY (4 tests) ---
-
-    # Test 1: ROA > 0 (Net Income / Total Assets > 0)
+    # Profitability (tests 1-4)
     roa_curr = None
     if net_income is not None and total_assets_curr is not None and total_assets_curr > 0:
         roa_curr = net_income / total_assets_curr
@@ -172,12 +138,10 @@ def calculate_piotroski_fscore(income_stmt, balance_sheet, cashflow):
     details["roa_positive"] = {"score": test1, "value": roa_curr}
     score += test1
 
-    # Test 2: Operating Cash Flow > 0
     test2 = 1 if cfo is not None and cfo > 0 else 0
     details["cfo_positive"] = {"score": test2, "value": cfo}
     score += test2
 
-    # Test 3: ROA increasing (ROA this year > ROA last year)
     test3 = 0
     roa_prev = None
     if has_two_years and total_assets_prev is not None and total_assets_prev > 0:
@@ -189,16 +153,13 @@ def calculate_piotroski_fscore(income_stmt, balance_sheet, cashflow):
     details["roa_increasing"] = {"score": test3, "value_curr": roa_curr, "value_prev": roa_prev}
     score += test3
 
-    # Test 4: Cash Flow > Net Income (accruals quality)
-    test4 = 0
+    test4 = 0  # CFO > net income (accrual quality)
     if cfo is not None and net_income is not None and cfo > net_income:
         test4 = 1
     details["cfo_gt_net_income"] = {"score": test4, "cfo": cfo, "net_income": net_income}
     score += test4
 
-    # --- LEVERAGE / LIQUIDITY (3 tests) ---
-
-    # Test 5: Long-term debt ratio decreasing
+    # Leverage / liquidity (tests 5-7)
     test5 = 0
     lt_debt_curr = _safe_val(balance_sheet, ["Long Term Debt", "LongTermDebt", "Total Debt", "TotalDebt"])
     if has_two_years:
@@ -209,11 +170,10 @@ def calculate_piotroski_fscore(income_stmt, balance_sheet, cashflow):
             if ratio_curr <= ratio_prev:
                 test5 = 1
         elif lt_debt_curr is None or lt_debt_curr == 0:
-            test5 = 1  # No debt is good
+            test5 = 1
     details["debt_decreasing"] = {"score": test5}
     score += test5
 
-    # Test 6: Current ratio increasing
     test6 = 0
     ca_curr = _safe_val(balance_sheet, ["Current Assets", "CurrentAssets", "Total Current Assets"])
     cl_curr = _safe_val(balance_sheet, ["Current Liabilities", "CurrentLiabilities", "Total Current Liabilities"])
@@ -228,7 +188,6 @@ def calculate_piotroski_fscore(income_stmt, balance_sheet, cashflow):
     details["current_ratio_increasing"] = {"score": test6}
     score += test6
 
-    # Test 7: No new shares issued (dilution check)
     test7 = 0
     shares_curr = _safe_val(income_stmt, [
         "Diluted Average Shares", "Basic Average Shares",
@@ -242,13 +201,11 @@ def calculate_piotroski_fscore(income_stmt, balance_sheet, cashflow):
         if shares_curr is not None and shares_prev is not None and shares_curr <= shares_prev:
             test7 = 1
         elif shares_curr is None and shares_prev is None:
-            test7 = 1  # Can't determine, give benefit of doubt
+            test7 = 1
     details["no_dilution"] = {"score": test7}
     score += test7
 
-    # --- EFFICIENCY (2 tests) ---
-
-    # Test 8: Gross margin increasing
+    # Efficiency (tests 8-9)
     test8 = 0
     gp_curr = _safe_val(income_stmt, ["Gross Profit", "GrossProfit"])
     rev_curr = _safe_val(income_stmt, ["Total Revenue", "TotalRevenue", "Revenue"])
@@ -263,7 +220,6 @@ def calculate_piotroski_fscore(income_stmt, balance_sheet, cashflow):
     details["gross_margin_increasing"] = {"score": test8}
     score += test8
 
-    # Test 9: Asset turnover increasing
     test9 = 0
     if has_two_years and rev_curr is not None and total_assets_curr and total_assets_curr > 0:
         at_curr = rev_curr / total_assets_curr
@@ -275,7 +231,7 @@ def calculate_piotroski_fscore(income_stmt, balance_sheet, cashflow):
     details["asset_turnover_increasing"] = {"score": test9}
     score += test9
 
-    # Summary by category
+    # category totals
     details["profitability"] = test1 + test2 + test3 + test4
     details["leverage_liquidity"] = test5 + test6 + test7
     details["efficiency"] = test8 + test9
@@ -284,15 +240,8 @@ def calculate_piotroski_fscore(income_stmt, balance_sheet, cashflow):
     return score, details
 
 
-# =============================================================================
-# MARKET REGIME DETECTION
-# =============================================================================
-
 def detect_market_regime(sp500_df, vix_df):
-    """
-    Detect market regime: Bull, Bear, Sideways, or High-Volatility.
-    High volatility overrides other regimes.
-    """
+    """Classify market as Bull/Bear/Sideways/High-Volatility using SMA200 slope + VIX."""
     if sp500_df.empty or vix_df.empty:
         return "Unknown", "gray", {}
 
@@ -345,21 +294,14 @@ def detect_market_regime(sp500_df, vix_df):
     return "Sideways", "orange", metrics
 
 
-# =============================================================================
-# STRATEGY 2: Paper 1 — EMA Crossover + ATV Confirmation + RSI Gate + RL Agent
-# =============================================================================
-
 def calculate_volume_score(df):
-    """
-    Calculate volume score (0-100) based on volume trend alignment and
-    relative volume strength (Paper 1: Kadia et al.).
-    """
+    """Volume score (0-100) from ATV slope alignment + relative volume strength."""
     if df.empty or "Volume" not in df.columns:
         return 0, {"score": 0, "volume_confirms_trend": False, "details": {}}
 
     details = {}
 
-    # --- Volume trend alignment (0-50) ---
+    # ATV slope alignment score (0-50)
     price_change = 0
     if len(df) >= 10:
         price_change = df["Close"].iloc[-1] - df["Close"].iloc[-10]
@@ -368,9 +310,7 @@ def calculate_volume_score(df):
     details["volume_slope"] = vol_slope
     details["price_direction"] = "up" if price_change > 0 else "down"
 
-    # Paper 1: ATV slope > 0 confirms signals regardless of price direction
-    # (positive slope = big money active, entering or exiting)
-    # ATV slope <= 0 = big money has no interest, signal unreliable
+    # ATV slope > 0 = institutional activity, confirms signal
     volume_confirms = vol_slope > 0
     details["volume_confirms_trend"] = volume_confirms
 
@@ -383,7 +323,7 @@ def calculate_volume_score(df):
     alignment_score = min(50, max(0, alignment_score))
     details["alignment_score"] = alignment_score
 
-    # --- Relative volume strength (0-50) ---
+    # Relative volume score (0-50)
     rel_vol = df["Rel_Volume"].iloc[-1] if "Rel_Volume" in df.columns and pd.notna(df["Rel_Volume"].iloc[-1]) else 1.0
     details["rel_volume"] = rel_vol
 
@@ -409,13 +349,7 @@ def calculate_volume_score(df):
 
 
 def generate_paper1_signal(df, row_idx=-1):
-    """
-    Generate Paper 1 signal faithfully: SMA20/50 crossover + ATV slope confirmation + RSI gate.
-
-    Returns:
-        signal: "BUY", "SELL", or "HOLD"
-        details: dict with crossover_type, atv_confirmed, rsi_gate, etc.
-    """
+    """Paper 1 signal: SMA20/50 crossover + ATV slope confirmation + RSI gate."""
     if df.empty or len(df) < 50:
         return "HOLD", {"reason": "insufficient_data"}
 
@@ -424,28 +358,21 @@ def generate_paper1_signal(df, row_idx=-1):
 
     details = {}
 
-    # 1. Check SMA Cross Signal at row_idx
     sma_cross = df["SMA_Cross_Signal"].iloc[row_idx] if "SMA_Cross_Signal" in df.columns else 0
     details["sma_cross_signal"] = int(sma_cross)
 
-    # 2. Get ATV slope
     atv_slope = df["ATV_Slope"].iloc[row_idx] if "ATV_Slope" in df.columns and pd.notna(df["ATV_Slope"].iloc[row_idx]) else 0
     details["atv_slope"] = atv_slope
 
-    # 3. Get RSI
     rsi = df["RSI"].iloc[row_idx] if "RSI" in df.columns and pd.notna(df["RSI"].iloc[row_idx]) else 50
     details["rsi"] = rsi
 
-    # Determine base signal from SMA crossover
-    if sma_cross == 1:
-        # Golden cross detected
+    if sma_cross == 1:  # golden cross
         details["crossover_type"] = "golden_cross"
-        # Confirm with ATV slope > 0
         atv_confirmed = atv_slope > 0
         details["atv_confirmed"] = atv_confirmed
         if atv_confirmed:
-            # RSI gate: block BUY if RSI > 70
-            if rsi > 70:
+            if rsi > 70:  # RSI gate: block overbought
                 details["rsi_gate"] = "blocked_overbought"
                 return "HOLD", details
             else:
@@ -455,15 +382,12 @@ def generate_paper1_signal(df, row_idx=-1):
             details["rsi_gate"] = "n/a"
             return "HOLD", details
 
-    elif sma_cross == -1:
-        # Death cross detected
+    elif sma_cross == -1:  # death cross
         details["crossover_type"] = "death_cross"
-        # Confirm with ATV slope > 0 (rising volume = big money exiting, confirms sell)
         atv_confirmed = atv_slope > 0
         details["atv_confirmed"] = atv_confirmed
         if atv_confirmed:
-            # RSI gate: block SELL if RSI < 30
-            if rsi < 30:
+            if rsi < 30:  # RSI gate: block oversold
                 details["rsi_gate"] = "blocked_oversold"
                 return "HOLD", details
             else:
@@ -473,8 +397,7 @@ def generate_paper1_signal(df, row_idx=-1):
             details["rsi_gate"] = "n/a"
             return "HOLD", details
 
-    else:
-        # No crossover event — check current SMA position for trend bias
+    else:  # no crossover — report SMA trend bias
         sma20 = df["SMA20"].iloc[row_idx] if "SMA20" in df.columns else None
         sma50 = df["SMA50"].iloc[row_idx] if "SMA50" in df.columns else None
         details["crossover_type"] = "none"
@@ -492,22 +415,15 @@ def generate_paper1_signal(df, row_idx=-1):
 def generate_recommendation_paper1(volume_score, rsi_value,
                                     market_regime, ticker, info, time_horizon="long",
                                     price_data=None, rl_prediction=None):
-    """
-    Generate recommendation using Paper 1 approach (Kadia et al., 2025):
-    SMA20/50 crossover + ATV confirmation + RSI gate, with optional RL agent override.
-    No crossover = HOLD (pure Paper 1). RL can override when no crossover is active.
-    """
-    # Get Paper 1 rule-based signal
+    """Combine Paper 1 rule-based signal with optional RL override."""
     paper1_signal = "HOLD"
     paper1_details = {}
     if price_data is not None and not price_data.empty:
         paper1_signal, paper1_details = generate_paper1_signal(price_data)
 
-    # Determine recommendation from rule-based signal
     recommendation = paper1_signal
     confidence = 50
 
-    # RL agent integration
     rl_agrees = None
     if rl_prediction is not None:
         rl_action_map = {0: "BUY", 1: "SELL", 2: "HOLD"}
@@ -517,11 +433,9 @@ def generate_recommendation_paper1(volume_score, rsi_value,
         paper1_details["rl_agrees"] = rl_agrees
 
         if not rl_agrees and paper1_details.get("crossover_type") == "none":
-            # PPO overrides HOLD when no crossover event
-            recommendation = rl_signal
+            recommendation = rl_signal  # PPO overrides HOLD when no crossover
             paper1_details["rl_override"] = True
 
-    # Confidence calculation
     if paper1_details.get("crossover_type") in ("golden_cross", "death_cross"):
         if paper1_details.get("atv_confirmed"):
             confidence = 80
@@ -532,7 +446,6 @@ def generate_recommendation_paper1(volume_score, rsi_value,
         else:
             confidence = 45
     else:
-        # No crossover: base confidence is low (HOLD or RL override)
         if paper1_details.get("rl_override"):
             confidence = 55
             if rl_agrees:
@@ -595,6 +508,66 @@ def generate_recommendation_paper1(volume_score, rsi_value,
     }
 
 
+def compute_indicators(df):
+    """Compute all technical indicators for price data."""
+    df = df.copy()
 
+    # Moving averages
+    df["SMA20"] = df["Close"].rolling(20).mean()
+    df["SMA50"] = df["Close"].rolling(50).mean()
+    df["SMA200"] = df["Close"].rolling(200).mean()
 
+    # Bollinger Bands
+    r20 = df["Close"].rolling(20)
+    df["BB_MID"] = r20.mean()
+    df["BB_UPPER"] = df["BB_MID"] + 2 * r20.std()
+    df["BB_LOWER"] = df["BB_MID"] - 2 * r20.std()
+
+    # RSI (14-period)
+    delta = df["Close"].diff()
+    avg_gain = delta.where(delta > 0, 0.0).rolling(14).mean()
+    avg_loss = (-delta.where(delta < 0, 0.0)).rolling(14).mean()
+    df["RSI"] = 100 - (100 / (1 + avg_gain / avg_loss))
+
+    # MACD
+    ema12 = df["Close"].ewm(span=12, adjust=False).mean()
+    ema26 = df["Close"].ewm(span=26, adjust=False).mean()
+    df["MACD"] = ema12 - ema26
+    df["MACD_SIGNAL"] = df["MACD"].ewm(span=9, adjust=False).mean()
+    df["MACD_HIST"] = df["MACD"] - df["MACD_SIGNAL"]
+
+    # ATR
+    high_low = df["High"] - df["Low"]
+    high_close = (df["High"] - df["Close"].shift()).abs()
+    low_close = (df["Low"] - df["Close"].shift()).abs()
+    df["ATR"] = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1).rolling(14).mean()
+
+    # Z-score (60-day)
+    ma60 = df["Close"].rolling(60).mean()
+    df["Z_SCORE_60"] = (df["Close"] - ma60) / df["Close"].rolling(60).std()
+
+    # SMA crossover signal (vectorised): +1 golden, -1 death
+    above = (df["SMA20"] > df["SMA50"]).astype(int)
+    cross = above.diff()
+    df["SMA_Cross_Signal"] = cross.fillna(0).astype(int)
+
+    # Volume indicators
+    if "Volume" in df.columns:
+        df["Volume_SMA20"] = df["Volume"].rolling(20).mean()
+        df["Volume_SMA50"] = df["Volume"].rolling(50).mean()
+        df["Rel_Volume"] = df["Volume"] / df["Volume_SMA20"]
+
+        # ATV slope: linear regression of Volume_SMA20 over 10 days
+        vol_sma = df["Volume_SMA20"]
+        df["Volume_Slope"] = vol_sma.rolling(10).apply(
+            lambda x: np.polyfit(range(len(x)), x, 1)[0] if x.notna().all() else 0,
+            raw=False)
+
+        df["ATV_20"] = df["Volume"].rolling(20).mean()
+        df["ATV_Slope"] = df["ATV_20"].rolling(10).apply(
+            lambda x: np.polyfit(range(len(x)), x, 1)[0] if x.notna().all() else 0,
+            raw=False)
+
+    df["Monthly_Return"] = df["Close"].pct_change(periods=22)
+    return df
 

@@ -1,8 +1,5 @@
-# =============================================================================
-# US Stock Analytics Dashboard - Main Application
-# =============================================================================
+# US Stock Analytics Dashboard — Main Application
 # Run: streamlit run app.py
-# =============================================================================
 
 import datetime as dt
 import os
@@ -15,426 +12,25 @@ import streamlit as st
 import yfinance as yf
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
 load_dotenv()
 
-# Import from modular files
 from models import (
     calculate_volume_score,
+    compute_indicators,
     detect_market_regime,
     generate_recommendation_paper1,
     generate_paper1_signal,
     calculate_piotroski_fscore,
 )
+from styles import inject_css
 from tabs import dashboard, technical, fundamentals, news
 
-# =============================================================================
-# PAGE CONFIG
-# =============================================================================
 st.set_page_config(page_title="US Stock Analytics Dashboard", layout="wide")
-
-# =============================================================================
-# CUSTOM CSS - Premium Light Theme with Source Sans Pro
-# =============================================================================
-st.markdown("""
-<style>
-/* Import Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700&display=swap');
-
-/* Global Styles — matches Dash design tokens */
-.stApp {
-    background-color: #F4F7F9 !important;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
-}
-
-/* Main container styling */
-.main .block-container {
-    max-width: 1200px !important;
-    padding: 2rem 1rem !important;
-    background-color: #F4F7F9 !important;
-}
-
-/* Hide Streamlit branding */
-#MainMenu {visibility: hidden;}
-footer {visibility: hidden;}
-
-/* Sidebar styling */
-[data-testid="stSidebar"] {
-    background-color: #F8FAFB !important;
-    border-right: 1px solid #E8EDF2 !important;
-}
-[data-testid="stSidebar"] .stMarkdown {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
-}
-[data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
-    font-weight: 600 !important;
-    color: #1E293B !important;
-    font-size: 14px !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.06em !important;
-}
-
-/* Tab styling */
-.stTabs [data-baseweb="tab-list"] {
-    gap: 2px;
-    background-color: transparent !important;
-    border-bottom: 1px solid #E8EDF2 !important;
-}
-.stTabs [data-baseweb="tab"] {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
-    font-size: 13px !important;
-    font-weight: 500 !important;
-    color: #94A3B8 !important;
-    background-color: transparent !important;
-    border: none !important;
-    padding: 10px 18px !important;
-    letter-spacing: 0.01em !important;
-}
-.stTabs [aria-selected="true"] {
-    color: #0097A7 !important;
-    font-weight: 600 !important;
-    border-bottom: 2px solid #0097A7 !important;
-    background-color: transparent !important;
-}
-
-/* Headers */
-h1 {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
-    font-size: 24px !important;
-    font-weight: 700 !important;
-    color: #0F172A !important;
-    letter-spacing: -0.03em !important;
-}
-h2, h3 {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
-    font-weight: 600 !important;
-    color: #0F172A !important;
-}
-
-/* Body text */
-p, span { color: #1E293B; }
-.muted { color: #94A3B8 !important; }
-
-/* Streamlit metric styling */
-[data-testid="stMetric"] {
-    background: #FFFFFF;
-    border: 1px solid #E8EDF2;
-    border-radius: 12px;
-    padding: 12px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02);
-}
-[data-testid="stMetricLabel"] { color: #64748B !important; }
-[data-testid="stMetricValue"] { color: #1E293B !important; }
-[data-testid="stMetricDelta"] { color: #1E293B !important; }
-
-/* Caption styling */
-[data-testid="stCaptionContainer"] { color: #64748B !important; }
-.stCaption, small { color: #64748B !important; }
-
-/* Progress bar styling */
-[data-testid="stProgress"] > div > div { background-color: #F1F5F9 !important; }
-[data-testid="stProgress"] > div > div > div { background-color: #0097A7 !important; }
-
-/* Expander text */
-[data-testid="stExpander"] { color: #1E293B !important; }
-[data-testid="stExpander"] summary { color: #1E293B !important; }
-
-/* Toggle styling — visible card with border */
-[data-testid="stToggle"] label { color: #1E293B !important; font-weight: 500 !important; }
-[data-testid="stToggle"] {
-    background-color: #FFFFFF !important;
-    border: 1.5px solid #CBD5E1 !important;
-    border-radius: 12px !important;
-    padding: 10px 14px !important;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
-    transition: border-color 150ms ease !important;
-}
-[data-testid="stToggle"]:hover {
-    border-color: #0097A7 !important;
-}
-[data-testid="stToggle"] > div {
-    background-color: #FFFFFF !important;
-}
-
-/* Button styling */
-.stButton > button {
-    background-color: #FFFFFF !important;
-    color: #1E293B !important;
-    border: 1px solid #E8EDF2 !important;
-    border-radius: 12px !important;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
-    font-weight: 500 !important;
-    padding: 8px 16px !important;
-    transition: all 150ms ease !important;
-}
-.stButton > button:hover {
-    background-color: #F4F7F9 !important;
-    border-color: #0097A7 !important;
-}
-.stButton > button:active {
-    background-color: #E8EDF2 !important;
-}
-
-/* Primary button teal styling */
-.stButton > button[kind="primary"],
-button[data-testid="stBaseButton-primary"] {
-    background-color: #0097A7 !important;
-    color: #FFFFFF !important;
-    border: 1px solid #0097A7 !important;
-}
-button[data-testid="stBaseButton-primary"]:hover {
-    background-color: #00838F !important;
-    border-color: #00838F !important;
-}
-
-/* Sidebar button styling */
-[data-testid="stSidebar"] .stButton > button {
-    background-color: #FFFFFF !important;
-    color: #1E293B !important;
-    border: 1px solid #E8EDF2 !important;
-    width: 100% !important;
-}
-[data-testid="stSidebar"] .stButton > button:hover {
-    background-color: #F4F7F9 !important;
-    border-color: #0097A7 !important;
-}
-
-/* Write/Text styling */
-[data-testid="stText"] { color: #1E293B !important; }
-
-/* Markdown text */
-[data-testid="stMarkdownContainer"] { color: #1E293B !important; }
-[data-testid="stMarkdownContainer"] p { color: #1E293B !important; }
-[data-testid="stMarkdownContainer"] li { color: #1E293B !important; }
-
-/* Card base style */
-.metric-card {
-    background: #FFFFFF;
-    border: 1px solid #E8EDF2;
-    border-radius: 14px;
-    padding: 16px 20px;
-    text-align: center;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02);
-}
-
-/* Card label */
-.card-label {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    font-size: 11px;
-    font-weight: 600;
-    color: #64748B;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    margin-bottom: 8px;
-}
-
-/* Big numbers */
-.big-number {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    font-size: 22px;
-    font-weight: 500;
-    color: #1E293B;
-}
-
-/* Status colors */
-.status-success { color: #10B981 !important; }
-.status-warning { color: #F59E0B !important; }
-.status-danger { color: #F43F5E !important; }
-.status-info { color: #0097A7 !important; }
-
-/* Status backgrounds */
-.bg-success { background-color: rgba(16, 185, 129, 0.08) !important; }
-.bg-warning { background-color: rgba(245, 158, 11, 0.08) !important; }
-.bg-danger { background-color: rgba(244, 63, 94, 0.08) !important; }
-.bg-info { background-color: rgba(0, 151, 167, 0.08) !important; }
-
-/* Badge/Pill style */
-.badge {
-    display: inline-block;
-    padding: 3px 14px;
-    border-radius: 20px;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-}
-
-/* Section spacing */
-.section-gap { margin-top: 20px !important; }
-.row-gap { margin-top: 10px !important; }
-
-/* Section divider */
-.section-divider {
-    height: 1px;
-    background: #E8EDF2;
-    border: none;
-    margin: 12px 0;
-}
-
-/* Section header with teal left-border */
-.section-header {
-    border-left: 3px solid #0097A7;
-    padding-left: 12px;
-    margin: 16px 0 8px 0;
-}
-.section-header h3 {
-    margin: 0 !important;
-    padding: 0 !important;
-    font-size: 17px !important;
-    letter-spacing: -0.01em !important;
-}
-
-/* Expander styling */
-.streamlit-expanderHeader {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
-    font-size: 13px !important;
-    font-weight: 500 !important;
-    color: #1E293B !important;
-    background-color: #FFFFFF !important;
-    border: 1px solid #E8EDF2 !important;
-    border-radius: 14px !important;
-}
-[data-testid="stExpander"] {
-    background-color: #FFFFFF !important;
-    border: 1px solid #E8EDF2 !important;
-    border-radius: 14px !important;
-    padding: 0 !important;
-}
-[data-testid="stExpander"] details {
-    background-color: #FFFFFF !important;
-    border: 1px solid #E8EDF2 !important;
-    border-radius: 14px !important;
-}
-[data-testid="stExpander"] summary {
-    background-color: #FFFFFF !important;
-    padding: 12px 16px !important;
-    border-radius: 14px !important;
-}
-[data-testid="stExpander"] [data-testid="stExpanderDetails"] {
-    background-color: #FFFFFF !important;
-    padding: 16px !important;
-    border-top: 1px solid #E8EDF2 !important;
-}
-
-/* DataFrame styling */
-.stDataFrame {
-    border: 1px solid #E8EDF2 !important;
-    border-radius: 14px !important;
-}
-
-/* Info/Warning boxes */
-.stAlert {
-    background-color: #F8FAFB !important;
-    border: 1px solid #E8EDF2 !important;
-    border-radius: 14px !important;
-    color: #1E293B !important;
-}
-
-/* Sidebar selectbox and input styling */
-[data-testid="stSidebar"] [data-baseweb="select"] { background-color: #FFFFFF !important; }
-[data-testid="stSidebar"] [data-baseweb="select"] > div {
-    background-color: #FFFFFF !important;
-    border-color: #E8EDF2 !important;
-    border-radius: 10px !important;
-    color: #1E293B !important;
-}
-[data-testid="stSidebar"] [data-baseweb="select"] svg { color: #64748B !important; }
-[data-testid="stSidebar"] [data-baseweb="input"] {
-    background-color: #FFFFFF !important;
-    border-color: #E8EDF2 !important;
-    border-radius: 10px !important;
-}
-[data-testid="stSidebar"] input {
-    color: #1E293B !important;
-    background-color: #FFFFFF !important;
-}
-[data-testid="stSidebar"] label {
-    color: #1E293B !important;
-    font-size: 13px !important;
-    font-weight: 500 !important;
-}
-[data-testid="stSidebar"] .stCheckbox label span { color: #1E293B !important; }
-
-/* Sidebar divider — subtle */
-[data-testid="stSidebar"] hr {
-    border-color: #E8EDF2 !important;
-    margin: 16px 0 !important;
-}
-
-/* Dropdown menu styling — white background, dark text */
-[data-baseweb="popover"] { background-color: #FFFFFF !important; }
-[data-baseweb="popover"] ul { background-color: #FFFFFF !important; }
-[data-baseweb="popover"] li {
-    color: #1E293B !important;
-    background-color: #FFFFFF !important;
-}
-[data-baseweb="popover"] li:hover {
-    background-color: #F4F7F9 !important;
-}
-[data-baseweb="popover"] li[aria-selected="true"] {
-    background-color: #E0F4F5 !important;
-    color: #0097A7 !important;
-}
-
-/* Dropdown list container — force white everywhere */
-[data-baseweb="menu"],
-[data-baseweb="menu"] > div,
-[data-baseweb="menu"] ul,
-[data-baseweb="menu"] li,
-[role="listbox"],
-[role="listbox"] > div,
-[role="listbox"] li,
-[role="option"],
-[data-baseweb="popover"] > div,
-[data-baseweb="popover"] > div > div,
-[data-baseweb="popover"] > div > div > div,
-[data-baseweb="popover"] [data-baseweb="menu"],
-[data-baseweb="popover"] [role="listbox"] {
-    background-color: #FFFFFF !important;
-    background: #FFFFFF !important;
-    color: #1E293B !important;
-}
-[role="listbox"] li:hover,
-[role="option"]:hover,
-[data-baseweb="menu"] li:hover {
-    background-color: #F4F7F9 !important;
-    background: #F4F7F9 !important;
-}
-[role="option"][aria-selected="true"] {
-    background-color: #E0F4F5 !important;
-    background: #E0F4F5 !important;
-    color: #0097A7 !important;
-}
-
-/* Sidebar button — compact and styled */
-[data-testid="stSidebar"] .stButton > button {
-    font-size: 12px !important;
-    padding: 6px 14px !important;
-    min-height: 0 !important;
-}
-
-/* Fix selectbox text color */
-[data-baseweb="select"] span { color: #1E293B !important; }
-[data-baseweb="select"] div[data-testid="stMarkdownContainer"] p { color: #1E293B !important; }
-[data-baseweb="select"] input { color: #1E293B !important; background-color: #FFFFFF !important; }
+inject_css()
 
 
+# -- Data loading (cached) --
 
-/* Plotly charts — no border/shadow */
-[data-testid="stPlotlyChart"] {
-    border: none !important;
-    box-shadow: none !important;
-    background: transparent !important;
-}
-
-</style>
-""", unsafe_allow_html=True)
-
-
-# =============================================================================
-# DATA LOADING FUNCTIONS (cached)
-# =============================================================================
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY", "")
 if not FINNHUB_API_KEY:
@@ -446,11 +42,10 @@ if not FINNHUB_API_KEY:
 
 @st.cache_data(ttl=86400)
 def load_sp500_tickers():
-    """Fetch S&P 500 tickers from Wikipedia."""
     try:
         url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-        response = requests.get(url, headers=HEADERS)
-        tables = pd.read_html(StringIO(response.text))
+        resp = requests.get(url, headers=HEADERS)
+        tables = pd.read_html(StringIO(resp.text))
         df = tables[0][["Symbol", "Security", "GICS Sector", "GICS Sub-Industry"]].copy()
         df.columns = ["ticker", "name", "sector", "industry"]
         df["ticker"] = df["ticker"].str.replace(".", "-", regex=False)
@@ -462,33 +57,29 @@ def load_sp500_tickers():
 
 @st.cache_data(ttl=86400)
 def load_nasdaq100_tickers():
-    """Fetch NASDAQ-100 tickers from Wikipedia."""
     try:
         url = "https://en.wikipedia.org/wiki/Nasdaq-100"
-        response = requests.get(url, headers=HEADERS)
-        tables = pd.read_html(StringIO(response.text))
-
+        resp = requests.get(url, headers=HEADERS)
+        tables = pd.read_html(StringIO(resp.text))
         for table in tables:
             str_cols = [str(c).lower() for c in table.columns]
-            if any("ticker" in c or "symbol" in c for c in str_cols):
-                ticker_col = None
-                name_col = None
-                for col in table.columns:
-                    col_lower = str(col).lower()
-                    if "ticker" in col_lower or "symbol" in col_lower:
-                        ticker_col = col
-                    if "company" in col_lower or "security" in col_lower:
-                        name_col = col
-
-                if ticker_col:
-                    df = pd.DataFrame()
-                    df["ticker"] = table[ticker_col].astype(str).str.replace(".", "-", regex=False)
-                    df["name"] = table[name_col] if name_col else df["ticker"]
-                    df["sector"] = "Technology"
-                    df["industry"] = "Technology"
-                    df["is_sp500"] = False
-                    return df
-
+            if not any("ticker" in c or "symbol" in c for c in str_cols):
+                continue
+            ticker_col, name_col = None, None
+            for col in table.columns:
+                cl = str(col).lower()
+                if "ticker" in cl or "symbol" in cl:
+                    ticker_col = col
+                if "company" in cl or "security" in cl:
+                    name_col = col
+            if ticker_col:
+                df = pd.DataFrame()
+                df["ticker"] = table[ticker_col].astype(str).str.replace(".", "-", regex=False)
+                df["name"] = table[name_col] if name_col else df["ticker"]
+                df["sector"] = "Technology"
+                df["industry"] = "Technology"
+                df["is_sp500"] = False
+                return df
         return pd.DataFrame(columns=["ticker", "name", "sector", "industry", "is_sp500"])
     except Exception:
         return pd.DataFrame(columns=["ticker", "name", "sector", "industry", "is_sp500"])
@@ -496,7 +87,6 @@ def load_nasdaq100_tickers():
 
 @st.cache_data(ttl=86400)
 def load_all_us_stocks():
-    """Load combined list of S&P 500 and NASDAQ-100 stocks."""
     sp500 = load_sp500_tickers()
     nasdaq = load_nasdaq100_tickers()
     combined = pd.concat([sp500, nasdaq], ignore_index=True)
@@ -506,120 +96,87 @@ def load_all_us_stocks():
 
 @st.cache_data(ttl=3600)
 def load_history(ticker, period="max", interval="1d"):
-    """Load historical price data."""
     try:
         stock = yf.Ticker(ticker)
         data = stock.history(period=period, interval=interval, auto_adjust=False)
         if data.empty:
             st.warning(f"No data returned for {ticker}")
             return data
-        required_cols = ["Open", "High", "Low", "Close", "Volume"]
-        for col in required_cols:
+        for col in ["Open", "High", "Low", "Close", "Volume"]:
             if col not in data.columns:
                 st.error(f"Missing column {col} in data for {ticker}")
                 return pd.DataFrame()
         if data["Close"].min() <= 0:
             st.warning(f"Warning: Found zero or negative Close prices for {ticker}")
-        data = data.rename_axis("Date").reset_index()
-        return data
+        return data.rename_axis("Date").reset_index()
     except Exception as e:
-        st.error(f"Error loading data for {ticker}: {str(e)}")
+        st.error(f"Error loading data for {ticker}: {e}")
         return pd.DataFrame()
 
 
 @st.cache_data(ttl=3600)
 def load_fundamentals(ticker):
-    """Load fundamental data from yfinance."""
     try:
-        info = yf.Ticker(ticker).get_info()
-        return info or {}
+        return yf.Ticker(ticker).get_info() or {}
     except Exception:
         return {}
 
 
 @st.cache_data(ttl=86400)
 def load_company_logo(ticker):
-    """Fetch company logo URL from Finnhub profile endpoint."""
     try:
         url = f"https://finnhub.io/api/v1/stock/profile2?symbol={ticker}&token={FINNHUB_API_KEY}"
-        response = requests.get(url, timeout=10)
-        if response.status_code == 200:
-            return response.json().get("logo", "")
-        return ""
+        resp = requests.get(url, timeout=10)
+        return resp.json().get("logo", "") if resp.status_code == 200 else ""
     except Exception:
         return ""
 
 
 @st.cache_data(ttl=1800)
 def load_finnhub_news(ticker):
-    """Fetch company news from Finnhub API."""
     try:
         today = dt.date.today()
         from_date = (today - dt.timedelta(days=30)).strftime("%Y-%m-%d")
         to_date = today.strftime("%Y-%m-%d")
         url = f"https://finnhub.io/api/v1/company-news?symbol={ticker}&from={from_date}&to={to_date}&token={FINNHUB_API_KEY}"
-        response = requests.get(url, timeout=10)
-        if response.status_code == 200:
-            return response.json()
-        return []
+        resp = requests.get(url, timeout=10)
+        return resp.json() if resp.status_code == 200 else []
     except Exception:
         return []
 
 
 @st.cache_data(ttl=3600)
 def load_financial_statements(ticker):
-    """Load historical financial statements for charts."""
     try:
         stock = yf.Ticker(ticker)
-        income_stmt = stock.income_stmt
-        if income_stmt is not None and not income_stmt.empty:
-            income_stmt = income_stmt.T.sort_index()
-        balance_sheet = stock.balance_sheet
-        if balance_sheet is not None and not balance_sheet.empty:
-            balance_sheet = balance_sheet.T.sort_index()
-        cashflow = stock.cashflow
-        if cashflow is not None and not cashflow.empty:
-            cashflow = cashflow.T.sort_index()
-        quarterly_income = stock.quarterly_income_stmt
-        if quarterly_income is not None and not quarterly_income.empty:
-            quarterly_income = quarterly_income.T.sort_index()
-        quarterly_balance = stock.quarterly_balance_sheet
-        if quarterly_balance is not None and not quarterly_balance.empty:
-            quarterly_balance = quarterly_balance.T.sort_index()
-        quarterly_cashflow = stock.quarterly_cashflow
-        if quarterly_cashflow is not None and not quarterly_cashflow.empty:
-            quarterly_cashflow = quarterly_cashflow.T.sort_index()
+        def _sort(df):
+            return df.T.sort_index() if df is not None and not df.empty else None
         return {
-            "income_stmt": income_stmt,
-            "balance_sheet": balance_sheet,
-            "cashflow": cashflow,
-            "quarterly_income": quarterly_income,
-            "quarterly_balance": quarterly_balance,
-            "quarterly_cashflow": quarterly_cashflow,
+            "income_stmt": _sort(stock.income_stmt),
+            "balance_sheet": _sort(stock.balance_sheet),
+            "cashflow": _sort(stock.cashflow),
+            "quarterly_income": _sort(stock.quarterly_income_stmt),
+            "quarterly_balance": _sort(stock.quarterly_balance_sheet),
+            "quarterly_cashflow": _sort(stock.quarterly_cashflow),
         }
     except Exception:
-        return {
-            "income_stmt": None, "balance_sheet": None, "cashflow": None,
-            "quarterly_income": None, "quarterly_balance": None, "quarterly_cashflow": None,
-        }
+        return {k: None for k in [
+            "income_stmt", "balance_sheet", "cashflow",
+            "quarterly_income", "quarterly_balance", "quarterly_cashflow",
+        ]}
 
 
 @st.cache_data(ttl=3600)
 def load_sector_peers_metrics(tickers: tuple):
-    """Load metrics for sector peers comparison."""
     rows = []
-    for symbol in list(tickers):
-        info = load_fundamentals(symbol)
+    for sym in list(tickers):
+        info = load_fundamentals(sym)
         rows.append({
-            "ticker": symbol,
-            "pe": info.get("trailingPE"),
-            "peg": info.get("pegRatio"),
-            "roe": info.get("returnOnEquity"),
-            "net_margin": info.get("profitMargins"),
-            "rev_growth": info.get("revenueGrowth"),
-            "de": info.get("debtToEquity"),
-            "beta": info.get("beta"),
-            "priceToBook": info.get("priceToBook"),
+            "ticker": sym,
+            "pe": info.get("trailingPE"), "peg": info.get("pegRatio"),
+            "roe": info.get("returnOnEquity"), "net_margin": info.get("profitMargins"),
+            "rev_growth": info.get("revenueGrowth"), "de": info.get("debtToEquity"),
+            "beta": info.get("beta"), "priceToBook": info.get("priceToBook"),
             "marketCap": info.get("marketCap"),
         })
     return pd.DataFrame(rows)
@@ -627,129 +184,37 @@ def load_sector_peers_metrics(tickers: tuple):
 
 @st.cache_data(ttl=3600)
 def load_peer_fscores(tickers: tuple):
-    """Load Piotroski F-Scores for sector peers."""
     rows = []
-    for symbol in list(tickers):
+    for sym in list(tickers):
         try:
-            stock = yf.Ticker(symbol)
-            inc = stock.income_stmt
-            if inc is not None and not inc.empty:
-                inc = inc.T.sort_index()
-            bs = stock.balance_sheet
-            if bs is not None and not bs.empty:
-                bs = bs.T.sort_index()
-            cf = stock.cashflow
-            if cf is not None and not cf.empty:
-                cf = cf.T.sort_index()
+            stock = yf.Ticker(sym)
+            def _sort(df):
+                return df.T.sort_index() if df is not None and not df.empty else None
+            inc, bs, cf = _sort(stock.income_stmt), _sort(stock.balance_sheet), _sort(stock.cashflow)
             score, details = calculate_piotroski_fscore(inc, bs, cf)
             rows.append({
-                "ticker": symbol,
-                "fscore": score,
+                "ticker": sym, "fscore": score,
                 "profitability": details.get("profitability"),
                 "leverage": details.get("leverage_liquidity"),
                 "efficiency": details.get("efficiency"),
             })
         except Exception:
-            rows.append({
-                "ticker": symbol,
-                "fscore": None,
-                "profitability": None,
-                "leverage": None,
-                "efficiency": None,
-            })
+            rows.append({"ticker": sym, "fscore": None, "profitability": None,
+                         "leverage": None, "efficiency": None})
     return pd.DataFrame(rows)
 
 
 @st.cache_data(ttl=3600)
 def load_market_data():
-    """Load S&P 500 and VIX data for market regime detection."""
     sp500 = yf.Ticker("^GSPC").history(period="2y", interval="1d", auto_adjust=False)
     vix = yf.Ticker("^VIX").history(period="2y", interval="1d", auto_adjust=False)
     return sp500, vix
 
 
-def compute_indicators(df):
-    """Compute technical indicators for price data."""
-    df = df.copy()
-    df["SMA20"] = df["Close"].rolling(window=20).mean()
-    df["SMA50"] = df["Close"].rolling(window=50).mean()
-    df["SMA200"] = df["Close"].rolling(window=200).mean()
-    rolling_20 = df["Close"].rolling(window=20)
-    df["BB_MID"] = rolling_20.mean()
-    df["BB_UPPER"] = df["BB_MID"] + 2 * rolling_20.std()
-    df["BB_LOWER"] = df["BB_MID"] - 2 * rolling_20.std()
+# -- Main app --
 
-    delta = df["Close"].diff()
-    gain = delta.where(delta > 0, 0.0)
-    loss = -delta.where(delta < 0, 0.0)
-    avg_gain = gain.rolling(window=14).mean()
-    avg_loss = loss.rolling(window=14).mean()
-    rs = avg_gain / avg_loss
-    df["RSI"] = 100 - (100 / (1 + rs))
-
-    ema12 = df["Close"].ewm(span=12, adjust=False).mean()
-    ema26 = df["Close"].ewm(span=26, adjust=False).mean()
-    df["MACD"] = ema12 - ema26
-    df["MACD_SIGNAL"] = df["MACD"].ewm(span=9, adjust=False).mean()
-    df["MACD_HIST"] = df["MACD"] - df["MACD_SIGNAL"]
-
-    high_low = df["High"] - df["Low"]
-    high_close = (df["High"] - df["Close"].shift()).abs()
-    low_close = (df["Low"] - df["Close"].shift()).abs()
-    tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
-    df["ATR"] = tr.rolling(window=14).mean()
-
-    ma60 = df["Close"].rolling(window=60).mean()
-    std60 = df["Close"].rolling(window=60).std()
-    df["Z_SCORE_60"] = (df["Close"] - ma60) / std60
-
-    # SMA Cross Signal (Paper 1 — Kadia et al. use SMA crossover): +1 golden cross, -1 death cross, 0 otherwise
-    sma_cross = pd.Series(0, index=df.index)
-    if len(df) > 1:
-        sma20 = df["SMA20"].values
-        sma50 = df["SMA50"].values
-        for i in range(1, len(df)):
-            if pd.notna(sma20[i]) and pd.notna(sma50[i]) and pd.notna(sma20[i-1]) and pd.notna(sma50[i-1]):
-                if sma20[i-1] <= sma50[i-1] and sma20[i] > sma50[i]:
-                    sma_cross.iloc[i] = 1  # Golden cross
-                elif sma20[i-1] >= sma50[i-1] and sma20[i] < sma50[i]:
-                    sma_cross.iloc[i] = -1  # Death cross
-    df["SMA_Cross_Signal"] = sma_cross
-
-    # Volume indicators
-    if "Volume" in df.columns:
-        df["Volume_SMA20"] = df["Volume"].rolling(window=20).mean()
-        df["Volume_SMA50"] = df["Volume"].rolling(window=50).mean()
-        df["Rel_Volume"] = df["Volume"] / df["Volume_SMA20"]
-        # Volume slope: linear regression slope of Volume_SMA20 over last 10 days
-        vol_sma = df["Volume_SMA20"]
-        slope = vol_sma.rolling(window=10).apply(
-            lambda x: np.polyfit(range(len(x)), x, 1)[0] if len(x) == 10 and x.notna().all() else 0,
-            raw=False,
-        )
-        df["Volume_Slope"] = slope
-
-        # ATV (Average Trading Volume) indicators (Paper 1)
-        df["ATV_20"] = df["Volume"].rolling(window=20).mean()
-        atv_sma = df["ATV_20"]
-        atv_slope = atv_sma.rolling(window=10).apply(
-            lambda x: np.polyfit(range(len(x)), x, 1)[0] if len(x) == 10 and x.notna().all() else 0,
-            raw=False,
-        )
-        df["ATV_Slope"] = atv_slope
-
-    # Monthly return (22-trading-day price change)
-    df["Monthly_Return"] = df["Close"].pct_change(periods=22)
-
-    return df
-
-
-# =============================================================================
-# MAIN APPLICATION
-# =============================================================================
 st.title("US Stock Analytics Dashboard")
 
-# Load stock list
 with st.spinner("Loading US stocks..."):
     all_stocks_df = load_all_us_stocks()
     if all_stocks_df.empty or "is_sp500" not in all_stocks_df.columns:
@@ -757,57 +222,38 @@ with st.spinner("Loading US stocks..."):
         st.stop()
     sp500_set = set(all_stocks_df[all_stocks_df["is_sp500"]]["ticker"].tolist())
 
-# Sidebar (matches Dash: Stock Selection, My Position, Refresh Data)
+# Sidebar
 with st.sidebar:
-    st.markdown("""
-    <div style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;
-                font-size:18px;font-weight:700;color:#0F172A;letter-spacing:-0.02em;
-                margin-bottom:16px;padding-top:4px;">
-        Dashboard Controls
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        '<div style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;'
+        'font-size:18px;font-weight:700;color:#0F172A;letter-spacing:-0.02em;'
+        'margin-bottom:16px;padding-top:4px;">Dashboard Controls</div>',
+        unsafe_allow_html=True,
+    )
 
     ticker_options = all_stocks_df["ticker"].tolist()
-    ticker_labels = [f"{row['ticker']} - {row['name']}" for _, row in all_stocks_df.iterrows()]
+    ticker_labels = [f"{r['ticker']} - {r['name']}" for _, r in all_stocks_df.iterrows()]
+    default_idx = ticker_options.index("MSFT") if "MSFT" in ticker_options else 0
 
-    # Default to MSFT if available, otherwise first stock
-    default_idx = 0
-    if "MSFT" in ticker_options:
-        default_idx = ticker_options.index("MSFT")
-
-    selected_idx = st.selectbox(
-        "Stock",
-        range(len(ticker_options)),
-        format_func=lambda i: ticker_labels[i],
-        index=default_idx
-    )
+    selected_idx = st.selectbox("Stock", range(len(ticker_options)),
+                                format_func=lambda i: ticker_labels[i], index=default_idx)
     selected = ticker_options[selected_idx]
 
-    # Chart period — horizontal radio for compact look
     period_options = ["1D", "5D", "1M", "6M", "YTD", "1Y", "5Y", "MAX"]
-    chart_period = st.selectbox(
-        "Chart Period",
-        period_options,
-        index=period_options.index("6M"),
-    )
+    chart_period = st.selectbox("Chart Period", period_options, index=period_options.index("6M"))
 
     st.divider()
 
-    # Position tracker
     owns_stock = st.toggle("I own this stock", value=False)
-    cost_basis = None
-    if owns_stock:
-        cost_basis = st.number_input("Avg cost per share ($)", min_value=0.01, value=100.0, step=0.01)
+    cost_basis = st.number_input("Avg cost per share ($)", min_value=0.01, value=100.0, step=0.01) if owns_stock else None
 
     st.divider()
-
-    import datetime as _dt
-    st.caption(f"*Last updated: {_dt.datetime.now().strftime('%I:%M %p')}*")
+    st.caption(f"*Last updated: {dt.datetime.now().strftime('%I:%M %p')}*")
     if st.button("Refresh Data", help="Clear cached data and reload fresh data"):
         st.cache_data.clear()
         st.rerun()
 
-# Load data for selected stock
+# Load data
 with st.spinner("Loading data..."):
     try:
         price_data = load_history(selected)
@@ -818,10 +264,9 @@ with st.spinner("Loading data..."):
     financials = load_financial_statements(selected)
 
 try:
-    _fs = financials
+    fs = financials
     piotroski_score, _ = calculate_piotroski_fscore(
-        _fs.get("income_stmt"), _fs.get("balance_sheet"), _fs.get("cashflow")
-    )
+        fs.get("income_stmt"), fs.get("balance_sheet"), fs.get("cashflow"))
 except Exception:
     piotroski_score = None
 
@@ -829,7 +274,6 @@ if price_data.empty:
     st.error("No price data available for this ticker. Try another selection or wait a moment if rate limited.")
     st.stop()
 
-# Drop rows with NaN Close prices
 price_data = price_data.dropna(subset=["Close"])
 if price_data.empty:
     st.error("Price data contains no valid entries. Try again in a moment.")
@@ -841,26 +285,18 @@ last_row = price_data.iloc[-1]
 prev_row = price_data.iloc[-2] if len(price_data) > 1 else last_row
 change_pct = (last_row["Close"] - prev_row["Close"]) / prev_row["Close"] * 100
 
-sector = info.get("sector", "Technology")
-industry = info.get("industry", "N/A")
-
-# Load market data for regime detection
+# Market analysis
 with st.spinner("Analyzing market conditions..."):
     sp500_market, vix_market = load_market_data()
     market_regime, regime_color, regime_metrics = detect_market_regime(sp500_market, vix_market)
-
-    # Volume score (needed for Paper 1)
     volume_score, volume_details = calculate_volume_score(price_data)
-
-    # RSI value for RSI gate
     rsi_value = price_data["RSI"].iloc[-1] if "RSI" in price_data.columns else 50
 
-    # Paper 1 signal details
     paper1_details = None
     if len(price_data) >= 50:
         _, paper1_details = generate_paper1_signal(price_data)
 
-    # RL Agent (auto-trains, no sidebar controls — matches Dash)
+    # RL agent (optional)
     rl_prediction = None
     try:
         import rl_agent
@@ -872,73 +308,46 @@ with st.spinner("Analyzing market conditions..."):
     except Exception:
         pass
 
-# =============================================================================
-# Dashboard recommendation (long-term horizon) + news + logo (shared by Dashboard & News tabs)
-# =============================================================================
+# Shared data
 company_logo_url = load_company_logo(selected)
-
 dashboard_recommendation = generate_recommendation_paper1(
-    volume_score, rsi_value,
-    market_regime, selected, info, time_horizon="long",
-    price_data=price_data, rl_prediction=rl_prediction,
+    volume_score, rsi_value, market_regime, selected, info,
+    time_horizon="long", price_data=price_data, rl_prediction=rl_prediction,
 )
-
 news_items = load_finnhub_news(selected)
 
-# =============================================================================
-# TABS - Render using modular tab files
-# =============================================================================
+# Tabs
 dashboard_tab, technical_tab, fundamentals_tab, news_tab = st.tabs(
-    ["Dashboard", "Technical", "Fundamentals", "Recent News"]
-)
+    ["Dashboard", "Technical", "Fundamentals", "Recent News"])
 
 with dashboard_tab:
-    # Use paper1_details from recommendation (includes rl_signal)
     dashboard.render(
-        selected=selected,
-        price_data=price_data,
-        info=info,
-        last_row=last_row,
-        change_pct=change_pct,
-        volume_score=volume_score,
-        volume_details=volume_details,
-        market_regime=market_regime,
-        regime_metrics=regime_metrics,
-        recommendation_data=dashboard_recommendation,
-        rsi_value=rsi_value,
-        news_items=news_items,
-        cost_basis=cost_basis,
+        selected=selected, price_data=price_data, info=info,
+        last_row=last_row, change_pct=change_pct,
+        volume_score=volume_score, volume_details=volume_details,
+        market_regime=market_regime, regime_metrics=regime_metrics,
+        recommendation_data=dashboard_recommendation, rsi_value=rsi_value,
+        news_items=news_items, cost_basis=cost_basis,
         paper1_details=dashboard_recommendation.get("paper1_details", paper1_details),
-        logo_url=company_logo_url,
-        is_sp500=selected in sp500_set,
-        chart_period=chart_period,
-        piotroski_score=piotroski_score,
+        logo_url=company_logo_url, is_sp500=selected in sp500_set,
+        chart_period=chart_period, piotroski_score=piotroski_score,
     )
 
 with technical_tab:
     technical.render(
-        selected=selected,
-        price_data=price_data,
-        info=info,
-        last_row=last_row,
-        volume_score=volume_score,
-        volume_details=volume_details,
+        selected=selected, price_data=price_data, info=info,
+        last_row=last_row, volume_score=volume_score, volume_details=volume_details,
         paper1_details=dashboard_recommendation.get("paper1_details", paper1_details),
-        rl_prediction=rl_prediction,
-        rsi_value=rsi_value,
+        rl_prediction=rl_prediction, rsi_value=rsi_value,
     )
 
 with fundamentals_tab:
     fundamentals.render(
-        selected=selected,
-        info=info,
-        financials=financials,
-        all_stocks_df=all_stocks_df,
-        price_data=price_data,
+        selected=selected, info=info, financials=financials,
+        all_stocks_df=all_stocks_df, price_data=price_data,
         load_sector_peers_metrics=load_sector_peers_metrics,
         load_peer_fscores=load_peer_fscores,
     )
 
 with news_tab:
     news.render(news_items=news_items)
-
