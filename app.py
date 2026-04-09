@@ -24,19 +24,7 @@ from models import (
     detect_market_regime,
     generate_recommendation_paper1,
     generate_paper1_signal,
-    classify_headline_sentiment,
     calculate_piotroski_fscore,
-)
-from components import (
-    get_status_color,
-    get_status_bg,
-    render_metric_card,
-    render_badge_card,
-    render_compact_card,
-    render_hero_card,
-    render_accent_card,
-    render_metrics_strip,
-    format_mcap,
 )
 from tabs import dashboard, technical, fundamentals, news
 
@@ -549,21 +537,6 @@ def load_fundamentals(ticker):
         return {}
 
 
-@st.cache_data(ttl=3600)
-def load_industry_market_caps(tickers):
-    """Fetch market caps for a list of tickers."""
-    result = {}
-    for ticker in tickers:
-        try:
-            info = yf.Ticker(ticker).get_info()
-            market_cap = info.get("marketCap")
-            if market_cap and market_cap > 0:
-                result[ticker] = market_cap
-        except Exception:
-            continue
-    return result
-
-
 @st.cache_data(ttl=86400)
 def load_company_logo(ticker):
     """Fetch company logo URL from Finnhub profile endpoint."""
@@ -730,11 +703,7 @@ def compute_indicators(df):
     std60 = df["Close"].rolling(window=60).std()
     df["Z_SCORE_60"] = (df["Close"] - ma60) / std60
 
-    # SMA indicators (Paper 1 — Kadia et al. use SMA crossover)
-    df["SMA20"] = df["Close"].rolling(window=20).mean()
-    df["SMA50"] = df["Close"].rolling(window=50).mean()
-
-    # SMA Cross Signal: +1 golden cross, -1 death cross, 0 otherwise
+    # SMA Cross Signal (Paper 1 — Kadia et al. use SMA crossover): +1 golden cross, -1 death cross, 0 otherwise
     sma_cross = pd.Series(0, index=df.index)
     if len(df) > 1:
         sma20 = df["SMA20"].values

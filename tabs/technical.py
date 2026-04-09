@@ -7,8 +7,6 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from components import COLORS, FONTS, SHADOWS
-
 # Shared inline styles
 CARD = (
     "background:#FFFFFF;border:1px solid #E8EDF2;border-radius:14px;"

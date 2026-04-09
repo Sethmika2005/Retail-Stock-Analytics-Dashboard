@@ -4,11 +4,9 @@
 
 import datetime as dt
 import pandas as pd
-import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
 
-from components import COLORS, FONTS, SHADOWS, get_status_color
 from models import classify_headline_sentiment
 
 # Shared inline styles
