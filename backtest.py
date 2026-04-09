@@ -18,7 +18,6 @@ import pandas as pd
 import yfinance as yf
 
 from models import (
-    calculate_technical_score,
     calculate_volume_score,
     detect_market_regime,
     generate_recommendation_paper1,
@@ -280,7 +279,6 @@ def _make_novel_hybrid_strategy(info, market_regime, ppo_model):
             return "HOLD"
 
         # Compute scores at this step
-        tech_score, _ = calculate_technical_score(historical)
         volume_score, _ = calculate_volume_score(historical)
         rsi_value = historical["RSI"].iloc[-1] if "RSI" in historical.columns else 50
 
@@ -291,7 +289,6 @@ def _make_novel_hybrid_strategy(info, market_regime, ppo_model):
 
         # Full recommendation with regime awareness and RL integration
         rec = generate_recommendation_paper1(
-            tech_score=tech_score,
             volume_score=volume_score,
             rsi_value=rsi_value,
             market_regime=market_regime,

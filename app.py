@@ -20,7 +20,6 @@ load_dotenv()
 
 # Import from modular files
 from models import (
-    calculate_technical_score,
     calculate_volume_score,
     detect_market_regime,
     generate_recommendation_paper1,
@@ -881,9 +880,6 @@ with st.spinner("Analyzing market conditions..."):
     sp500_market, vix_market = load_market_data()
     market_regime, regime_color, regime_metrics = detect_market_regime(sp500_market, vix_market)
 
-    # Calculate scores
-    tech_score, tech_details = calculate_technical_score(price_data)
-
     # Volume score (needed for Paper 1)
     volume_score, volume_details = calculate_volume_score(price_data)
 
@@ -913,7 +909,7 @@ with st.spinner("Analyzing market conditions..."):
 company_logo_url = load_company_logo(selected)
 
 dashboard_recommendation = generate_recommendation_paper1(
-    tech_score, volume_score, rsi_value,
+    volume_score, rsi_value,
     market_regime, selected, info, time_horizon="long",
     price_data=price_data, rl_prediction=rl_prediction,
 )
@@ -935,8 +931,6 @@ with dashboard_tab:
         info=info,
         last_row=last_row,
         change_pct=change_pct,
-        tech_score=tech_score,
-        tech_details=tech_details,
         volume_score=volume_score,
         volume_details=volume_details,
         market_regime=market_regime,
@@ -957,8 +951,6 @@ with technical_tab:
         selected=selected,
         price_data=price_data,
         info=info,
-        tech_score=tech_score,
-        tech_details=tech_details,
         last_row=last_row,
         volume_score=volume_score,
         volume_details=volume_details,

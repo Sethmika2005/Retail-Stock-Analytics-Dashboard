@@ -9,7 +9,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from components import COLORS, FONTS, SHADOWS, get_status_color
-from models import classify_headline_sentiment, generate_bull_bear_case
+from models import classify_headline_sentiment
 
 # Shared inline styles
 CARD = (
@@ -207,7 +207,7 @@ def _signal_row(label_text, value, color):
 # =============================================================================
 
 def render(selected, price_data, info, last_row, change_pct,
-           tech_score, tech_details, volume_score, volume_details,
+           volume_score, volume_details,
            market_regime, regime_metrics,
            recommendation_data, rsi_value,
            news_items, cost_basis, paper1_details,
@@ -578,9 +578,6 @@ def render(selected, price_data, info, last_row, change_pct,
         bars_html += fscore_bar
 
         fund_snip = _fund_snippet(info)
-        bull_case, bear_case = generate_bull_bear_case(info, tech_score, price_data, market_regime)
-        bull_pt = bull_case[0] if bull_case else "Potential for mean reversion"
-        bear_pt = bear_case[0] if bear_case else "Standard market risk"
 
         st.markdown(f"""
         <div style="{CARD} padding:16px 20px;">
@@ -590,14 +587,6 @@ def render(selected, price_data, info, last_row, change_pct,
             {rel_vol_row}
             <div style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;
                         color:#64748B;line-height:1.5;margin-top:8px;">{fund_snip}</div>
-            <div style="margin-top:14px;display:flex;gap:10px;">
-                <div style="flex:1;border-left:3px solid #10B981;padding:6px 10px;font-size:12px;color:#1E293B;
-                            line-height:1.4;border-radius:0 6px 6px 0;background:rgba(16,185,129,0.04);
-                            font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">{bull_pt}</div>
-                <div style="flex:1;border-left:3px solid #FF6B6B;padding:6px 10px;font-size:12px;color:#1E293B;
-                            line-height:1.4;border-radius:0 6px 6px 0;background:rgba(255,107,107,0.04);
-                            font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">{bear_pt}</div>
-            </div>
         </div>
         """, unsafe_allow_html=True)
 

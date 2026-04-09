@@ -122,7 +122,7 @@ def _find_sma_crossovers(df):
 # RENDER
 # =============================================================================
 
-def render(selected, price_data, info, tech_score, tech_details, last_row,
+def render(selected, price_data, info, last_row,
            volume_score=0, volume_details=None,
            paper1_details=None, rl_prediction=None, rsi_value=None):
     """Render the Technical tab — mirrors Dash technical tab exactly."""
@@ -458,7 +458,7 @@ def render(selected, price_data, info, tech_score, tech_details, last_row,
         # Agreement
         from models import generate_recommendation_paper1
         rule_rec_data = generate_recommendation_paper1(
-            tech_score, volume_score, rsi_safe,
+            volume_score, rsi_safe,
             "Bull", selected, info, time_horizon="long",
             price_data=price_data, rl_prediction=rl_prediction,
         )

@@ -9,7 +9,8 @@ from components import COLORS, FONTS, SHADOWS, get_status_color
 from models import (
     generate_recommendation_paper1,
     generate_bull_bear_case,
-    generate_action_checklist, generate_view_changers,
+    generate_action_checklist,
+    generate_view_changers,
 )
 
 # Shared inline styles
@@ -110,7 +111,7 @@ def _build_narrative_html(rec, paper1_details, rsi_value, rl_prediction):
 # RENDER
 # =============================================================================
 
-def render(selected, price_data, info, tech_score, tech_details,
+def render(selected, price_data, info,
            market_regime, regime_metrics, last_row,
            volume_score=0, volume_details=None,
            rsi_value=50,
@@ -119,7 +120,7 @@ def render(selected, price_data, info, tech_score, tech_details,
 
     # Generate recommendation
     recommendation_data = generate_recommendation_paper1(
-        tech_score, volume_score, rsi_value,
+        volume_score, rsi_value,
         market_regime, selected, info, time_horizon="long",
         price_data=price_data, rl_prediction=rl_prediction,
     )
@@ -150,7 +151,7 @@ def render(selected, price_data, info, tech_score, tech_details,
     # =========================================================================
     # 2. BULL VS BEAR CASE
     # =========================================================================
-    bull_case, bear_case = generate_bull_bear_case(info, tech_score, price_data, market_regime)
+    bull_case, bear_case = generate_bull_bear_case(info, price_data, market_regime)
 
     def _case_items_html(items, color, bg_rgba):
         html = ""

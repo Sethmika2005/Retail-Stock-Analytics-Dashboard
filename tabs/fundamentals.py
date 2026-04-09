@@ -730,7 +730,8 @@ def render(selected, info, financials, all_stocks_df, price_data, load_sector_pe
                 if stock_val is not None and peer_val is not None and not pd.isna(stock_val) and not pd.isna(peer_val):
                     diff = stock_val - peer_val
                     if is_score:
-                        diff_txt = f"{'+' if diff >= 0 else ''}{diff:.0f}"
+                        diff_int = int(round(diff))
+                        diff_txt = f"{'+' if diff_int >= 0 else ''}{diff_int}"
                     elif is_pct:
                         diff_txt = f"{'+' if diff >= 0 else ''}{diff * 100:.1f}pp"
                     elif peer_val != 0:

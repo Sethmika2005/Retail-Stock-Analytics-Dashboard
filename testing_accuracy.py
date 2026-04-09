@@ -21,7 +21,6 @@ import pandas as pd
 import yfinance as yf
 
 from models import (
-    calculate_technical_score,
     calculate_volume_score,
     detect_market_regime,
     generate_paper1_signal,
@@ -198,12 +197,10 @@ def evaluate_crossovers(df: pd.DataFrame, ticker: str, market_regime: str, ppo_m
         if ppo_model is not None:
             rl_prediction = rl_agent.predict_action(ppo_model, historical, row_idx=-1)
 
-        tech_score, _ = calculate_technical_score(historical)
         volume_score, _ = calculate_volume_score(historical)
         rsi_value = historical["RSI"].iloc[-1] if "RSI" in historical.columns else 50
 
         hybrid_rec = generate_recommendation_paper1(
-            tech_score=tech_score,
             volume_score=volume_score,
             rsi_value=rsi_value,
             market_regime=market_regime,

@@ -346,128 +346,8 @@ def detect_market_regime(sp500_df, vix_df):
 
 
 # =============================================================================
-# SCORING MODELS
-# =============================================================================
-
-def calculate_technical_score(df):
-    """Calculate technical score (0-100) based on trend, RSI, MACD."""
-    if df.empty or len(df) < 200:
-        return 50, {}
-
-    scores = {}
-
-    current_price = df["Close"].iloc[-1]
-    sma50 = df["SMA50"].iloc[-1] if "SMA50" in df.columns else df["Close"].rolling(50).mean().iloc[-1]
-    sma200 = df["SMA200"].iloc[-1] if "SMA200" in df.columns else df["Close"].rolling(200).mean().iloc[-1]
-
-    trend_score = 0
-    if pd.notna(sma50) and pd.notna(sma200):
-        if current_price > sma50 > sma200:
-            trend_score = 40
-        elif current_price > sma50 and current_price > sma200:
-            trend_score = 30
-        elif current_price > sma200:
-            trend_score = 20
-        elif current_price < sma50 < sma200:
-            trend_score = 0
-        elif current_price < sma50 and current_price < sma200:
-            trend_score = 10
-        else:
-            trend_score = 15
-    scores["trend"] = trend_score
-
-    rsi = df["RSI"].iloc[-1] if "RSI" in df.columns else 50
-    if pd.notna(rsi):
-        if 40 <= rsi <= 60:
-            rsi_score = 25
-        elif 30 <= rsi < 40:
-            rsi_score = 30
-        elif 60 < rsi <= 70:
-            rsi_score = 20
-        elif rsi < 30:
-            rsi_score = 25
-        elif rsi > 70:
-            rsi_score = 10
-        else:
-            rsi_score = 15
-    else:
-        rsi_score = 15
-    scores["rsi"] = rsi_score
-
-    macd = df["MACD"].iloc[-1] if "MACD" in df.columns else 0
-    macd_signal = df["MACD_SIGNAL"].iloc[-1] if "MACD_SIGNAL" in df.columns else 0
-    macd_hist = df["MACD_HIST"].iloc[-1] if "MACD_HIST" in df.columns else 0
-
-    macd_score = 15
-    if pd.notna(macd) and pd.notna(macd_signal):
-        if macd > macd_signal and macd_hist > 0:
-            macd_score = 30 if macd > 0 else 25
-        elif macd < macd_signal and macd_hist < 0:
-            macd_score = 5 if macd < 0 else 10
-        else:
-            macd_score = 15
-    scores["macd"] = macd_score
-
-    total = trend_score + rsi_score + macd_score
-    scores["total"] = total
-
-    return total, scores
-
-
-# =============================================================================
 # RECOMMENDATION ENGINE
 # =============================================================================
-
-def generate_key_drivers(info, tech_score, price_data, market_regime):
-    """Generate 3 key drivers in plain English."""
-    drivers = []
-
-    if tech_score >= 65:
-        if "SMA50" in price_data.columns and "SMA200" in price_data.columns:
-            if price_data["SMA50"].iloc[-1] > price_data["SMA200"].iloc[-1]:
-                drivers.append("Price is above key moving averages with bullish momentum")
-            else:
-                drivers.append("Technical indicators show improving momentum")
-        else:
-            drivers.append("Technical setup is favorable with strong price action")
-    elif tech_score >= 40:
-        drivers.append("Technical picture is mixed - no clear trend")
-    else:
-        drivers.append("Technical weakness with price below key support levels")
-
-    pe = info.get("trailingPE")
-    roe = info.get("returnOnEquity")
-    growth = info.get("revenueGrowth")
-
-    # Assess fundamentals from raw metrics
-    strong = (growth and growth > 0.15) or (roe and roe > 0.15) or (pe and pe < 20)
-    weak = (pe and pe > 30) or (roe and roe < 0.08)
-
-    if strong:
-        if growth and growth > 0.15:
-            drivers.append(f"Strong fundamentals with {growth*100:.0f}% revenue growth")
-        elif roe and roe > 0.15:
-            drivers.append(f"Quality business with {roe*100:.0f}% return on equity")
-        elif pe and pe < 20:
-            drivers.append(f"Attractively valued at {pe:.1f}x earnings")
-        else:
-            drivers.append("Solid fundamentals support the investment thesis")
-    elif weak:
-        if pe and pe > 30:
-            drivers.append(f"Valuation stretched at {pe:.1f}x earnings")
-        else:
-            drivers.append("Fundamental concerns about profitability or growth")
-    else:
-        drivers.append("Fundamentals are acceptable but not compelling")
-
-    if market_regime in ["Bull"]:
-        drivers.append("Favorable market environment supports risk-taking")
-    elif market_regime in ["Bear", "High-Volatility"]:
-        drivers.append("Challenging market backdrop adds headwinds")
-    else:
-        drivers.append("Market conditions are neutral - stock-specific factors matter more")
-
-    return drivers[:3]
 
 
 def generate_key_risk(info, price_data):
@@ -539,21 +419,10 @@ def generate_action_checklist(recommendation, info, price_data, atr_multiplier=2
     return actions
 
 
-def generate_bull_bear_case(info, tech_score, price_data, market_regime):
+def generate_bull_bear_case(info, price_data, market_regime):
     """Generate bull and bear case arguments."""
     bull_case = []
     bear_case = []
-
-    # Technical factors
-    if tech_score >= 60:
-        bull_case.append("Positive price momentum and trend")
-    else:
-        bear_case.append("Weak technical setup and momentum")
-
-    if tech_score < 40:
-        bear_case.append("Price below key moving averages")
-    elif tech_score >= 70:
-        bull_case.append("Strong technical breakout potential")
 
     # Fundamental factors
     pe = info.get("trailingPE")
@@ -654,7 +523,10 @@ def calculate_volume_score(df):
     details["volume_slope"] = vol_slope
     details["price_direction"] = "up" if price_change > 0 else "down"
 
-    volume_confirms = (price_change > 0 and vol_slope > 0) or (price_change < 0 and vol_slope < 0)
+    # Paper 1: ATV slope > 0 confirms signals regardless of price direction
+    # (positive slope = big money active, entering or exiting)
+    # ATV slope <= 0 = big money has no interest, signal unreliable
+    volume_confirms = vol_slope > 0
     details["volume_confirms_trend"] = volume_confirms
 
     if volume_confirms:
@@ -772,7 +644,7 @@ def generate_paper1_signal(df, row_idx=-1):
         return "HOLD", details
 
 
-def generate_recommendation_paper1(tech_score, volume_score, rsi_value,
+def generate_recommendation_paper1(volume_score, rsi_value,
                                     market_regime, ticker, info, time_horizon="long",
                                     price_data=None, rl_prediction=None):
     """
@@ -789,10 +661,6 @@ def generate_recommendation_paper1(tech_score, volume_score, rsi_value,
     # Determine recommendation from rule-based signal
     recommendation = paper1_signal
     confidence = 50
-
-    # Composite score for display purposes only (not used for decision)
-    composite = (tech_score * 0.50 + volume_score * 0.50)
-    weights = {"technical": 0.50, "volume": 0.50}
 
     # RL agent integration
     rl_agrees = None
@@ -874,8 +742,6 @@ def generate_recommendation_paper1(tech_score, volume_score, rsi_value,
         "recommendation": recommendation,
         "rec_color": rec_color,
         "confidence": confidence,
-        "composite_score": composite,
-        "weights": weights,
         "explanation": explanation,
         "rsi_gate_applied": rsi_gate not in ("n/a", "passed"),
         "rsi_warning": f"RSI at {rsi_value:.1f}" if rsi_gate not in ("n/a", "passed") else "",
