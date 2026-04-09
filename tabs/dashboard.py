@@ -175,8 +175,9 @@ def render(selected, price_data, info, last_row, change_pct,
     _period_days = {"1D": 1, "5D": 5, "1M": 22, "6M": 126, "1Y": 252, "5Y": 1260, "MAX": len(price_data)}
     if chart_period == "YTD":
         _today = price_data["Date"].iloc[-1]
-        _year_start = pd.Timestamp(_today.year, 1, 1) if hasattr(_today, 'year') else pd.Timestamp(dt.date.today().year, 1, 1)
-        _n_days = max(len(price_data[price_data["Date"] >= _year_start]), 1)
+        _yr = _today.year if hasattr(_today, 'year') else dt.date.today().year
+        _ytd_mask = price_data["Date"].dt.year == _yr
+        _n_days = max(int(_ytd_mask.sum()), 1)
     else:
         _n_days = min(_period_days.get(chart_period, 126), len(price_data))
 
