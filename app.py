@@ -22,7 +22,7 @@ from models import (
     generate_paper1_signal,
     calculate_piotroski_fscore,
 )
-from styles import inject_css
+from styles import inject_css, render_disclaimer_footer, render_disclaimer_sidebar
 from tabs import dashboard, technical, fundamentals, news
 
 st.set_page_config(page_title="US Stock Analytics Dashboard", layout="wide")
@@ -253,6 +253,8 @@ with st.sidebar:
         st.cache_data.clear()
         st.rerun()
 
+render_disclaimer_sidebar()
+
 # Load data
 with st.spinner("Loading data..."):
     try:
@@ -351,3 +353,5 @@ with fundamentals_tab:
 
 with news_tab:
     news.render(news_items=news_items)
+
+render_disclaimer_footer()
