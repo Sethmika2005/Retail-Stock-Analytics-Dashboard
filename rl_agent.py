@@ -1,8 +1,5 @@
 # RL agent — PPO for Paper 1 signal enhancement
-# Gymnasium env + training pipeline with model caching
 
-import os
-import hashlib
 import numpy as np
 import pandas as pd
 
@@ -10,8 +7,6 @@ import gymnasium as gym
 from gymnasium import spaces
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
-
-CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models_cache")
 
 
 class StockTradingEnv(gym.Env):
@@ -116,11 +111,6 @@ class StockTradingEnv(gym.Env):
         return obs, float(reward), terminated, truncated, {}
 
 
-def _get_cache_key(ticker, data_len):
-    raw = f"{ticker}_{data_len}"
-    return hashlib.md5(raw.encode()).hexdigest()[:12]
-
-
 def train_ppo_agent(df, ticker="UNKNOWN", total_timesteps=50000):
     """Train PPO on historical data. Returns model or None if too little data."""
     train_df = df.iloc[:int(len(df) * 0.8)].copy()
@@ -140,27 +130,6 @@ def train_ppo_agent(df, ticker="UNKNOWN", total_timesteps=50000):
         verbose=0,
     )
     model.learn(total_timesteps=total_timesteps)
-    return model
-
-
-def get_ppo_agent(df, ticker="UNKNOWN", force_retrain=False):
-    """Load cached PPO model or train a new one."""
-    os.makedirs(CACHE_DIR, exist_ok=True)
-    cache_key = _get_cache_key(ticker, len(df))
-    cache_path = os.path.join(CACHE_DIR, f"ppo_{cache_key}")
-
-    if not force_retrain and os.path.exists(cache_path + ".zip"):
-        try:
-            return PPO.load(cache_path)
-        except Exception:
-            pass
-
-    model = train_ppo_agent(df, ticker)
-    if model is not None:
-        try:
-            model.save(cache_path)
-        except Exception:
-            pass
     return model
 
 

@@ -224,7 +224,7 @@ def get_strategy_functions(info, market_regime, backtest_df=None, ticker="UNKNOW
     ppo_model = None
     if backtest_df is not None and len(backtest_df) >= 100:
         print("  Training RL agent...", end=" ", flush=True)
-        ppo_model = rl_agent.get_ppo_agent(backtest_df, ticker=ticker)
+        ppo_model = rl_agent.train_ppo_agent(backtest_df, ticker=ticker)
         print("done." if ppo_model is not None else "failed (not enough data).")
 
     return {

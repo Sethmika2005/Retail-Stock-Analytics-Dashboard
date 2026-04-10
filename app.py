@@ -314,7 +314,7 @@ with st.spinner("Analyzing market conditions..."):
     import rl_agent
     rl_prediction = None
     with st.spinner("Loading RL agent..."):
-        model = rl_agent.get_ppo_agent(price_data, ticker=selected)
+        model = rl_agent.train_ppo_agent(price_data, ticker=selected)
         if model is not None:
             rl_prediction = rl_agent.predict_action(model, price_data)
 
