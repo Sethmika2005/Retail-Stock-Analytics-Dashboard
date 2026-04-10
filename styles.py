@@ -477,7 +477,7 @@ This dashboard was built as a final-year university research project.
 DISCLAIMER_SHORT = (
     "For educational purposes only. Not investment advice. "
     "The creator is not a registered investment advisor. "
-    "Investing involves risk of loss. Do your own research."
+    "Investing involves risk of loss."
 )
 
 

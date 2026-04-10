@@ -213,7 +213,19 @@ def load_market_data():
 
 # -- Main app --
 
-st.title("US Stock Analytics Dashboard")
+_disclaimer_tip = (
+    "DISCLAIMER: For educational purposes only. Not investment advice. "
+    "The creator is not a registered investment advisor (RIA), broker-dealer, or financial planner. "
+    "BUY/SELL/HOLD signals are automated outputs of academic research models, not personalized advice. "
+    "Investing involves risk of loss. Past performance does not guarantee future results. "
+    "Data from third parties (Yahoo Finance, Finnhub); accuracy not guaranteed. "
+    "Do your own research and consult a licensed financial advisor before investing."
+)
+st.markdown(
+    f'<h1 style="display:inline;">US Stock Analytics Dashboard</h1>'
+    f'<span title="{_disclaimer_tip}" style="font-size:18px;color:#64748B;cursor:help;margin-left:8px;vertical-align:super;">&#9432;</span>',
+    unsafe_allow_html=True,
+)
 
 with st.spinner("Loading US stocks..."):
     all_stocks_df = load_all_us_stocks()
