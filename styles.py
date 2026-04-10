@@ -499,8 +499,17 @@ def render_disclaimer_footer():
 
 
 def render_disclaimer_sidebar():
-    """Expandable full disclaimer in the sidebar."""
+    """Full disclaimer in the sidebar (no container box)."""
     import streamlit as st
     with st.sidebar:
-        with st.expander("Legal Disclaimer", expanded=False):
-            st.markdown(DISCLAIMER_FULL)
+        st.markdown(
+            f"""
+            <div style="margin-top:8px;font-family:{FONT};font-size:11px;
+                        color:{MUTED};line-height:1.55;">
+                <div style="font-size:12px;font-weight:600;color:{TEXT_SEC};
+                            margin-bottom:6px;">Legal Disclaimer</div>
+                {DISCLAIMER_SHORT}
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
