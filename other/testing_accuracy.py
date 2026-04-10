@@ -33,11 +33,7 @@ from models import (
     generate_recommendation_paper1,
 )
 
-try:
-    import rl_agent
-    RL_AVAILABLE = rl_agent.is_available()
-except (ImportError, OSError):
-    RL_AVAILABLE = False
+import rl_agent
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 
@@ -87,11 +83,8 @@ def fetch_stock_data(ticker: str) -> pd.DataFrame | None:
 # ── Train RL model for a stock ───────────────────────────────────────────────
 def train_rl_model(df: pd.DataFrame, ticker: str):
     """Train PPO agent and return model (or None)."""
-    if not RL_AVAILABLE:
-        return None
     try:
-        model = rl_agent.train_ppo_agent(df, ticker=ticker, total_timesteps=50_000)
-        return model
+        return rl_agent.train_ppo_agent(df, ticker=ticker, total_timesteps=50_000)
     except Exception as e:
         print(f"  [WARNING] RL training failed for {ticker}: {e}")
         return None
@@ -362,14 +355,9 @@ def main():
         print(f"  {len(df)} trading days loaded.")
 
         # Train RL model
-        ppo_model = None
-        if RL_AVAILABLE:
-            print(f"  Training PPO agent...")
-            ppo_model = train_rl_model(df, ticker)
-            if ppo_model:
-                print(f"  PPO model ready.")
-            else:
-                print(f"  PPO model unavailable - rule-based only.")
+        print(f"  Training PPO agent...")
+        ppo_model = train_rl_model(df, ticker)
+        print(f"  PPO model ready." if ppo_model else f"  PPO model unavailable - rule-based only.")
 
         # Evaluate crossovers
         print(f"  Evaluating crossover events...")

@@ -29,11 +29,7 @@ from models import (
     generate_paper1_signal,
 )
 
-try:
-    import rl_agent
-    RL_AVAILABLE = rl_agent.is_available()
-except (ImportError, OSError):
-    RL_AVAILABLE = False
+import rl_agent
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 
@@ -226,20 +222,14 @@ def _make_novel_hybrid_strategy(info, market_regime, ppo_model):
 def get_strategy_functions(info, market_regime, backtest_df=None, ticker="UNKNOWN"):
     """Return dict of strategy functions for backtesting."""
     ppo_model = None
-    if RL_AVAILABLE and backtest_df is not None and len(backtest_df) >= 100:
+    if backtest_df is not None and len(backtest_df) >= 100:
         print("  Training RL agent...", end=" ", flush=True)
         ppo_model = rl_agent.get_ppo_agent(backtest_df, ticker=ticker)
-        if ppo_model is not None:
-            print("done.")
-        else:
-            print("failed (not enough data).")
-    elif not RL_AVAILABLE:
-        print("  RL agent: skipped (stable-baselines3 not installed)")
+        print("done." if ppo_model is not None else "failed (not enough data).")
 
-    strategies = {
+    return {
         "Novel Hybrid (EMA+ATV+RSI+RL)": _make_novel_hybrid_strategy(info, market_regime, ppo_model),
     }
-    return strategies
 
 
 # =============================================================================

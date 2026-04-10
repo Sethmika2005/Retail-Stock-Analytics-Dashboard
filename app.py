@@ -310,17 +310,13 @@ with st.spinner("Analyzing market conditions..."):
     if len(price_data) >= 50:
         _, paper1_details = generate_paper1_signal(price_data)
 
-    # RL agent (optional)
+    # RL agent
+    import rl_agent
     rl_prediction = None
-    try:
-        import rl_agent
-        if rl_agent.is_available():
-            with st.spinner("Loading RL agent..."):
-                model = rl_agent.get_ppo_agent(price_data, ticker=selected)
-                if model is not None:
-                    rl_prediction = rl_agent.predict_action(model, price_data)
-    except Exception:
-        pass
+    with st.spinner("Loading RL agent..."):
+        model = rl_agent.get_ppo_agent(price_data, ticker=selected)
+        if model is not None:
+            rl_prediction = rl_agent.predict_action(model, price_data)
 
 # Shared data
 company_logo_url = load_company_logo(selected)
