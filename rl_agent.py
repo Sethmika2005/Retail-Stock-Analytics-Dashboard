@@ -15,7 +15,7 @@ class StockTradingEnv(gym.Env):
 
     def __init__(self, df, beta=0.5):
         super().__init__()
-        self.df = df.reset_index(drop=True)
+        self.df = df
         self.beta = beta
         self.current_step = 0
         self.max_steps = len(df) - 2  # need ≥1 future step for reward
@@ -29,54 +29,38 @@ class StockTradingEnv(gym.Env):
 
     def _precompute(self):
         df = self.df
-
-        self.sma_cross = df["SMA_Cross_Signal"].values.astype(np.float32) if "SMA_Cross_Signal" in df.columns else np.zeros(len(df), dtype=np.float32)
-
-        if "ATV_Slope" in df.columns:
-            atv = df["ATV_Slope"].fillna(0).values.astype(np.float64)
-            atv_std = np.std(atv) if np.std(atv) > 0 else 1.0
-            self.atv_norm = (atv / atv_std).astype(np.float32)
-        else:
-            self.atv_norm = np.zeros(len(df), dtype=np.float32)
-
         close = df["Close"].values.astype(np.float64)
+
+        self.sma_cross = df["SMA_Cross_Signal"].values.astype(np.float32)
+
+        atv = df["ATV_Slope"].fillna(0).values.astype(np.float64)
+        atv_std = np.std(atv) or 1.0
+        self.atv_norm = (atv / atv_std).astype(np.float32)
+
         self.ret_1d = np.zeros(len(df), dtype=np.float32)
-        self.ret_1d[1:] = ((close[1:] - close[:-1]) / np.where(close[:-1] != 0, close[:-1], 1)).astype(np.float32)
+        self.ret_1d[1:] = ((close[1:] - close[:-1]) / close[:-1]).astype(np.float32)
 
         self.ret_5d = np.zeros(len(df), dtype=np.float32)
         if len(df) > 5:
-            self.ret_5d[5:] = ((close[5:] - close[:-5]) / np.where(close[:-5] != 0, close[:-5], 1)).astype(np.float32)
+            self.ret_5d[5:] = ((close[5:] - close[:-5]) / close[:-5]).astype(np.float32)
 
-        if "RSI" in df.columns:
-            rsi = df["RSI"].fillna(50).values.astype(np.float64)
-            self.rsi_norm = ((rsi - 50) / 50).astype(np.float32)
-        else:
-            self.rsi_norm = np.zeros(len(df), dtype=np.float32)
+        rsi = df["RSI"].fillna(50).values.astype(np.float64)
+        self.rsi_norm = ((rsi - 50) / 50).astype(np.float32)
 
-        if "Rel_Volume" in df.columns:
-            rv = df["Rel_Volume"].fillna(1.0).values.astype(np.float64)
-            self.rel_vol = np.clip(rv, 0, 5).astype(np.float32)
-        else:
-            self.rel_vol = np.ones(len(df), dtype=np.float32)
+        rv = df["Rel_Volume"].fillna(1.0).values.astype(np.float64)
+        self.rel_vol = np.clip(rv, 0, 5).astype(np.float32)
 
         self.close = close
-        if "Volume" in df.columns:
-            vol = df["Volume"].fillna(0).values.astype(np.float64)
-            self.volume = vol
-            self.vol_avg = pd.Series(vol).rolling(window=20, min_periods=1).mean().values
-        else:
-            self.volume = np.ones(len(df), dtype=np.float64)
-            self.vol_avg = np.ones(len(df), dtype=np.float64)
+        vol = df["Volume"].fillna(0).values.astype(np.float64)
+        self.volume = vol
+        self.vol_avg = pd.Series(vol).rolling(window=20, min_periods=1).mean().values
 
     def _get_obs(self):
         i = self.current_step
         return np.array([
-            self.sma_cross[i],
-            self.atv_norm[i],
-            self.ret_1d[i],
-            self.ret_5d[i],
-            self.rsi_norm[i],
-            self.rel_vol[i],
+            self.sma_cross[i], self.atv_norm[i],
+            self.ret_1d[i], self.ret_5d[i],
+            self.rsi_norm[i], self.rel_vol[i],
         ], dtype=np.float32)
 
     def reset(self, seed=None, options=None):
@@ -86,29 +70,21 @@ class StockTradingEnv(gym.Env):
 
     def step(self, action):
         i = self.current_step
-
-        if i + 1 < len(self.close):
-            price_return = (self.close[i + 1] - self.close[i]) / self.close[i] if self.close[i] != 0 else 0
-        else:
-            price_return = 0
-
-        v_avg = self.vol_avg[i] if self.vol_avg[i] > 0 else 1
+        price_return = (self.close[i + 1] - self.close[i]) / self.close[i] if i + 1 < len(self.close) else 0
+        v_avg = self.vol_avg[i] or 1
         vol_factor = 1 + self.beta * (self.volume[i] - v_avg) / v_avg
 
-        if action == 0:  # buy
+        if action == 0:      # buy
             reward = price_return * vol_factor
-        elif action == 1:  # sell
+        elif action == 1:    # sell
             reward = -price_return * vol_factor
-        else:  # hold
+        else:                # hold
             reward = 0.0
 
         self.current_step += 1
         terminated = self.current_step >= self.max_steps
-        truncated = False
-
         obs = self._get_obs() if not terminated else np.zeros(6, dtype=np.float32)
-
-        return obs, float(reward), terminated, truncated, {}
+        return obs, float(reward), terminated, False, {}
 
 
 def train_ppo_agent(df, ticker="UNKNOWN", total_timesteps=50000):
@@ -118,16 +94,10 @@ def train_ppo_agent(df, ticker="UNKNOWN", total_timesteps=50000):
         return None
 
     env = DummyVecEnv([lambda: StockTradingEnv(train_df)])
-
     model = PPO(
-        "MlpPolicy",
-        env,
-        learning_rate=3e-4,
-        n_steps=256,
-        batch_size=64,
-        n_epochs=10,
-        gamma=0.99,
-        verbose=0,
+        "MlpPolicy", env,
+        learning_rate=3e-4, n_steps=256, batch_size=64,
+        n_epochs=10, gamma=0.99, verbose=0,
     )
     model.learn(total_timesteps=total_timesteps)
     return model
@@ -142,37 +112,17 @@ def predict_action(model, df, row_idx=-1):
         row_idx = len(df) + row_idx
 
     row = df.iloc[row_idx]
+    sma_cross = float(row["SMA_Cross_Signal"])
 
-    sma_cross = float(row.get("SMA_Cross_Signal", 0) or 0)
+    atv_std = df["ATV_Slope"].std()
+    atv_norm = float(row["ATV_Slope"]) / atv_std if atv_std else 0.0
 
-    atv_slope = float(row.get("ATV_Slope", 0) or 0)
-    if "ATV_Slope" in df.columns:
-        atv_std = df["ATV_Slope"].std()
-        atv_norm = atv_slope / atv_std if atv_std and atv_std > 0 else 0.0
-    else:
-        atv_norm = 0.0
+    ret_1d = (row["Close"] - df["Close"].iloc[row_idx - 1]) / df["Close"].iloc[row_idx - 1] if row_idx > 0 else 0.0
+    ret_5d = (row["Close"] - df["Close"].iloc[row_idx - 5]) / df["Close"].iloc[row_idx - 5] if row_idx >= 5 else 0.0
 
-    if row_idx > 0:
-        prev_close = df["Close"].iloc[row_idx - 1]
-        ret_1d = (row["Close"] - prev_close) / prev_close if prev_close != 0 else 0
-    else:
-        ret_1d = 0.0
-
-    if row_idx >= 5:
-        close_5d_ago = df["Close"].iloc[row_idx - 5]
-        ret_5d = (row["Close"] - close_5d_ago) / close_5d_ago if close_5d_ago != 0 else 0
-    else:
-        ret_5d = 0.0
-
-    rsi = float(row.get("RSI", 50) or 50)
-    rsi_norm = (rsi - 50) / 50
-
-    rel_vol = min(float(row.get("Rel_Volume", 1.0) or 1.0), 5.0)
+    rsi_norm = (float(row["RSI"]) - 50) / 50
+    rel_vol = min(float(row["Rel_Volume"]), 5.0)
 
     obs = np.array([sma_cross, atv_norm, ret_1d, ret_5d, rsi_norm, rel_vol], dtype=np.float32)
-
-    try:
-        action, _ = model.predict(obs, deterministic=True)
-        return int(action)
-    except Exception:
-        return None
+    action, _ = model.predict(obs, deterministic=True)
+    return int(action)
