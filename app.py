@@ -29,6 +29,10 @@ st.set_page_config(page_title="US Stock Analytics Dashboard", layout="wide")
 inject_css()
 
 
+def _sort(df):
+    return df.T.sort_index() if df is not None and not df.empty else None
+
+
 # -- Data loading (cached) --
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
@@ -149,8 +153,6 @@ def load_finnhub_news(ticker):
 def load_financial_statements(ticker):
     try:
         stock = yf.Ticker(ticker)
-        def _sort(df):
-            return df.T.sort_index() if df is not None and not df.empty else None
         return {
             "income_stmt": _sort(stock.income_stmt),
             "balance_sheet": _sort(stock.balance_sheet),
@@ -169,7 +171,7 @@ def load_financial_statements(ticker):
 @st.cache_data(ttl=3600)
 def load_sector_peers_metrics(tickers: tuple):
     rows = []
-    for sym in list(tickers):
+    for sym in tickers:
         info = load_fundamentals(sym)
         rows.append({
             "ticker": sym,
@@ -185,11 +187,9 @@ def load_sector_peers_metrics(tickers: tuple):
 @st.cache_data(ttl=3600)
 def load_peer_fscores(tickers: tuple):
     rows = []
-    for sym in list(tickers):
+    for sym in tickers:
         try:
             stock = yf.Ticker(sym)
-            def _sort(df):
-                return df.T.sort_index() if df is not None and not df.empty else None
             inc, bs, cf = _sort(stock.income_stmt), _sort(stock.balance_sheet), _sort(stock.cashflow)
             score, details = calculate_piotroski_fscore(inc, bs, cf)
             rows.append({
@@ -314,7 +314,7 @@ with st.spinner("Analyzing market conditions..."):
     import rl_agent
     rl_prediction = None
     with st.spinner("Loading RL agent..."):
-        model = rl_agent.train_ppo_agent(price_data, ticker=selected)
+        model = rl_agent.train_ppo_agent(price_data)
         if model is not None:
             rl_prediction = rl_agent.predict_action(model, price_data)
 

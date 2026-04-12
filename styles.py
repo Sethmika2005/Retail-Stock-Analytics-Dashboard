@@ -438,15 +438,6 @@ def render_metrics_strip(metrics):
     )
 
 
-def score_color(score):
-    """Green/amber/red based on 0-100 score."""
-    if score >= 60:
-        return SUCCESS
-    if score >= 40:
-        return WARNING
-    return CORAL
-
-
 def metric_color(value, good, ok, higher_is_better=True):
     """Green/amber/red based on thresholds."""
     if value is None:

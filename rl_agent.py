@@ -74,12 +74,7 @@ class StockTradingEnv(gym.Env):
         v_avg = self.vol_avg[i] or 1
         vol_factor = 1 + self.beta * (self.volume[i] - v_avg) / v_avg
 
-        if action == 0:      # buy
-            reward = price_return * vol_factor
-        elif action == 1:    # sell
-            reward = -price_return * vol_factor
-        else:                # hold
-            reward = 0.0
+        reward = {0: price_return, 1: -price_return, 2: 0.0}[action] * vol_factor
 
         self.current_step += 1
         terminated = self.current_step >= self.max_steps
@@ -87,7 +82,7 @@ class StockTradingEnv(gym.Env):
         return obs, float(reward), terminated, False, {}
 
 
-def train_ppo_agent(df, ticker="UNKNOWN", total_timesteps=50000):
+def train_ppo_agent(df, total_timesteps=50000):
     """Train PPO on historical data. Returns model or None if too little data."""
     train_df = df.iloc[:int(len(df) * 0.8)].copy()
     if len(train_df) < 100:

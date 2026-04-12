@@ -5,6 +5,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+from models import RL_ACTION_MAP
 from styles import (
     CARD, LABEL, FONT, TEAL, CORAL, SUCCESS, WARNING, DANGER, MUTED, TEXT, BORDER,
     badge_html, chart_layout, chart_axes, chart_card_bg, chart_card_header, explanation_html,
@@ -252,8 +253,7 @@ def render(selected, price_data, info, last_row,
 
     # -- AI Model Lens --
     if rl_prediction is not None:
-        rl_action_map = {0: "BUY", 1: "SELL", 2: "HOLD"}
-        rl_signal = paper1_details.get("rl_signal", rl_action_map.get(rl_prediction, "HOLD"))
+        rl_signal = paper1_details.get("rl_signal", RL_ACTION_MAP.get(rl_prediction, "HOLD"))
         rl_agrees = paper1_details.get("rl_agrees")
 
         rec_colors = {"BUY": SUCCESS, "SELL": CORAL, "HOLD": WARNING}

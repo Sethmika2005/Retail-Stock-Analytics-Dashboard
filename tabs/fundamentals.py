@@ -10,7 +10,7 @@ from styles import (
     FONT, TEAL, CORAL, SUCCESS, WARNING, MUTED, TEXT, TEXT_SEC, BORDER, CARD_BG, SIDEBAR_BG,
     SHADOW, GRID,
     badge_html, chart_layout, chart_axes, chart_card_bg, chart_card_header,
-    explanation_html, progress_bar, metric_tag, metric_color, score_color,
+    explanation_html, progress_bar, metric_tag, metric_color,
 )
 
 CARD_STYLE = (
@@ -44,18 +44,14 @@ def _label(text):
     return f'<span style="{LABEL_CSS};display:inline-block;vertical-align:middle;margin-right:10px;">{text}</span>'
 
 
-def _card_open():
-    return f'<div style="{CARD_STYLE}">'
-
-
-def _card_close():
-    return '</div>'
+CARD_OPEN = f'<div style="{CARD_STYLE}">'
+CARD_CLOSE = '</div>'
 
 
 def _not_available(title, msg):
-    st.markdown(f'{_card_open()}{_label(title)}'
+    st.markdown(f'{CARD_OPEN}{_label(title)}'
                 f'<div style="font-size:12px;color:{MUTED};font-family:{FONT};">{msg}</div>'
-                f'{_card_close()}', unsafe_allow_html=True)
+                f'{CARD_CLOSE}', unsafe_allow_html=True)
 
 
 def render(selected, info, financials, all_stocks_df, price_data,
@@ -87,10 +83,10 @@ def render(selected, info, financials, all_stocks_df, price_data,
         elif fscore >= 4: fund_verdict, fund_vcolor = "Fair", WARNING
         else: fund_verdict, fund_vcolor = "Weak", CORAL
 
-        html = _card_open()
+        html = CARD_OPEN
         html += f'<div style="margin-bottom:12px;">{_label("PIOTROSKI F-SCORE")}{badge_html(fund_verdict, fund_vcolor)}</div>'
         html += (f'<div style="margin-bottom:12px;">'
-                 f'<span style="font-size:32px;font-weight:700;color:{score_color(fscore / 9 * 100)};font-family:{FONT};">{fscore}</span>'
+                 f'<span style="font-size:32px;font-weight:700;color:{metric_color(fscore / 9 * 100, 60, 40)};font-family:{FONT};">{fscore}</span>'
                  f'<span style="font-size:14px;font-weight:500;color:{MUTED};margin-left:2px;font-family:{FONT};">/9</span></div>')
 
         prof = fscore_details.get("profitability", 0)
@@ -120,7 +116,7 @@ def render(selected, info, financials, all_stocks_df, price_data,
                  f'{_test("gross_margin_increasing", "Gross Margin Up")}'
                  f'{_test("asset_turnover_increasing", "Asset Turnover Up")}'
                  f'</div>')
-        html += _card_close()
+        html += CARD_CLOSE
         st.markdown(html, unsafe_allow_html=True)
     else:
         _not_available("PIOTROSKI F-SCORE", "Financial statement data not available.")
@@ -306,9 +302,9 @@ def render(selected, info, financials, all_stocks_df, price_data,
             + metric_tag("Beta", _fmt(beta, "", 1, 2), metric_color(beta, 1.0, 1.5, False) if beta else MUTED))
 
     st.markdown(
-        f'{_card_open()}<div style="{LABEL_CSS};margin-bottom:10px;">KEY METRICS</div>'
+        f'{CARD_OPEN}<div style="{LABEL_CSS};margin-bottom:10px;">KEY METRICS</div>'
         f'<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;">{row1}</div>'
-        f'<div style="display:flex;gap:10px;flex-wrap:wrap;">{row2}</div>{_card_close()}',
+        f'<div style="display:flex;gap:10px;flex-wrap:wrap;">{row2}</div>{CARD_CLOSE}',
         unsafe_allow_html=True)
 
     # -- Sector Peer Comparison --

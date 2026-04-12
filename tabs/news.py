@@ -32,10 +32,7 @@ def render(news_items):
             {"label": "Negative", "value": str(sentiments["Negative"]),
              "color": get_status_color("danger"), "tooltip": "Negative sentiment headlines"},
         ])
-        try:
-            st.html(strip)
-        except Exception:
-            st.markdown(strip, unsafe_allow_html=True)
+        st.html(strip)
 
         dominant = max(sentiments, key=sentiments.get)
         if dominant == "Positive":

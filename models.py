@@ -4,6 +4,8 @@ import re
 import numpy as np
 import pandas as pd
 
+RL_ACTION_MAP = {0: "BUY", 1: "SELL", 2: "HOLD"}
+
 POSITIVE_WORDS = {
     # Earnings & performance
     "beat", "beats", "beating", "exceeded", "exceeds", "topped", "tops", "topping",
@@ -426,8 +428,7 @@ def generate_recommendation_paper1(volume_score, rsi_value,
 
     rl_agrees = None
     if rl_prediction is not None:
-        rl_action_map = {0: "BUY", 1: "SELL", 2: "HOLD"}
-        rl_signal = rl_action_map.get(rl_prediction, "HOLD")
+        rl_signal = RL_ACTION_MAP.get(rl_prediction, "HOLD")
         paper1_details["rl_signal"] = rl_signal
         rl_agrees = (rl_signal == recommendation)
         paper1_details["rl_agrees"] = rl_agrees
