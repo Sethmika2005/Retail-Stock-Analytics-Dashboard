@@ -25,8 +25,8 @@ from models import (
     calculate_volume_score,
     compute_indicators,
     detect_market_regime,
-    generate_recommendation_paper1,
-    generate_paper1_signal,
+    generate_hybrid_recommendation,
+    generate_rule_signal,
 )
 
 import rl_agent
@@ -205,7 +205,7 @@ def _make_novel_hybrid_strategy(info, market_regime, ppo_model):
             rl_prediction = rl_agent.predict_action(ppo_model, historical, row_idx=-1)
 
         # Full recommendation with regime awareness and RL integration
-        rec = generate_recommendation_paper1(
+        rec = generate_hybrid_recommendation(
             volume_score=volume_score,
             rsi_value=rsi_value,
             market_regime=market_regime,

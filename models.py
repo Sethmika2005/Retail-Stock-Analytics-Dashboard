@@ -1,4 +1,5 @@
 # Models — scoring algorithms, technical indicators, and recommendation engine
+# ATV = Average Traded Volume (20-day slope is Paper 1's volume confirmation signal).
 
 import re
 import numpy as np
@@ -137,64 +138,64 @@ def calculate_piotroski_fscore(income_stmt, balance_sheet, cashflow):
     ]) if cashflow is not None and not cashflow.empty else None
 
     # Profitability (tests 1-4)
-    roa_curr = None
+    roa_current = None
     if net_income is not None and total_assets_curr is not None and total_assets_curr > 0:
-        roa_curr = net_income / total_assets_curr
-    test1 = 1 if roa_curr is not None and roa_curr > 0 else 0
-    details["roa_positive"] = {"score": test1, "value": roa_curr}
-    score += test1
+        roa_current = net_income / total_assets_curr
+    roa_positive = 1 if roa_current is not None and roa_current > 0 else 0
+    details["roa_positive"] = {"score": roa_positive, "value": roa_current}
+    score += roa_positive
 
-    test2 = 1 if cfo is not None and cfo > 0 else 0
-    details["cfo_positive"] = {"score": test2, "value": cfo}
-    score += test2
+    cfo_positive = 1 if cfo is not None and cfo > 0 else 0
+    details["cfo_positive"] = {"score": cfo_positive, "value": cfo}
+    score += cfo_positive
 
-    test3 = 0
-    roa_prev = None
+    roa_improving = 0
+    roa_prior = None
     if has_two_years and total_assets_prev is not None and total_assets_prev > 0:
-        ni_prev = _safe_val(income_stmt, ["Net Income", "NetIncome", "Net Income Common Stockholders"], -2)
-        if ni_prev is not None:
-            roa_prev = ni_prev / total_assets_prev
-            if roa_curr is not None and roa_prev is not None and roa_curr > roa_prev:
-                test3 = 1
-    details["roa_increasing"] = {"score": test3, "value_curr": roa_curr, "value_prev": roa_prev}
-    score += test3
+        net_income_prior = _safe_val(income_stmt, ["Net Income", "NetIncome", "Net Income Common Stockholders"], -2)
+        if net_income_prior is not None:
+            roa_prior = net_income_prior / total_assets_prev
+            if roa_current is not None and roa_prior is not None and roa_current > roa_prior:
+                roa_improving = 1
+    details["roa_increasing"] = {"score": roa_improving, "value_curr": roa_current, "value_prev": roa_prior}
+    score += roa_improving
 
-    test4 = 0  # CFO > net income (accrual quality)
+    accruals_quality = 0  # CFO > net income (accrual quality)
     if cfo is not None and net_income is not None and cfo > net_income:
-        test4 = 1
-    details["cfo_gt_net_income"] = {"score": test4, "cfo": cfo, "net_income": net_income}
-    score += test4
+        accruals_quality = 1
+    details["cfo_gt_net_income"] = {"score": accruals_quality, "cfo": cfo, "net_income": net_income}
+    score += accruals_quality
 
     # Leverage / liquidity (tests 5-7)
-    test5 = 0
-    lt_debt_curr = _safe_val(balance_sheet, ["Long Term Debt", "LongTermDebt", "Total Debt", "TotalDebt"])
+    leverage_decreasing = 0
+    long_term_debt_current = _safe_val(balance_sheet, ["Long Term Debt", "LongTermDebt", "Total Debt", "TotalDebt"])
     if has_two_years:
-        lt_debt_prev = _safe_val(balance_sheet, ["Long Term Debt", "LongTermDebt", "Total Debt", "TotalDebt"], -2)
-        if lt_debt_curr is not None and lt_debt_prev is not None and total_assets_curr and total_assets_prev:
-            ratio_curr = lt_debt_curr / total_assets_curr
-            ratio_prev = lt_debt_prev / total_assets_prev
-            if ratio_curr <= ratio_prev:
-                test5 = 1
-        elif lt_debt_curr is None or lt_debt_curr == 0:
-            test5 = 1
-    details["debt_decreasing"] = {"score": test5}
-    score += test5
+        long_term_debt_prior = _safe_val(balance_sheet, ["Long Term Debt", "LongTermDebt", "Total Debt", "TotalDebt"], -2)
+        if long_term_debt_current is not None and long_term_debt_prior is not None and total_assets_curr and total_assets_prev:
+            ratio_current = long_term_debt_current / total_assets_curr
+            ratio_prior = long_term_debt_prior / total_assets_prev
+            if ratio_current <= ratio_prior:
+                leverage_decreasing = 1
+        elif long_term_debt_current is None or long_term_debt_current == 0:
+            leverage_decreasing = 1
+    details["debt_decreasing"] = {"score": leverage_decreasing}
+    score += leverage_decreasing
 
-    test6 = 0
-    ca_curr = _safe_val(balance_sheet, ["Current Assets", "CurrentAssets", "Total Current Assets"])
-    cl_curr = _safe_val(balance_sheet, ["Current Liabilities", "CurrentLiabilities", "Total Current Liabilities"])
+    liquidity_improving = 0
+    current_assets = _safe_val(balance_sheet, ["Current Assets", "CurrentAssets", "Total Current Assets"])
+    current_liabilities = _safe_val(balance_sheet, ["Current Liabilities", "CurrentLiabilities", "Total Current Liabilities"])
     if has_two_years:
-        ca_prev = _safe_val(balance_sheet, ["Current Assets", "CurrentAssets", "Total Current Assets"], -2)
-        cl_prev = _safe_val(balance_sheet, ["Current Liabilities", "CurrentLiabilities", "Total Current Liabilities"], -2)
-        if ca_curr and cl_curr and cl_curr > 0 and ca_prev and cl_prev and cl_prev > 0:
-            cr_curr = ca_curr / cl_curr
-            cr_prev = ca_prev / cl_prev
-            if cr_curr > cr_prev:
-                test6 = 1
-    details["current_ratio_increasing"] = {"score": test6}
-    score += test6
+        current_assets_prior = _safe_val(balance_sheet, ["Current Assets", "CurrentAssets", "Total Current Assets"], -2)
+        current_liabilities_prior = _safe_val(balance_sheet, ["Current Liabilities", "CurrentLiabilities", "Total Current Liabilities"], -2)
+        if current_assets and current_liabilities and current_liabilities > 0 and current_assets_prior and current_liabilities_prior and current_liabilities_prior > 0:
+            current_ratio = current_assets / current_liabilities
+            current_ratio_prior = current_assets_prior / current_liabilities_prior
+            if current_ratio > current_ratio_prior:
+                liquidity_improving = 1
+    details["current_ratio_increasing"] = {"score": liquidity_improving}
+    score += liquidity_improving
 
-    test7 = 0
+    no_share_dilution = 0
     shares_curr = _safe_val(income_stmt, [
         "Diluted Average Shares", "Basic Average Shares",
         "Shares Issued", "ShareIssued", "Ordinary Shares Number",
@@ -205,42 +206,42 @@ def calculate_piotroski_fscore(income_stmt, balance_sheet, cashflow):
             "Shares Issued", "ShareIssued", "Ordinary Shares Number",
         ], -2)
         if shares_curr is not None and shares_prev is not None and shares_curr <= shares_prev:
-            test7 = 1
+            no_share_dilution = 1
         elif shares_curr is None and shares_prev is None:
-            test7 = 1
-    details["no_dilution"] = {"score": test7}
-    score += test7
+            no_share_dilution = 1
+    details["no_dilution"] = {"score": no_share_dilution}
+    score += no_share_dilution
 
     # Efficiency (tests 8-9)
-    test8 = 0
-    gp_curr = _safe_val(income_stmt, ["Gross Profit", "GrossProfit"])
-    rev_curr = _safe_val(income_stmt, ["Total Revenue", "TotalRevenue", "Revenue"])
-    if has_two_years and gp_curr is not None and rev_curr and rev_curr > 0:
-        gm_curr = gp_curr / rev_curr
-        gp_prev = _safe_val(income_stmt, ["Gross Profit", "GrossProfit"], -2)
-        rev_prev = _safe_val(income_stmt, ["Total Revenue", "TotalRevenue", "Revenue"], -2)
-        if gp_prev is not None and rev_prev and rev_prev > 0:
-            gm_prev = gp_prev / rev_prev
-            if gm_curr > gm_prev:
-                test8 = 1
-    details["gross_margin_increasing"] = {"score": test8}
-    score += test8
+    gross_margin_improving = 0
+    gross_profit_current = _safe_val(income_stmt, ["Gross Profit", "GrossProfit"])
+    revenue_current = _safe_val(income_stmt, ["Total Revenue", "TotalRevenue", "Revenue"])
+    if has_two_years and gross_profit_current is not None and revenue_current and revenue_current > 0:
+        gross_margin_current = gross_profit_current / revenue_current
+        gross_profit_prior = _safe_val(income_stmt, ["Gross Profit", "GrossProfit"], -2)
+        revenue_prior = _safe_val(income_stmt, ["Total Revenue", "TotalRevenue", "Revenue"], -2)
+        if gross_profit_prior is not None and revenue_prior and revenue_prior > 0:
+            gross_margin_prior = gross_profit_prior / revenue_prior
+            if gross_margin_current > gross_margin_prior:
+                gross_margin_improving = 1
+    details["gross_margin_increasing"] = {"score": gross_margin_improving}
+    score += gross_margin_improving
 
-    test9 = 0
-    if has_two_years and rev_curr is not None and total_assets_curr and total_assets_curr > 0:
-        at_curr = rev_curr / total_assets_curr
-        rev_prev_val = _safe_val(income_stmt, ["Total Revenue", "TotalRevenue", "Revenue"], -2)
-        if rev_prev_val is not None and total_assets_prev and total_assets_prev > 0:
-            at_prev = rev_prev_val / total_assets_prev
-            if at_curr > at_prev:
-                test9 = 1
-    details["asset_turnover_increasing"] = {"score": test9}
-    score += test9
+    asset_turnover_improving = 0
+    if has_two_years and revenue_current is not None and total_assets_curr and total_assets_curr > 0:
+        asset_turnover_current = revenue_current / total_assets_curr
+        revenue_prior_val = _safe_val(income_stmt, ["Total Revenue", "TotalRevenue", "Revenue"], -2)
+        if revenue_prior_val is not None and total_assets_prev and total_assets_prev > 0:
+            asset_turnover_prior = revenue_prior_val / total_assets_prev
+            if asset_turnover_current > asset_turnover_prior:
+                asset_turnover_improving = 1
+    details["asset_turnover_increasing"] = {"score": asset_turnover_improving}
+    score += asset_turnover_improving
 
     # category totals
-    details["profitability"] = test1 + test2 + test3 + test4
-    details["leverage_liquidity"] = test5 + test6 + test7
-    details["efficiency"] = test8 + test9
+    details["profitability"] = roa_positive + cfo_positive + roa_improving + accruals_quality
+    details["leverage_liquidity"] = leverage_decreasing + liquidity_improving + no_share_dilution
+    details["efficiency"] = gross_margin_improving + asset_turnover_improving
     details["total"] = score
 
     return score, details
@@ -357,8 +358,8 @@ def calculate_volume_score(df):
     return total, {"score": total, "volume_confirms_trend": volume_confirms, "details": details}
 
 
-def generate_paper1_signal(df, row_idx=-1):
-    """Paper 1 signal: SMA20/50 crossover + ATV slope confirmation + RSI gate."""
+def generate_rule_signal(df, row_idx=-1):
+    """Rule-based signal (Paper 1): SMA20/50 crossover + ATV slope confirmation + RSI gate."""
     if df.empty or len(df) < 50:
         return "HOLD", {"reason": "insufficient_data"}
 
@@ -422,31 +423,31 @@ def generate_paper1_signal(df, row_idx=-1):
         return "HOLD", details
 
 
-def generate_recommendation_paper1(volume_score, rsi_value,
+def generate_hybrid_recommendation(volume_score, rsi_value,
                                     market_regime, ticker, info, time_horizon="long",
                                     price_data=None, rl_prediction=None):
-    """Combine Paper 1 rule-based signal with optional RL override."""
-    paper1_signal = "HOLD"
-    paper1_details = {}
+    """Combine rule-based signal (Paper 1) with optional RL override."""
+    rule_signal = "HOLD"
+    rule_details = {}
     if price_data is not None and not price_data.empty:
-        paper1_signal, paper1_details = generate_paper1_signal(price_data)
+        rule_signal, rule_details = generate_rule_signal(price_data)
 
-    recommendation = paper1_signal
+    recommendation = rule_signal
     confidence = 50
 
     rl_agrees = None
     if rl_prediction is not None:
         rl_signal = RL_ACTION_MAP.get(rl_prediction, "HOLD")
-        paper1_details["rl_signal"] = rl_signal
+        rule_details["rl_signal"] = rl_signal
         rl_agrees = (rl_signal == recommendation)
-        paper1_details["rl_agrees"] = rl_agrees
+        rule_details["rl_agrees"] = rl_agrees
 
         # hierarchy: if rules say HOLD (no crossover) but RL sees something, let RL take over
-        if not rl_agrees and paper1_details.get("crossover_type") == "none":
+        if not rl_agrees and rule_details.get("crossover_type") == "none":
             recommendation = rl_signal
-            paper1_details["rl_override"] = True
+            rule_details["rl_override"] = True
 
-    if paper1_signal in ("BUY", "SELL"):
+    if rule_signal in ("BUY", "SELL"):
         if rl_agrees is True:
             confidence = 90
         elif rl_agrees is False:
@@ -469,35 +470,35 @@ def generate_recommendation_paper1(volume_score, rsi_value,
     explanation = f"**Strategy: SMA + ATV + RL (Paper 1)**\n\n"
     explanation += "**Approach:** SMA20/50 crossover with ATV slope confirmation and RSI gating.\n\n"
 
-    crossover_type = paper1_details.get("crossover_type", "none")
+    crossover_type = rule_details.get("crossover_type", "none")
     if crossover_type == "golden_cross":
         explanation += "**Signal:** Golden Cross (SMA20 crossed above SMA50). "
-        if paper1_details.get("atv_confirmed"):
+        if rule_details.get("atv_confirmed"):
             explanation += "ATV slope confirms rising volume. "
         else:
             explanation += "ATV slope does NOT confirm — signal weakened. "
     elif crossover_type == "death_cross":
         explanation += "**Signal:** Death Cross (SMA20 crossed below SMA50). "
-        if paper1_details.get("atv_confirmed"):
+        if rule_details.get("atv_confirmed"):
             explanation += "ATV slope confirms rising volume (big money exiting). "
         else:
             explanation += "ATV slope does NOT confirm — low volume, signal weakened. "
     else:
-        sma_trend = paper1_details.get("sma_trend", "neutral")
+        sma_trend = rule_details.get("sma_trend", "neutral")
         explanation += f"**Signal:** No crossover event detected. SMA trend: {sma_trend}. Defaulting to HOLD. "
 
-    rsi_gate = paper1_details.get("rsi_gate", "n/a")
+    rsi_gate = rule_details.get("rsi_gate", "n/a")
     if rsi_gate == "blocked_overbought":
         explanation += f"\n\n**RSI Gate:** RSI at {rsi_value:.1f} (overbought) — BUY blocked."
     elif rsi_gate == "blocked_oversold":
         explanation += f"\n\n**RSI Gate:** RSI at {rsi_value:.1f} (oversold) — SELL blocked."
 
     if rl_prediction is not None:
-        rl_signal = paper1_details.get("rl_signal", "N/A")
+        rl_signal = rule_details.get("rl_signal", "N/A")
         explanation += f"\n\n**RL Agent:** PPO predicts {rl_signal}. "
         if rl_agrees:
             explanation += "Agrees with rule-based signal (high confidence)."
-        elif paper1_details.get("rl_override"):
+        elif rule_details.get("rl_override"):
             explanation += "Overrides HOLD — RL sees an opportunity the rules don't."
         else:
             explanation += "Disagrees with rule-based signal."
@@ -512,7 +513,7 @@ def generate_recommendation_paper1(volume_score, rsi_value,
         "rsi_gate_applied": rsi_gate not in ("n/a", "passed"),
         "rsi_warning": f"RSI at {rsi_value:.1f}" if rsi_gate not in ("n/a", "passed") else "",
         "volume_confirms": volume_score > 50,
-        "paper1_details": paper1_details,
+        "rule_details": rule_details,
     }
 
 

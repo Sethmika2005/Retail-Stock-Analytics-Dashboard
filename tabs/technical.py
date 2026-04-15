@@ -31,9 +31,9 @@ def _find_sma_crossovers(df):
 
 def render(selected, price_data, info, last_row,
            volume_score=0, volume_details=None,
-           paper1_details=None, rl_prediction=None, rsi_value=None):
+           rule_details=None, rl_prediction=None, rsi_value=None):
 
-    paper1_details = paper1_details or {}
+    rule_details = rule_details or {}
     rsi_safe = rsi_value if rsi_value is not None and not pd.isna(rsi_value) else 50  # default to neutral RSI if missing so UI doesn't break
     # tail(252) = last 252 trading days (~1 year of data) for the charts
     chart_data = price_data.tail(252).copy()
@@ -61,7 +61,7 @@ def render(selected, price_data, info, last_row,
                                font=dict(size=9, color=DANGER), bgcolor="white",
                                bordercolor=DANGER, borderwidth=1, ax=0, ay=30)
 
-    ct = paper1_details.get("crossover_type", "none")
+    ct = rule_details.get("crossover_type", "none")
     if ct == "golden_cross":
         sma_verdict, sma_color = "Golden Cross", SUCCESS
         sma_explain = "SMA tracks the average closing price. SMA-20 crossed above SMA-50, indicating upward momentum."
@@ -70,7 +70,7 @@ def render(selected, price_data, info, last_row,
         sma_explain = "SMA tracks the average closing price. SMA-20 crossed below SMA-50, indicating downward momentum."
     else:
         sma_verdict, sma_color = "No Crossover", MUTED
-        trend = paper1_details.get("sma_trend", "neutral")
+        trend = rule_details.get("sma_trend", "neutral")
         sma_explain = f"No crossover between SMA-20 and SMA-50. Current trend bias is {trend}."
 
     sma_fig.update_layout(**chart_layout(280), showlegend=True)
@@ -100,7 +100,7 @@ def render(selected, price_data, info, last_row,
         vol_fig.add_trace(go.Scatter(x=dates, y=chart_data["Volume_SMA20"].tolist(), name="Volume SMA-20",
                                       line=dict(color=TEAL, width=2), mode="lines"))
 
-    atv_confirmed = paper1_details.get("atv_confirmed", False)
+    atv_confirmed = rule_details.get("atv_confirmed", False)
     if ct in ("golden_cross", "death_cross"):
         if atv_confirmed:
             vol_verdict, vol_color = "Volume Confirms", SUCCESS
@@ -141,7 +141,7 @@ def render(selected, price_data, info, last_row,
             text=[f"{rsi_safe:.0f}"], textposition="top center",
             textfont=dict(size=10, color=TEAL, family=FONT), showlegend=False))
 
-    rsi_gate = paper1_details.get("rsi_gate", "n/a")
+    rsi_gate = rule_details.get("rsi_gate", "n/a")
     if rsi_gate == "passed":
         rsi_verdict, rsi_vcolor = "Gate Passed", SUCCESS
         rsi_explain = f"RSI at {rsi_safe:.0f} is within normal range (30\u201370) — not overbought or oversold."
@@ -260,15 +260,15 @@ def render(selected, price_data, info, last_row,
 
     # -- AI Model Lens --
     if rl_prediction is not None:
-        rl_signal = paper1_details.get("rl_signal", RL_ACTION_MAP.get(rl_prediction, "HOLD"))
-        rl_agrees = paper1_details.get("rl_agrees")
+        rl_signal = rule_details.get("rl_signal", RL_ACTION_MAP.get(rl_prediction, "HOLD"))
+        rl_agrees = rule_details.get("rl_agrees")
 
         rec_colors = {"BUY": SUCCESS, "SELL": CORAL, "HOLD": WARNING}
         rl_color = rec_colors.get(rl_signal, WARNING)
 
-        sma_signal_val = paper1_details.get("sma_cross_signal", 0)
-        atv_slope_val = paper1_details.get("atv_slope", 0)
-        rsi_val = paper1_details.get("rsi", rsi_safe)
+        sma_signal_val = rule_details.get("sma_cross_signal", 0)
+        atv_slope_val = rule_details.get("atv_slope", 0)
+        rsi_val = rule_details.get("rsi", rsi_safe)
 
         ret_1d = ret_5d = 0
         rel_vol = 1.0
@@ -279,8 +279,8 @@ def render(selected, price_data, info, last_row,
         if "Rel_Volume" in price_data.columns and pd.notna(price_data["Rel_Volume"].iloc[-1]):
             rel_vol = float(price_data["Rel_Volume"].iloc[-1])
 
-        from models import generate_recommendation_paper1
-        rule_rec_data = generate_recommendation_paper1(
+        from models import generate_hybrid_recommendation
+        rule_rec_data = generate_hybrid_recommendation(
             volume_score, rsi_safe, "Bull", selected, info,
             time_horizon="long", price_data=price_data, rl_prediction=rl_prediction)
         rule_rec = rule_rec_data.get("recommendation", "HOLD")

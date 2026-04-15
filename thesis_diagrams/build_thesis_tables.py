@@ -1,6 +1,6 @@
 """Consolidated Excel workbook for thesis Methodology chapter.
 
-Sheet 1: Confidence Logic  (models.py : generate_recommendation_paper1, lines 449-462)
+Sheet 1: Confidence Logic  (models.py : generate_hybrid_recommendation, lines 449-462)
 Sheet 2: Market Regime     (models.py : detect_market_regime, lines 249-300)
 """
 
@@ -127,7 +127,7 @@ def build_confidence_sheet(ws):
 
     note_row = legend_row + 5
     ws.cell(row=note_row, column=1,
-            value="Source: models.py — generate_recommendation_paper1 (lines 449–462).").font = NOTE_FONT
+            value="Source: models.py — generate_hybrid_recommendation (lines 449–462).").font = NOTE_FONT
     ws.merge_cells(start_row=note_row, start_column=1, end_row=note_row, end_column=6)
 
 

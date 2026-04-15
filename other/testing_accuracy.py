@@ -29,8 +29,8 @@ from models import (
     calculate_volume_score,
     compute_indicators,
     detect_market_regime,
-    generate_paper1_signal,
-    generate_recommendation_paper1,
+    generate_rule_signal,
+    generate_hybrid_recommendation,
 )
 
 import rl_agent
@@ -115,7 +115,7 @@ def evaluate_crossovers(df: pd.DataFrame, ticker: str, market_regime: str, ppo_m
 
         # ── Rule-based signal at this crossover ──────────────────────────
         historical = df.iloc[: row_pos + 1]
-        rule_signal, rule_details = generate_paper1_signal(historical, row_idx=-1)
+        rule_signal, rule_details = generate_rule_signal(historical, row_idx=-1)
 
         # ── Hybrid signal (rule + RL) ────────────────────────────────────
         rl_prediction = None
@@ -125,7 +125,7 @@ def evaluate_crossovers(df: pd.DataFrame, ticker: str, market_regime: str, ppo_m
         volume_score, _ = calculate_volume_score(historical)
         rsi_value = historical["RSI"].iloc[-1] if "RSI" in historical.columns else 50
 
-        hybrid_rec = generate_recommendation_paper1(
+        hybrid_rec = generate_hybrid_recommendation(
             volume_score=volume_score,
             rsi_value=rsi_value,
             market_regime=market_regime,
@@ -137,7 +137,7 @@ def evaluate_crossovers(df: pd.DataFrame, ticker: str, market_regime: str, ppo_m
         )
         hybrid_signal = hybrid_rec["recommendation"]
         confidence = hybrid_rec["confidence"]
-        rl_agrees = hybrid_rec.get("paper1_details", {}).get("rl_agrees")
+        rl_agrees = hybrid_rec.get("rule_details", {}).get("rl_agrees")
 
         # ── Measure post-trade outcome at different horizons ─────────────
         for hold in HOLD_DAYS:
@@ -213,7 +213,7 @@ def evaluate_overrides(df: pd.DataFrame, ticker: str, market_regime: str, ppo_mo
 
         volume_score, _ = calculate_volume_score(historical)
         rsi_value = historical["RSI"].iloc[-1] if "RSI" in historical.columns else 50
-        hybrid_rec = generate_recommendation_paper1(
+        hybrid_rec = generate_hybrid_recommendation(
             volume_score=volume_score,
             rsi_value=rsi_value,
             market_regime=market_regime,

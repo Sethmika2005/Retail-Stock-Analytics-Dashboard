@@ -108,8 +108,8 @@ def build():
     add_shape(slide, MSO_SHAPE.RECTANGLE, 0.75, 3.6, 5.0, 1.15,
               "models.py\n"
               "• compute_indicators (SMA, RSI, ATV, rel. volume)\n"
-              "• generate_paper1_signal  (crossover + ATV + RSI gate)\n"
-              "• generate_recommendation_paper1  (+ confidence)\n"
+              "• generate_rule_signal  (crossover + ATV + RSI gate)\n"
+              "• generate_hybrid_recommendation  (+ confidence)\n"
               "• detect_market_regime  • calculate_piotroski_fscore",
               fill=WHITE, line=GREEN, bold=False, font_size=9, align=PP_ALIGN.LEFT)
     # rl_agent.py

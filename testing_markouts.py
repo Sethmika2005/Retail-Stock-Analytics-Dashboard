@@ -29,8 +29,8 @@ from models import (
     calculate_volume_score,
     compute_indicators,
     detect_market_regime,
-    generate_paper1_signal,
-    generate_recommendation_paper1,
+    generate_rule_signal,
+    generate_hybrid_recommendation,
 )
 
 import rl_agent
@@ -81,7 +81,7 @@ def signals_at_bar(df, row_pos, ticker, market_regime, ppo_model):
     """Return (rule_signal, hybrid_signal, rl_signal) at row_pos."""
     historical = df.iloc[: row_pos + 1]
 
-    rule_signal, _ = generate_paper1_signal(historical, row_idx=-1)
+    rule_signal, _ = generate_rule_signal(historical, row_idx=-1)
 
     rl_prediction = None
     rl_signal = "HOLD"
@@ -92,7 +92,7 @@ def signals_at_bar(df, row_pos, ticker, market_regime, ppo_model):
 
     volume_score, _ = calculate_volume_score(historical)
     rsi_value = historical["RSI"].iloc[-1] if "RSI" in historical.columns else 50
-    hybrid_rec = generate_recommendation_paper1(
+    hybrid_rec = generate_hybrid_recommendation(
         volume_score=volume_score,
         rsi_value=rsi_value,
         market_regime=market_regime,

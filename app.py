@@ -19,8 +19,8 @@ from models import (
     calculate_volume_score,
     compute_indicators,
     detect_market_regime,
-    generate_recommendation_paper1,
-    generate_paper1_signal,
+    generate_hybrid_recommendation,
+    generate_rule_signal,
     calculate_piotroski_fscore,
 )
 from styles import inject_css, render_disclaimer_footer, render_disclaimer_sidebar
@@ -323,9 +323,9 @@ with st.spinner("Analyzing market conditions..."):
     volume_score, volume_details = calculate_volume_score(price_data)
     rsi_value = price_data["RSI"].iloc[-1] if "RSI" in price_data.columns else 50
 
-    paper1_details = None
+    rule_details = None
     if len(price_data) >= 50:
-        _, paper1_details = generate_paper1_signal(price_data)
+        _, rule_details = generate_rule_signal(price_data)
 
     # RL agent
     import rl_agent
@@ -337,7 +337,7 @@ with st.spinner("Analyzing market conditions..."):
 
 # Shared data
 company_logo_url = load_company_logo(selected)
-dashboard_recommendation = generate_recommendation_paper1(
+dashboard_recommendation = generate_hybrid_recommendation(
     volume_score, rsi_value, market_regime, selected, info,
     time_horizon="long", price_data=price_data, rl_prediction=rl_prediction,
 )
@@ -355,7 +355,7 @@ with dashboard_tab:
         market_regime=market_regime, regime_metrics=regime_metrics,
         recommendation_data=dashboard_recommendation, rsi_value=rsi_value,
         news_items=news_items, cost_basis=cost_basis,
-        paper1_details=dashboard_recommendation.get("paper1_details", paper1_details),
+        rule_details=dashboard_recommendation.get("rule_details", rule_details),
         logo_url=company_logo_url, is_sp500=selected in sp500_set,
         chart_period=chart_period, piotroski_score=piotroski_score,
     )
@@ -364,7 +364,7 @@ with technical_tab:
     technical.render(
         selected=selected, price_data=price_data, info=info,
         last_row=last_row, volume_score=volume_score, volume_details=volume_details,
-        paper1_details=dashboard_recommendation.get("paper1_details", paper1_details),
+        rule_details=dashboard_recommendation.get("rule_details", rule_details),
         rl_prediction=rl_prediction, rsi_value=rsi_value,
     )
 

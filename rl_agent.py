@@ -1,4 +1,5 @@
 # RL agent — PPO for Paper 1 signal enhancement
+# ATV = Average Traded Volume (20-day slope is Paper 1's volume confirmation signal).
 
 import numpy as np
 import pandas as pd

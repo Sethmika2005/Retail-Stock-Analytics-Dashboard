@@ -269,7 +269,7 @@ def build():
 
     # Source note (bottom-right, small)
     add_label(slide, 4.5, 13.2, 3.9, 0.25,
-              "Source: models.py : generate_paper1_signal + generate_recommendation_paper1",
+              "Source: models.py : generate_rule_signal + generate_hybrid_recommendation",
               font_size=7)
 
     out = Path(__file__).parent / "buy_sell_decision_flowchart.pptx"

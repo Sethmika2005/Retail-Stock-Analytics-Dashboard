@@ -33,24 +33,26 @@ def _smart_comment(price_data):
     pct_from_low = ((current - low_90) / low_90) * 100
     range_pct = ((high_90 - low_90) / low_90) * 100
 
-    p30, p60, p90 = prices.get("30d", current), prices.get("60d", current), prices.get("90d", current)
+    price_30d_ago = prices.get("30d", current)
+    price_60d_ago = prices.get("60d", current)
+    price_90d_ago = prices.get("90d", current)
 
     def fmt(d):
         # hasattr check because dates could be datetime objects or plain strings
         return d.strftime("%b %Y") if hasattr(d, "strftime") else str(d)[:10]
 
-    if current < p30 < p60 and pct_from_high < -5:
+    if current < price_30d_ago < price_60d_ago and pct_from_high < -5:
         return f"Declining since {fmt(high_date)}, down {abs(pct_from_high):.1f}% from its recent high of ${high_90:.2f}."
-    if current > p30 > p60 and pct_from_low > 5:
+    if current > price_30d_ago > price_60d_ago and pct_from_low > 5:
         return f"Trending higher since {fmt(low_date)}, up {pct_from_low:.1f}% from ${low_90:.2f}."
     if range_pct < 15:
         return f"Fluctuating in a range between ${low_90:.0f}\u2013${high_90:.0f} over the past 3 months."
-    if current > p30 and current < p90:
+    if current > price_30d_ago and current < price_90d_ago:
         return f"Recovering from recent lows, currently at ${current:.2f}. Still below 90-day levels."
-    if current < p30 and current > p90:
-        return f"Short-term pullback from ${p30:.2f} (30 days ago), but still above 90-day levels."
+    if current < price_30d_ago and current > price_90d_ago:
+        return f"Short-term pullback from ${price_30d_ago:.2f} (30 days ago), but still above 90-day levels."
 
-    chg = ((current - p90) / p90) * 100 if p90 else 0
+    chg = ((current - price_90d_ago) / price_90d_ago) * 100 if price_90d_ago else 0
     return f"Price is {'up' if chg > 0 else 'down'} {abs(chg):.1f}% over the past 3 months, currently at ${current:.2f}."
 
 
@@ -125,7 +127,7 @@ def render(selected, price_data, info, last_row, change_pct,
            volume_score, volume_details,
            market_regime, regime_metrics,
            recommendation_data, rsi_value,
-           news_items, cost_basis, paper1_details,
+           news_items, cost_basis, rule_details,
            logo_url="", is_sp500=False, chart_period="6M", piotroski_score=None):
 
     rec = recommendation_data.get("recommendation", "HOLD")
@@ -189,22 +191,22 @@ def render(selected, price_data, info, last_row, change_pct,
     # flatten the returns list into a dict for quick lookup by period label
     ret_map = {p["label"]: p["value"] for p in _calc_period_returns(price_data)}
 
-    btns_html = ""
-    for p_label in ["1D", "5D", "1M", "6M", "YTD", "1Y", "5Y"]:
-        val = ret_map.get(p_label)
-        clr = (SUCCESS if val >= 0 else DANGER) if val is not None else MUTED
-        val_text = f"{val:+.2f}%" if val is not None else "\u2014"
-        is_active = p_label == chart_period
-        bg = "#E0F4F5" if is_active else SIDEBAR_BG
-        border_s = f"1.5px solid {TEAL}" if is_active else "1.5px solid transparent"
-        lbl_clr = TEAL if is_active else MUTED
-        lbl_wt = "600" if is_active else "500"
-        btns_html += (
+    period_buttons_html = ""
+    for period_label in ["1D", "5D", "1M", "6M", "YTD", "1Y", "5Y"]:
+        return_val = ret_map.get(period_label)
+        return_color = (SUCCESS if return_val >= 0 else DANGER) if return_val is not None else MUTED
+        return_text = f"{return_val:+.2f}%" if return_val is not None else "\u2014"
+        is_active = period_label == chart_period
+        background = "#E0F4F5" if is_active else SIDEBAR_BG
+        border_style = f"1.5px solid {TEAL}" if is_active else "1.5px solid transparent"
+        label_color = TEAL if is_active else MUTED
+        label_weight = "600" if is_active else "500"
+        period_buttons_html += (
             f'<div style="flex:1;text-align:center;padding:8px 4px;border-radius:10px;'
-            f'background:{bg};border:{border_s};">'
-            f'<div style="font-size:11px;color:{lbl_clr};font-weight:{lbl_wt};letter-spacing:0.02em;'
-            f'font-family:{FONT};">{p_label}</div>'
-            f'<div style="font-size:13px;color:{clr};font-weight:600;font-family:{FONT};">{val_text}</div>'
+            f'background:{background};border:{border_style};">'
+            f'<div style="font-size:11px;color:{label_color};font-weight:{label_weight};letter-spacing:0.02em;'
+            f'font-family:{FONT};">{period_label}</div>'
+            f'<div style="font-size:13px;color:{return_color};font-weight:600;font-family:{FONT};">{return_text}</div>'
             f'</div>')
 
     st.markdown(f"""
@@ -215,7 +217,7 @@ def render(selected, price_data, info, last_row, change_pct,
     _, dc, _ = st.columns([0.2, 9.6, 0.2])
     with dc:
         st.plotly_chart(fig, use_container_width=True, key="dash_price_chart", config={"displayModeBar": False})
-    st.markdown(f'<div style="padding:4px 16px 12px 16px;display:flex;gap:6px;">{btns_html}</div>',
+    st.markdown(f'<div style="padding:4px 16px 12px 16px;display:flex;gap:6px;">{period_buttons_html}</div>',
                 unsafe_allow_html=True)
 
     # 3. Smart comment
@@ -269,68 +271,68 @@ def render(selected, price_data, info, last_row, change_pct,
     }
     regime_explain = regime_explanations.get(market_regime, "Market conditions being assessed.")
 
-    ct = paper1_details.get("crossover_type", "none") if paper1_details else "none"
-    atv_ok = paper1_details.get("atv_confirmed", False) if paper1_details else False
-    rl_override = paper1_details.get("rl_override", False) if paper1_details else False
+    crossover_type = rule_details.get("crossover_type", "none") if rule_details else "none"
+    atv_confirmed = rule_details.get("atv_confirmed", False) if rule_details else False
+    rl_override = rule_details.get("rl_override", False) if rule_details else False
 
     if rec == "BUY":
-        if ct == "golden_cross" and atv_ok:
+        if crossover_type == "golden_cross" and atv_confirmed:
             signal_explain = "Golden Cross with rising volume confirmed by ATV slope. RSI gate passed."
         elif rl_override:
             signal_explain = "No SMA crossover. RL agent identified a buying opportunity."
         else:
             signal_explain = "SMA crossover with volume and RSI confirmation pointing upward."
     elif rec == "SELL":
-        if ct == "death_cross" and atv_ok:
+        if crossover_type == "death_cross" and atv_confirmed:
             signal_explain = "Death Cross with rising volume confirmed by ATV slope. RSI gate passed."
         elif rl_override:
             signal_explain = "No SMA crossover. RL agent identified downside risk."
         else:
             signal_explain = "SMA crossover with volume and RSI confirmation pointing downward."
     else:
-        if ct == "none" and not rl_override:
+        if crossover_type == "none" and not rl_override:
             signal_explain = "No SMA-20/50 crossover detected. Holding until confirmed crossover with volume support."
-        elif ct in ("golden_cross", "death_cross") and not atv_ok:
+        elif crossover_type in ("golden_cross", "death_cross") and not atv_confirmed:
             signal_explain = "Crossover detected but ATV slope did not confirm — signal weakened to HOLD."
         else:
             signal_explain = "RSI gate or conflicting signals resulted in HOLD."
 
-    conf_clr = SUCCESS if confidence >= 70 else WARNING if confidence >= 50 else DANGER
+    confidence_color = SUCCESS if confidence >= 70 else WARNING if confidence >= 50 else DANGER
     if confidence >= 70:
-        conf_explain = "All indicators aligned — crossover, volume, and RL agreement."
+        confidence_explain = "All indicators aligned — crossover, volume, and RL agreement."
     elif confidence >= 50:
-        conf_explain = "Some indicators not fully aligned."
+        confidence_explain = "Some indicators not fully aligned."
     else:
-        conf_explain = "Weak signal — no crossover or volume not confirmed."
+        confidence_explain = "Weak signal — no crossover or volume not confirmed."
 
     # Key signals data
-    if paper1_details:
+    if rule_details:
         cross_labels = {"golden_cross": ("Golden Cross", SUCCESS), "death_cross": ("Death Cross", DANGER),
                         "none": ("No Crossover", MUTED)}
-        cross_name, cross_clr = cross_labels.get(ct, ("No Crossover", MUTED))
-        atv = "Confirmed" if paper1_details.get("atv_confirmed") else "Not Confirmed"
-        atv_clr = SUCCESS if paper1_details.get("atv_confirmed") else WARNING
-        rsi_g = paper1_details.get("rsi_gate", "n/a")
+        cross_name, cross_color = cross_labels.get(crossover_type, ("No Crossover", MUTED))
+        atv = "Confirmed" if rule_details.get("atv_confirmed") else "Not Confirmed"
+        atv_color = SUCCESS if rule_details.get("atv_confirmed") else WARNING
+        rsi_gate = rule_details.get("rsi_gate", "n/a")
         rsi_map = {"passed": ("Passed", SUCCESS), "blocked_overbought": ("Blocked \u2014 Overbought", DANGER),
                    "blocked_oversold": ("Blocked \u2014 Oversold", DANGER), "n/a": ("N/A", MUTED)}
-        rsi_lbl, rsi_clr = rsi_map.get(rsi_g, ("N/A", MUTED))
-        rl_sig = paper1_details.get("rl_signal")
-        if rl_sig:
-            ai_agrees = paper1_details.get("rl_agrees", False)
-            if paper1_details.get("rl_override"):
-                ai_status, ai_clr = "Override", WARNING
-            elif ai_agrees:
-                ai_status, ai_clr = "Agrees", SUCCESS
+        rsi_label, rsi_color = rsi_map.get(rsi_gate, ("N/A", MUTED))
+        rl_signal = rule_details.get("rl_signal")
+        if rl_signal:
+            rl_agrees = rule_details.get("rl_agrees", False)
+            if rule_details.get("rl_override"):
+                rl_status, rl_color_badge = "Override", WARNING
+            elif rl_agrees:
+                rl_status, rl_color_badge = "Agrees", SUCCESS
             else:
-                ai_status, ai_clr = "Disagrees", WARNING
-            ai_row = signal_row("RL Agent (PPO)", f"{rl_sig} \u2014 {ai_status}", ai_clr)
+                rl_status, rl_color_badge = "Disagrees", WARNING
+            rl_row = signal_row("RL Agent (PPO)", f"{rl_signal} \u2014 {rl_status}", rl_color_badge)
         else:
-            ai_row = signal_row("RL Agent (PPO)", "Not Active", MUTED)
+            rl_row = signal_row("RL Agent (PPO)", "Not Active", MUTED)
     else:
-        cross_name, cross_clr = "N/A", MUTED
-        atv, atv_clr = "N/A", MUTED
-        rsi_lbl, rsi_clr = "N/A", MUTED
-        ai_row = signal_row("RL Agent (PPO)", "Not Active", MUTED)
+        cross_name, cross_color = "N/A", MUTED
+        atv, atv_color = "N/A", MUTED
+        rsi_label, rsi_color = "N/A", MUTED
+        rl_row = signal_row("RL Agent (PPO)", "Not Active", MUTED)
 
     sig_cols = st.columns([1, 1, 1, 1.5])
     with sig_cols[0]:
@@ -353,19 +355,19 @@ def render(selected, price_data, info, last_row, change_pct,
         st.markdown(f"""
         <div style="{BOX}">
             <div style="{LABEL}">Confidence</div>
-            <div style="font-size:28px;font-weight:700;color:{conf_clr};margin-top:4px;
+            <div style="font-size:28px;font-weight:700;color:{confidence_color};margin-top:4px;
                         letter-spacing:-0.02em;font-family:{FONT};">{confidence}%</div>
-            <div style="{EXPLAIN}">{conf_explain}</div>
+            <div style="{EXPLAIN}">{confidence_explain}</div>
         </div>""", unsafe_allow_html=True)
     with sig_cols[3]:
         st.markdown(f"""
         <div style="{BOX}">
             <div style="{LABEL}">Key Signals</div>
             <div style="line-height:1.6;font-family:{FONT};">
-                {signal_row("SMA Crossover", cross_name, cross_clr)}
-                {signal_row("ATV Volume", atv, atv_clr)}
-                {signal_row("RSI Gate", rsi_lbl, rsi_clr)}
-                {ai_row}
+                {signal_row("SMA Crossover", cross_name, cross_color)}
+                {signal_row("ATV Volume", atv, atv_color)}
+                {signal_row("RSI Gate", rsi_label, rsi_color)}
+                {rl_row}
             </div>
         </div>""", unsafe_allow_html=True)
 

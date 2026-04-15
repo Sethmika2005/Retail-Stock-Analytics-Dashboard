@@ -183,24 +183,24 @@ def render(selected, info, financials, all_stocks_df, price_data,
                 rev_vals = (income_stmt[rev_col] / 1e9).tolist()
                 fig.add_trace(go.Bar(x=prof_dates, y=rev_vals, name="Revenue ($B)", marker_color=TEAL))
 
-                rg = info.get("revenueGrowth")
-                if rg is not None:
-                    rg_pct = rg * 100
-                    if rg > 0.15: v, vc, ex = "Strong Growth", SUCCESS, f"Revenue growing at {rg_pct:.1f}% YoY."
-                    elif rg > 0.05: v, vc, ex = "Moderate Growth", TEAL, f"Revenue growing at {rg_pct:.1f}% YoY."
-                    elif rg > 0: v, vc, ex = "Slow Growth", WARNING, f"Revenue growing at {rg_pct:.1f}% YoY."
-                    else: v, vc, ex = "Declining", CORAL, f"Revenue declining at {rg_pct:.1f}% YoY."
+                rev_growth = info.get("revenueGrowth")
+                if rev_growth is not None:
+                    rev_growth_pct = rev_growth * 100
+                    if rev_growth > 0.15: verdict, verdict_color, explanation = "Strong Growth", SUCCESS, f"Revenue growing at {rev_growth_pct:.1f}% YoY."
+                    elif rev_growth > 0.05: verdict, verdict_color, explanation = "Moderate Growth", TEAL, f"Revenue growing at {rev_growth_pct:.1f}% YoY."
+                    elif rev_growth > 0: verdict, verdict_color, explanation = "Slow Growth", WARNING, f"Revenue growing at {rev_growth_pct:.1f}% YoY."
+                    else: verdict, verdict_color, explanation = "Declining", CORAL, f"Revenue declining at {rev_growth_pct:.1f}% YoY."
                 else:
-                    v, vc, ex = "No Data", MUTED, "Revenue growth rate not available."
+                    verdict, verdict_color, explanation = "No Data", MUTED, "Revenue growth rate not available."
 
                 fig.update_layout(**chart_layout(250), showlegend=True, bargap=0.3)
                 chart_axes(fig, y_prefix="$", x_category=True)
                 fig.update_yaxes(ticksuffix=" B", rangemode="tozero")
 
                 st.markdown(chart_card_bg(350), unsafe_allow_html=True)
-                st.markdown(chart_card_header("REVENUE GROWTH", v, vc), unsafe_allow_html=True)
+                st.markdown(chart_card_header("REVENUE GROWTH", verdict, verdict_color), unsafe_allow_html=True)
                 st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-                st.markdown(explanation_html(ex), unsafe_allow_html=True)
+                st.markdown(explanation_html(explanation), unsafe_allow_html=True)
             else:
                 _not_available("REVENUE GROWTH", "Revenue data not available.")
         else:
@@ -228,18 +228,18 @@ def render(selected, info, financials, all_stocks_df, price_data,
                     fig.add_trace(go.Bar(x=lev_dates, y=(balance_sheet[equity_col] / 1e9).tolist(),
                                           name="Equity ($B)", marker_color=TEAL, width=0.35, offset=0.2), secondary_y=False)
 
-                de = info.get("debtToEquity")
-                if de is not None:
-                    fig.add_trace(go.Scatter(x=lev_dates, y=[de] * len(lev_dates),
-                                              name=f"D/E ({de:.1f})", mode="lines",
+                debt_to_equity = info.get("debtToEquity")
+                if debt_to_equity is not None:
+                    fig.add_trace(go.Scatter(x=lev_dates, y=[debt_to_equity] * len(lev_dates),
+                                              name=f"D/E ({debt_to_equity:.1f})", mode="lines",
                                               line=dict(color=CORAL, width=2, dash="dash")), secondary_y=True)
 
-                if de is not None:
-                    if de < 50: v, vc, ex = "Conservative", SUCCESS, f"D/E of {de:.0f} is low."
-                    elif de < 100: v, vc, ex = "Moderate", WARNING, f"D/E of {de:.0f} is moderate."
-                    else: v, vc, ex = "High Leverage", CORAL, f"D/E of {de:.0f} is high."
+                if debt_to_equity is not None:
+                    if debt_to_equity < 50: verdict, verdict_color, explanation = "Conservative", SUCCESS, f"D/E of {debt_to_equity:.0f} is low."
+                    elif debt_to_equity < 100: verdict, verdict_color, explanation = "Moderate", WARNING, f"D/E of {debt_to_equity:.0f} is moderate."
+                    else: verdict, verdict_color, explanation = "High Leverage", CORAL, f"D/E of {debt_to_equity:.0f} is high."
                 else:
-                    v, vc, ex = "No Data", MUTED, "D/E ratio not available."
+                    verdict, verdict_color, explanation = "No Data", MUTED, "D/E ratio not available."
 
                 fig.update_layout(**chart_layout(250), showlegend=True, barmode="group", bargap=0.3)
                 chart_axes(fig, y_prefix="$", x_category=True)
@@ -247,9 +247,9 @@ def render(selected, info, financials, all_stocks_df, price_data,
                 fig.update_yaxes(secondary_y=True, showgrid=False)
 
                 st.markdown(chart_card_bg(350), unsafe_allow_html=True)
-                st.markdown(chart_card_header("LEVERAGE", v, vc), unsafe_allow_html=True)
+                st.markdown(chart_card_header("LEVERAGE", verdict, verdict_color), unsafe_allow_html=True)
                 st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-                st.markdown(explanation_html(ex), unsafe_allow_html=True)
+                st.markdown(explanation_html(explanation), unsafe_allow_html=True)
             else:
                 _not_available("LEVERAGE", "Balance sheet data not available.")
         else:
@@ -346,40 +346,40 @@ def render(selected, info, financials, all_stocks_df, price_data,
     stock_de = info.get("debtToEquity")
 
     # median is more robust than mean for financial metrics (resistant to outliers)
-    med_pe = peers_df["pe"].dropna().median()          # ignore peers with missing P/E
-    med_roe = peers_df["roe"].dropna().median()        # ignore peers with missing ROE
-    med_margin = peers_df["net_margin"].dropna().median()  # ignore peers with missing net margin
-    med_rg = peers_df["rev_growth"].dropna().median()  # ignore peers with missing revenue growth
-    med_de = peers_df["de"].dropna().median()          # ignore peers with missing debt/equity
+    peer_median_pe = peers_df["pe"].dropna().median()          # ignore peers with missing P/E
+    peer_median_roe = peers_df["roe"].dropna().median()        # ignore peers with missing ROE
+    peer_median_margin = peers_df["net_margin"].dropna().median()  # ignore peers with missing net margin
+    peer_median_rg = peers_df["rev_growth"].dropna().median()  # ignore peers with missing revenue growth
+    peer_median_de = peers_df["de"].dropna().median()          # ignore peers with missing debt/equity
 
     stock_fs = fscore
-    med_fs = med_prof = med_lev = med_eff = None
+    peer_median_fs = peer_median_prof = peer_median_lev = peer_median_eff = None
     if peer_fscores_df is not None and not peer_fscores_df.empty:
         def _med(col):
             vals = peer_fscores_df[col].dropna()  # strip out peers with no F-score before computing median
             return float(vals.median()) if len(vals) > 0 else None
-        med_fs, med_prof, med_lev, med_eff = _med("fscore"), _med("profitability"), _med("leverage"), _med("efficiency")
+        peer_median_fs, peer_median_prof, peer_median_lev, peer_median_eff = _med("fscore"), _med("profitability"), _med("leverage"), _med("efficiency")
 
     comparisons = []
     metrics_cmp = [
-        ("P/E Ratio", stock_pe, med_pe, False), ("ROE", stock_roe, med_roe, True),
-        ("Net Margin", stock_margin, med_margin, True), ("Rev Growth", stock_rg, med_rg, True),
-        ("Debt/Equity", stock_de, med_de, False), ("F-Score", stock_fs, med_fs, True)]
+        ("P/E Ratio", stock_pe, peer_median_pe, False), ("ROE", stock_roe, peer_median_roe, True),
+        ("Net Margin", stock_margin, peer_median_margin, True), ("Rev Growth", stock_rg, peer_median_rg, True),
+        ("Debt/Equity", stock_de, peer_median_de, False), ("F-Score", stock_fs, peer_median_fs, True)]
 
     # count how many metrics the stock beats its peers on
     wins = 0
-    for label, sv, pv, hb in metrics_cmp:
-        if sv is not None and pv is not None and not pd.isna(pv):  # only count the metric if both stock & peer value exist
-            # hb = "higher is better" — for ROE, higher wins; for P/E, lower wins
-            better = (sv >= pv) if hb else (sv <= pv)
+    for label, stock_val, peer_median, higher_is_better in metrics_cmp:
+        if stock_val is not None and peer_median is not None and not pd.isna(peer_median):  # only count the metric if both stock & peer value exist
+            # for ROE, higher wins; for P/E, lower wins
+            better = (stock_val >= peer_median) if higher_is_better else (stock_val <= peer_median)
             if better: wins += 1
-            comparisons.append((label, sv, pv, hb, better))
+            comparisons.append((label, stock_val, peer_median, higher_is_better, better))
         else:
-            comparisons.append((label, sv, pv, hb, None))
+            comparisons.append((label, stock_val, peer_median, higher_is_better, None))
 
-    if wins >= 5: pv_text, pv_color = "Above Peers", SUCCESS
-    elif wins >= 3: pv_text, pv_color = "In Line", TEAL
-    else: pv_text, pv_color = "Below Peers", CORAL
+    if wins >= 5: peer_verdict_text, peer_verdict_color = "Above Peers", SUCCESS
+    elif wins >= 3: peer_verdict_text, peer_verdict_color = "In Line", TEAL
+    else: peer_verdict_text, peer_verdict_color = "Below Peers", CORAL
 
     def _pfmt(val, is_pct=False, is_score=False):
         if val is None or (isinstance(val, float) and pd.isna(val)): return "\u2014"  # show em-dash "—" for missing values instead of crashing
@@ -388,46 +388,52 @@ def render(selected, info, financials, all_stocks_df, price_data,
         return f"{val:.1f}"
 
     header_cells = stock_cells = peer_cells = diff_cells = ""
-    for label, sv, pv, hb, better in comparisons:
+    for label, stock_val, peer_median, higher_is_better, better in comparisons:
         is_pct = label in ("ROE", "Net Margin", "Rev Growth")
         is_score = label == "F-Score"
-        vc = SUCCESS if better else CORAL if better is False else MUTED
+        cell_color = SUCCESS if better else CORAL if better is False else MUTED
 
         header_cells += (f'<div style="flex:1;text-align:center;"><div style="font-size:11px;font-weight:600;'
                          f'color:{MUTED};text-transform:uppercase;letter-spacing:0.04em;font-family:{FONT};">{label}</div></div>')
         stock_cells += (f'<div style="flex:1;text-align:center;"><div style="font-size:15px;font-weight:600;'
-                        f'color:{vc};font-family:{FONT};">{_pfmt(sv, is_pct, is_score)}</div></div>')
+                        f'color:{cell_color};font-family:{FONT};">{_pfmt(stock_val, is_pct, is_score)}</div></div>')
         peer_cells += (f'<div style="flex:1;text-align:center;"><div style="font-size:15px;font-weight:500;'
-                       f'color:{TEXT_SEC};font-family:{FONT};">{_pfmt(pv, is_pct, is_score)}</div></div>')
+                       f'color:{TEXT_SEC};font-family:{FONT};">{_pfmt(peer_median, is_pct, is_score)}</div></div>')
 
-        if sv is not None and pv is not None and not pd.isna(sv) and not pd.isna(pv):  # only compute diff if both values are valid
-            diff = sv - pv
-            if is_score: dt_txt = f"{'+' if diff >= 0 else ''}{int(round(diff))}"
-            elif is_pct: dt_txt = f"{'+' if diff >= 0 else ''}{diff * 100:.1f}pp"
-            elif pv != 0: dt_txt = f"{'+' if (sv-pv)/abs(pv)*100 >= 0 else ''}{(sv-pv)/abs(pv)*100:.0f}%"
-            else: dt_txt = f"{'+' if diff >= 0 else ''}{diff:.1f}"
-            dc = SUCCESS if better else CORAL if better is False else MUTED
+        if stock_val is not None and peer_median is not None and not pd.isna(stock_val) and not pd.isna(peer_median):  # only compute diff if both values are valid
+            diff = stock_val - peer_median
+            if is_score: diff_text = f"{'+' if diff >= 0 else ''}{int(round(diff))}"
+            elif is_pct: diff_text = f"{'+' if diff >= 0 else ''}{diff * 100:.1f}pp"
+            elif peer_median != 0: diff_text = f"{'+' if diff / abs(peer_median) * 100 >= 0 else ''}{diff / abs(peer_median) * 100:.0f}%"
+            else: diff_text = f"{'+' if diff >= 0 else ''}{diff:.1f}"
+            diff_color = SUCCESS if better else CORAL if better is False else MUTED
         else:
-            dt_txt, dc = "\u2014", MUTED
+            diff_text, diff_color = "\u2014", MUTED
 
         diff_cells += (f'<div style="flex:1;text-align:center;"><div style="font-size:12px;font-weight:600;'
-                       f'color:{dc};font-family:{FONT};">{dt_txt}</div></div>')
+                       f'color:{diff_color};font-family:{FONT};">{diff_text}</div></div>')
 
     # F-Score breakdown vs peers
     fscore_bk = ""
-    if stock_fs is not None and fscore_details and med_prof is not None:
-        sp, sl, se = fscore_details.get("profitability", 0), fscore_details.get("leverage_liquidity", 0), fscore_details.get("efficiency", 0)
+    if stock_fs is not None and fscore_details and peer_median_prof is not None:
+        score_profit = fscore_details.get("profitability", 0)
+        score_leverage = fscore_details.get("leverage_liquidity", 0)
+        score_efficiency = fscore_details.get("efficiency", 0)
         cats = ""
-        for cn, sv, mx, pm in [("Profitability", sp, 4, med_prof), ("Leverage", sl, 3, med_lev), ("Efficiency", se, 2, med_eff)]:
-            sb = sv >= pm if pm is not None else None
-            sc = SUCCESS if sb else CORAL if sb is False else MUTED
+        for category_name, stock_val, max_score, peer_median_score in [
+            ("Profitability", score_profit, 4, peer_median_prof),
+            ("Leverage", score_leverage, 3, peer_median_lev),
+            ("Efficiency", score_efficiency, 2, peer_median_eff),
+        ]:
+            score_beats_peer = stock_val >= peer_median_score if peer_median_score is not None else None
+            score_color = SUCCESS if score_beats_peer else CORAL if score_beats_peer is False else MUTED
             cats += (f'<div style="flex:1;text-align:center;">'
                      f'<div style="font-size:10px;font-weight:600;color:{MUTED};text-transform:uppercase;'
-                     f'letter-spacing:0.04em;font-family:{FONT};margin-bottom:4px;">{cn}</div>'
+                     f'letter-spacing:0.04em;font-family:{FONT};margin-bottom:4px;">{category_name}</div>'
                      f'<div style="font-family:{FONT};">'
-                     f'<span style="font-size:14px;font-weight:600;color:{sc};">{sv}/{mx}</span>'
+                     f'<span style="font-size:14px;font-weight:600;color:{score_color};">{stock_val}/{max_score}</span>'
                      f'<span style="font-size:11px;color:{MUTED};margin:0 4px;">vs</span>'
-                     f'<span style="font-size:14px;font-weight:500;color:{TEXT_SEC};">{pm:.0f}/{mx}</span>'
+                     f'<span style="font-size:14px;font-weight:500;color:{TEXT_SEC};">{peer_median_score:.0f}/{max_score}</span>'
                      f'</div></div>')
         fscore_bk = (f'<div style="border-top:1px solid {BORDER};padding-top:12px;margin-top:4px;">'
                      f'<div style="font-size:10px;font-weight:600;color:{MUTED};text-transform:uppercase;'
@@ -439,7 +445,7 @@ def render(selected, info, financials, all_stocks_df, price_data,
                 box-shadow:{SHADOW};padding:20px;">
         <div style="margin-bottom:14px;">
             <span style="{LABEL_CSS};display:inline-block;vertical-align:middle;margin-right:10px;">SECTOR PEER COMPARISON</span>
-            {badge_html(pv_text, pv_color)}
+            {badge_html(peer_verdict_text, peer_verdict_color)}
         </div>
         <div style="display:flex;gap:4px;margin-bottom:6px;margin-left:55px;">{header_cells}</div>
         <div style="display:flex;gap:4px;align-items:center;margin-bottom:10px;">
