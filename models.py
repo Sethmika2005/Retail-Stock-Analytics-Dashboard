@@ -77,7 +77,9 @@ NEGATIVE_WORDS = {
 
 def classify_headline_sentiment(title):
     """Classify a headline as Positive, Negative, or Neutral via keyword matching."""
+    # regex extracts all lowercase words (including hyphenated ones like "sell-off")
     tokens = set(re.findall(r"[a-z]+(?:-[a-z]+)*", title.lower()))
+    # set intersection (&) finds which tokens appear in each word list
     pos = len(tokens & POSITIVE_WORDS)
     neg = len(tokens & NEGATIVE_WORDS)
     if pos > neg:
@@ -98,13 +100,15 @@ def _find_col(df, candidates):
 
 
 def _safe_val(df, col_candidates, year_idx=-1):
-    """Extract a numeric value from df given column name candidates and row index."""
+    """Extract a numeric value from df given column name candidates and row index.
+    year_idx=-1 means most recent year, -2 means the year before that."""
     if df is None or df.empty:
         return None
     col = _find_col(df, col_candidates)
     if col is None:
         return None
     try:
+        # iloc[-1] = latest year, iloc[-2] = prior year (for YoY comparisons)
         val = df[col].iloc[year_idx]
         if pd.notna(val):
             return float(val)
@@ -304,6 +308,7 @@ def calculate_volume_score(df):
     details = {}
 
     # ATV slope alignment score (0-50)
+    # checks whether volume trend aligns with price direction
     price_change = 0
     if len(df) >= 10:
         price_change = df["Close"].iloc[-1] - df["Close"].iloc[-10]
@@ -312,16 +317,18 @@ def calculate_volume_score(df):
     details["volume_slope"] = vol_slope
     details["price_direction"] = "up" if price_change > 0 else "down"
 
-    # ATV slope > 0 = institutional activity, confirms signal
+    # positive ATV slope = volume is increasing = institutional activity, confirms signal
     volume_confirms = vol_slope > 0
     details["volume_confirms_trend"] = volume_confirms
 
     if volume_confirms:
+        # base 40 + bonus up to 10 based on how steep the slope is (capped with min())
         alignment_score = 40 + min(10, abs(vol_slope) / 100000)
     elif vol_slope == 0:
         alignment_score = 25
     else:
         alignment_score = 10
+    # clamp between 0 and 50 — min/max combo is a common Python clamping pattern
     alignment_score = min(50, max(0, alignment_score))
     details["alignment_score"] = alignment_score
 
@@ -355,6 +362,7 @@ def generate_paper1_signal(df, row_idx=-1):
     if df.empty or len(df) < 50:
         return "HOLD", {"reason": "insufficient_data"}
 
+    # convert negative index to positive (e.g. -1 becomes last row index)
     if row_idx < 0:
         row_idx = len(df) + row_idx
 
@@ -433,24 +441,23 @@ def generate_recommendation_paper1(volume_score, rsi_value,
         rl_agrees = (rl_signal == recommendation)
         paper1_details["rl_agrees"] = rl_agrees
 
+        # hierarchy: if rules say HOLD (no crossover) but RL sees something, let RL take over
         if not rl_agrees and paper1_details.get("crossover_type") == "none":
-            recommendation = rl_signal  # PPO overrides HOLD when no crossover
+            recommendation = rl_signal
             paper1_details["rl_override"] = True
 
-    if paper1_details.get("crossover_type") in ("golden_cross", "death_cross"):
-        if paper1_details.get("atv_confirmed"):
-            confidence = 80
-            if rl_agrees:
-                confidence = 90
-            elif rl_agrees is False:
-                confidence = 65
+    if paper1_signal in ("BUY", "SELL"):
+        if rl_agrees is True:
+            confidence = 90
+        elif rl_agrees is False:
+            confidence = 60
         else:
-            confidence = 45
+            confidence = 75
     else:
-        if paper1_details.get("rl_override"):
+        if rl_agrees is True:
+            confidence = 70
+        elif rl_agrees is False:
             confidence = 55
-            if rl_agrees:
-                confidence = 65
         else:
             confidence = 40
     confidence = int(confidence)
@@ -511,6 +518,7 @@ def generate_recommendation_paper1(volume_score, rsi_value,
 
 def compute_indicators(df):
     """Compute all technical indicators for price data."""
+    # .copy() so we don't accidentally modify the original cached dataframe
     df = df.copy()
 
     # Moving averages
@@ -518,47 +526,54 @@ def compute_indicators(df):
     df["SMA50"] = df["Close"].rolling(50).mean()
     df["SMA200"] = df["Close"].rolling(200).mean()
 
-    # Bollinger Bands
+    # Bollinger Bands — middle band is SMA20, upper/lower are +/- 2 standard deviations
     r20 = df["Close"].rolling(20)
     df["BB_MID"] = r20.mean()
     df["BB_UPPER"] = df["BB_MID"] + 2 * r20.std()
     df["BB_LOWER"] = df["BB_MID"] - 2 * r20.std()
 
     # RSI (14-period)
+    # .diff() gets day-to-day price change, .where() zeros out the losses/gains respectively
     delta = df["Close"].diff()
     avg_gain = delta.where(delta > 0, 0.0).rolling(14).mean()
     avg_loss = (-delta.where(delta < 0, 0.0)).rolling(14).mean()
+    # standard RSI formula: 100 - (100 / (1 + RS)) where RS = avg gain / avg loss
     df["RSI"] = 100 - (100 / (1 + avg_gain / avg_loss))
 
-    # MACD
+    # MACD — ewm() calculates exponential weighted moving average (reacts faster to recent prices)
     ema12 = df["Close"].ewm(span=12, adjust=False).mean()
     ema26 = df["Close"].ewm(span=26, adjust=False).mean()
     df["MACD"] = ema12 - ema26
     df["MACD_SIGNAL"] = df["MACD"].ewm(span=9, adjust=False).mean()
     df["MACD_HIST"] = df["MACD"] - df["MACD_SIGNAL"]
 
-    # ATR
+    # ATR (Average True Range) — measures volatility
+    # True Range = max of these three values (accounts for overnight gaps)
     high_low = df["High"] - df["Low"]
-    high_close = (df["High"] - df["Close"].shift()).abs()
+    high_close = (df["High"] - df["Close"].shift()).abs()  # .shift() gets previous day's close
     low_close = (df["Low"] - df["Close"].shift()).abs()
+    # stack all three into columns, take the max of each row, then average over 14 days
     df["ATR"] = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1).rolling(14).mean()
 
-    # Z-score (60-day)
+    # Z-score — how many std deviations the price is from its 60-day mean
     ma60 = df["Close"].rolling(60).mean()
     df["Z_SCORE_60"] = (df["Close"] - ma60) / df["Close"].rolling(60).std()
 
-    # SMA crossover signal (vectorised): +1 golden, -1 death
+    # SMA crossover signal (vectorised instead of looping):
+    # above=1 when SMA20 > SMA50, diff() catches the moment it flips: +1 = golden cross, -1 = death cross
     above = (df["SMA20"] > df["SMA50"]).astype(int)
     cross = above.diff()
-    df["SMA_Cross_Signal"] = cross.fillna(0).astype(int)
+    df["SMA_Cross_Signal"] = cross.fillna(0).astype(int)  # NaN on day 1 (no prior day to diff) → 0 = no signal
 
     # Volume indicators
     if "Volume" in df.columns:
         df["Volume_SMA20"] = df["Volume"].rolling(20).mean()
         df["Volume_SMA50"] = df["Volume"].rolling(50).mean()
+        # relative volume: today's volume vs 20-day average (>1 = above average)
         df["Rel_Volume"] = df["Volume"] / df["Volume_SMA20"]
 
-        # ATV slope: linear regression of Volume_SMA20 over 10 days
+        # ATV slope: fit a straight line (linear regression) through last 10 days of volume
+        # np.polyfit returns [slope, intercept] — we grab [0] for just the slope
         vol_sma = df["Volume_SMA20"]
         df["Volume_Slope"] = vol_sma.rolling(10).apply(
             lambda x: np.polyfit(range(len(x)), x, 1)[0] if x.notna().all() else 0,
@@ -569,6 +584,7 @@ def compute_indicators(df):
             lambda x: np.polyfit(range(len(x)), x, 1)[0] if x.notna().all() else 0,
             raw=False)
 
+    # ~22 trading days in a month
     df["Monthly_Return"] = df["Close"].pct_change(periods=22)
     return df
 

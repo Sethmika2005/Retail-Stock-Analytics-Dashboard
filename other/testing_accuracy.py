@@ -84,7 +84,7 @@ def fetch_stock_data(ticker: str) -> pd.DataFrame | None:
 def train_rl_model(df: pd.DataFrame, ticker: str):
     """Train PPO agent and return model (or None)."""
     try:
-        return rl_agent.train_ppo_agent(df, ticker=ticker, total_timesteps=50_000)
+        return rl_agent.train_ppo_agent(df, total_timesteps=50_000)
     except Exception as e:
         print(f"  [WARNING] RL training failed for {ticker}: {e}")
         return None
@@ -190,6 +190,77 @@ def evaluate_crossovers(df: pd.DataFrame, ticker: str, market_regime: str, ppo_m
             })
 
     return results
+
+
+def evaluate_overrides(df: pd.DataFrame, ticker: str, market_regime: str, ppo_model):
+    """Non-crossover days where RL triggers an override (rule=HOLD → RL=BUY/SELL)."""
+    if ppo_model is None:
+        return []
+    info = {"shortName": ticker, "sector": "N/A"}
+    results = []
+    max_hold = max(HOLD_DAYS)
+
+    non_cross = df.index[df["SMA_Cross_Signal"] == 0].tolist()
+    for idx in non_cross:
+        row_pos = df.index.get_loc(idx)
+        if row_pos < 200 or row_pos + max_hold >= len(df):
+            continue
+
+        historical = df.iloc[: row_pos + 1]
+        rl_prediction = rl_agent.predict_action(ppo_model, historical, row_idx=-1)
+        if rl_prediction is None or rl_prediction == 2:  # HOLD => no override
+            continue
+
+        volume_score, _ = calculate_volume_score(historical)
+        rsi_value = historical["RSI"].iloc[-1] if "RSI" in historical.columns else 50
+        hybrid_rec = generate_recommendation_paper1(
+            volume_score=volume_score,
+            rsi_value=rsi_value,
+            market_regime=market_regime,
+            ticker=ticker,
+            info=info,
+            time_horizon="long",
+            price_data=historical,
+            rl_prediction=rl_prediction,
+        )
+        hybrid_signal = hybrid_rec["recommendation"]
+        if hybrid_signal == "HOLD":
+            continue
+
+        entry_price = df["Close"].iloc[row_pos]
+        date = df["Date"].iloc[row_pos] if "Date" in df.columns else idx
+        for hold in HOLD_DAYS:
+            future_pos = row_pos + hold
+            if future_pos >= len(df):
+                continue
+            exit_price = df["Close"].iloc[future_pos]
+            pct = (exit_price - entry_price) / entry_price * 100
+            correct = (pct > 0) if hybrid_signal == "BUY" else (pct < 0)
+            results.append({
+                "ticker": ticker,
+                "date": date,
+                "hold_days": hold,
+                "hybrid_signal": hybrid_signal,
+                "confidence": hybrid_rec["confidence"],
+                "price_change_pct": round(pct, 2),
+                "correct": correct,
+            })
+    return results
+
+
+def compute_buy_hold(df: pd.DataFrame) -> dict:
+    """Buy-and-hold total return from day 200 (indicators warmed) to last day."""
+    if len(df) < 210:
+        return {"start_price": None, "end_price": None, "total_return_pct": None, "days": 0}
+    start_price = df["Close"].iloc[200]
+    end_price = df["Close"].iloc[-1]
+    total_return = (end_price - start_price) / start_price * 100
+    return {
+        "start_price": round(start_price, 2),
+        "end_price": round(end_price, 2),
+        "total_return_pct": round(total_return, 2),
+        "days": len(df) - 200,
+    }
 
 
 # ── Reporting ────────────────────────────────────────────────────────────────
@@ -326,13 +397,75 @@ def print_report(all_results: list[dict]):
         if rl_yes.empty and rl_no.empty:
             print("\n  No RL data available.")
 
+    # ── Confidence tier breakdown ────────────────────────────────────────
+    print(f"\n{'=' * 80}")
+    print("IMPACT OF CONFIDENCE TIER (20-day hold, hybrid signal only)")
+    print(f"{'=' * 80}")
+
+    tiers = [
+        (">= 80", lambda c: c >= 80),
+        ("70-79", lambda c: 70 <= c < 80),
+        ("55-69", lambda c: 55 <= c < 70),
+        ("< 55", lambda c: c < 55),
+    ]
+
+    if not hold_20.empty:
+        traded = hold_20[hold_20["hybrid_correct"].notna()]
+        for label, predicate in tiers:
+            subset = traded[traded["confidence"].apply(predicate)]
+            if subset.empty:
+                print(f"\n  Confidence {label}: (no events)")
+                continue
+            acc = subset["hybrid_correct"].sum() / len(subset) * 100
+            avg_ret = subset["price_change_pct"].mean()
+            print(f"\n  Confidence {label}: {acc:5.1f}% accuracy  "
+                  f"({len(subset)} trades)  avg return: {avg_ret:+.2f}%")
+
     print(f"\n{'=' * 80}")
     print("Done.")
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────
+def print_override_report(override_results):
+    if not override_results:
+        print("\nNo RL override events.")
+        return
+    odf = pd.DataFrame(override_results)
+    print(f"\n{'=' * 80}")
+    print("RL OVERRIDE EVENTS (non-crossover days, RL drives the decision)")
+    print(f"{'=' * 80}")
+    for hold in HOLD_DAYS:
+        s = odf[odf["hold_days"] == hold]
+        if s.empty:
+            continue
+        acc = s["correct"].sum() / len(s) * 100
+        avg_ret = s["price_change_pct"].mean()
+        n_buy = (s["hybrid_signal"] == "BUY").sum()
+        n_sell = (s["hybrid_signal"] == "SELL").sum()
+        print(f"\n  {hold}-day hold: {acc:5.1f}% accuracy  avg return: {avg_ret:+.2f}%  "
+              f"(n={len(s)}  BUY={n_buy}  SELL={n_sell})")
+
+
+def print_benchmark_report(benchmarks):
+    if not benchmarks:
+        return
+    print(f"\n{'=' * 80}")
+    print("BUY-AND-HOLD BENCHMARK (from day 200 to end)")
+    print(f"{'=' * 80}")
+    total = 0.0
+    for ticker, b in benchmarks.items():
+        if b["total_return_pct"] is None:
+            continue
+        total += b["total_return_pct"]
+        print(f"  {ticker:6s}  {b['total_return_pct']:+7.2f}%   "
+              f"({b['days']} days, ${b['start_price']} → ${b['end_price']})")
+    print(f"\n  Equal-weight avg:  {total / len(benchmarks):+.2f}%")
+
+
 def main():
     all_results = []
+    override_results = []
+    benchmarks = {}
 
     # Fetch market data once for regime detection
     print("Downloading market data (SP500 & VIX)...")
@@ -366,7 +499,39 @@ def main():
         print(f"  Found {n_events} crossover events.")
         all_results.extend(results)
 
+        # Evaluate RL-override events (non-crossover days)
+        print(f"  Scanning non-crossover days for RL overrides...")
+        overrides = evaluate_overrides(df, ticker, market_regime, ppo_model)
+        n_ov = len([r for r in overrides if r["hold_days"] == HOLD_DAYS[0]])
+        print(f"  Found {n_ov} RL-override decisions.")
+        override_results.extend(overrides)
+
+        # Buy-and-hold benchmark
+        benchmarks[ticker] = compute_buy_hold(df)
+
     print_report(all_results)
+    print_override_report(override_results)
+    print_benchmark_report(benchmarks)
+
+    # ── Export per-event results for thesis reference ───────────────────
+    out_dir = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "thesis_diagrams",
+    )
+    os.makedirs(out_dir, exist_ok=True)
+    if all_results:
+        p = os.path.join(out_dir, "accuracy_results.csv")
+        pd.DataFrame(all_results).to_csv(p, index=False)
+        print(f"\nCrossover results      → {p}")
+    if override_results:
+        p = os.path.join(out_dir, "override_results.csv")
+        pd.DataFrame(override_results).to_csv(p, index=False)
+        print(f"RL override results    → {p}")
+    if benchmarks:
+        rows = [{"ticker": t, **b} for t, b in benchmarks.items()]
+        p = os.path.join(out_dir, "buy_hold_benchmark.csv")
+        pd.DataFrame(rows).to_csv(p, index=False)
+        print(f"Buy-and-hold benchmark → {p}")
 
 
 if __name__ == "__main__":

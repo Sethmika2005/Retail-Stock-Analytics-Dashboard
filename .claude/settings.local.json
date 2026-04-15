@@ -58,7 +58,8 @@
       "Bash(cd C:/python/Retail-Stock-Analytics-Dashboard && mv \"6DATA007W_Final_Project_Report_Template.docx\" archive/docs/ && mv Slide_Content.txt archive/docs/ 2>/dev/null; mv Smart_Stock_Trading.pdf archive/docs/ && mv Oprimal_Weights.pdf archive/docs/ && echo \"Docs moved\")",
       "Bash(mkdir -p other)",
       "Bash(mv backtest.py testing_accuracy.py \"image.png\" \"image copy.png\" \"image1.png\" \"MyPostion.png\" \"Sector_Peer_Compariosn.png\" \"Dashboard_Screengrabs.pptx\" \"Smart_Stock_Trading.pdf\" \"Error.txt\" other/)",
-      "Bash(wc -l app.py models.py rl_agent.py styles.py tabs/*.py)"
+      "Bash(wc -l app.py models.py rl_agent.py styles.py tabs/*.py)",
+      "Bash(ls:*)"
     ]
   }
 }

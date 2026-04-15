@@ -20,6 +20,7 @@ def _smart_comment(price_data):
     current = float(price_data["Close"].iloc[-1])
     dates = price_data["Date"]
 
+    # dict comprehension: look back N trading days (22 per month) to get historical prices
     lookbacks = {"30d": 22, "60d": 44, "90d": 63, "6m": 126}
     prices = {k: float(price_data["Close"].iloc[-n]) for k, n in lookbacks.items() if len(price_data) > n}
 
@@ -35,6 +36,7 @@ def _smart_comment(price_data):
     p30, p60, p90 = prices.get("30d", current), prices.get("60d", current), prices.get("90d", current)
 
     def fmt(d):
+        # hasattr check because dates could be datetime objects or plain strings
         return d.strftime("%b %Y") if hasattr(d, "strftime") else str(d)[:10]
 
     if current < p30 < p60 and pct_from_high < -5:
@@ -100,6 +102,8 @@ def _build_chart(price_data, n_days=126):
     pad = (y_max - y_min) * 0.08 if y_max != y_min else y_max * 0.02
 
     fig = go.Figure()
+    # invisible baseline trace at bottom — the next trace uses fill="tonexty" to shade
+    # the area between this invisible line and the actual price line
     fig.add_trace(go.Scatter(x=dates, y=[y_min - pad] * len(dates), mode="lines",
                               line=dict(width=0), showlegend=False, hoverinfo="skip"))
     fig.add_trace(go.Scatter(x=dates, y=close, mode="lines", line=dict(color=TEAL, width=2),
@@ -133,7 +137,7 @@ def render(selected, price_data, info, last_row, change_pct,
     current_price = float(price_data["Close"].iloc[-1])
     change_sign = "+" if change_pct >= 0 else ""
     change_color = SUCCESS if change_pct >= 0 else DANGER
-    rsi_safe = rsi_value if rsi_value is not None and not pd.isna(rsi_value) else 50
+    rsi_safe = rsi_value if rsi_value is not None and not pd.isna(rsi_value) else 50  # default to neutral RSI if missing so UI doesn't break
 
     logo_html = ""
     if logo_url:
@@ -182,6 +186,7 @@ def render(selected, price_data, info, last_row, change_pct,
         _n_days = min(_period_days.get(chart_period, 126), len(price_data))
 
     fig = _build_chart(price_data, n_days=_n_days)
+    # flatten the returns list into a dict for quick lookup by period label
     ret_map = {p["label"]: p["value"] for p in _calc_period_returns(price_data)}
 
     btns_html = ""

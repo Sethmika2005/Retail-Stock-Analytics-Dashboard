@@ -3,7 +3,7 @@
 
 import datetime as dt
 import os
-from io import StringIO
+from io import StringIO  # needed to wrap HTML text so pd.read_html can parse it
 
 import numpy as np
 import pandas as pd
@@ -12,6 +12,7 @@ import streamlit as st
 import yfinance as yf
 from dotenv import load_dotenv
 
+# pull API keys and config from .env file into environment variables
 load_dotenv()
 
 from models import (
@@ -30,11 +31,14 @@ inject_css()
 
 
 def _sort(df):
+    # yfinance returns financials with years as columns — .T flips them to rows,
+    # then sort_index puts them in chronological order
     return df.T.sort_index() if df is not None and not df.empty else None
 
 
 # -- Data loading (cached) --
 
+# Wikipedia blocks requests without a browser-like User-Agent header
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY", "")
 if not FINNHUB_API_KEY:
@@ -44,14 +48,18 @@ if not FINNHUB_API_KEY:
         FINNHUB_API_KEY = ""
 
 
+# @st.cache_data caches the result for ttl seconds (86400 = 24 hours)
+# so we don't re-scrape Wikipedia on every page refresh
 @st.cache_data(ttl=86400)
 def load_sp500_tickers():
     try:
         url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
         resp = requests.get(url, headers=HEADERS)
+        # StringIO wraps the HTML string so pandas can read it like a file
         tables = pd.read_html(StringIO(resp.text))
         df = tables[0][["Symbol", "Security", "GICS Sector", "GICS Sub-Industry"]].copy()
         df.columns = ["ticker", "name", "sector", "industry"]
+        # yfinance uses dashes instead of dots in tickers (e.g. BRK-B not BRK.B)
         df["ticker"] = df["ticker"].str.replace(".", "-", regex=False)
         df["is_sp500"] = True
         return df
@@ -65,8 +73,11 @@ def load_nasdaq100_tickers():
         url = "https://en.wikipedia.org/wiki/Nasdaq-100"
         resp = requests.get(url, headers=HEADERS)
         tables = pd.read_html(StringIO(resp.text))
+        # Wikipedia has multiple tables on the page — we need to find the one
+        # with ticker/symbol columns by checking each table's column names
         for table in tables:
             str_cols = [str(c).lower() for c in table.columns]
+            # skip tables that don't have a ticker or symbol column
             if not any("ticker" in c or "symbol" in c for c in str_cols):
                 continue
             ticker_col, name_col = None, None
@@ -93,6 +104,7 @@ def load_nasdaq100_tickers():
 def load_all_us_stocks():
     sp500 = load_sp500_tickers()
     nasdaq = load_nasdaq100_tickers()
+    # stack both lists and remove any stocks that appear in both (keep S&P 500 version)
     combined = pd.concat([sp500, nasdaq], ignore_index=True)
     combined = combined.drop_duplicates(subset=["ticker"], keep="first")
     return combined.sort_values("ticker").reset_index(drop=True)
@@ -102,6 +114,7 @@ def load_all_us_stocks():
 def load_history(ticker, period="max", interval="1d"):
     try:
         stock = yf.Ticker(ticker)
+        # auto_adjust=False keeps raw OHLC prices (not adjusted for splits/dividends)
         data = stock.history(period=period, interval=interval, auto_adjust=False)
         if data.empty:
             st.warning(f"No data returned for {ticker}")
@@ -232,6 +245,7 @@ with st.spinner("Loading US stocks..."):
     if all_stocks_df.empty or "is_sp500" not in all_stocks_df.columns:
         st.error("Failed to load stock list. Please refresh the page.")
         st.stop()
+    # convert to a set for O(1) lookup speed when checking if a ticker is in S&P 500
     sp500_set = set(all_stocks_df[all_stocks_df["is_sp500"]]["ticker"].tolist())
 
 # Sidebar
@@ -244,9 +258,11 @@ with st.sidebar:
     )
 
     ticker_options = all_stocks_df["ticker"].tolist()
+    # build "AAPL - Apple Inc." labels for the dropdown
     ticker_labels = [f"{r['ticker']} - {r['name']}" for _, r in all_stocks_df.iterrows()]
     default_idx = ticker_options.index("MSFT") if "MSFT" in ticker_options else 0
 
+    # format_func tells Streamlit to display the label instead of the raw index number
     selected_idx = st.selectbox("Stock", range(len(ticker_options)),
                                 format_func=lambda i: ticker_labels[i], index=default_idx)
     selected = ticker_options[selected_idx]
@@ -288,13 +304,14 @@ if price_data.empty:
     st.error("No price data available for this ticker. Try another selection or wait a moment if rate limited.")
     st.stop()
 
-price_data = price_data.dropna(subset=["Close"])
+price_data = price_data.dropna(subset=["Close"])  # drop rows without Close — nothing downstream can work without a price
 if price_data.empty:
     st.error("Price data contains no valid entries. Try again in a moment.")
     st.stop()
 
 price_data = compute_indicators(price_data)
 
+# iloc[-1] gets the last row, iloc[-2] gets second-to-last — used for daily % change
 last_row = price_data.iloc[-1]
 prev_row = price_data.iloc[-2] if len(price_data) > 1 else last_row
 change_pct = (last_row["Close"] - prev_row["Close"]) / prev_row["Close"] * 100

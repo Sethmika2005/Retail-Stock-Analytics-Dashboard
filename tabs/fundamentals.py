@@ -30,6 +30,8 @@ def _find_column(df, names):
 
 
 def _get_dates(df):
+    # extract year labels from the dataframe index for chart x-axis
+    # hasattr check because index might be DatetimeIndex or plain strings
     if hasattr(df.index, "strftime"):
         return df.index.strftime("%Y").tolist()
     return [str(d)[:4] for d in df.index]
@@ -60,16 +62,18 @@ def render(selected, info, financials, all_stocks_df, price_data,
     income_stmt = financials.get("income_stmt")
     balance_sheet = financials.get("balance_sheet")
 
-    # Drop years missing key columns
+    # Drop years where all key financial columns are NaN — these are incomplete rows
+    # that would cause misleading gaps in the charts
     if income_stmt is not None and not income_stmt.empty:
+        # list comprehension: find columns whose names match any of our target names
         key = [c for c in income_stmt.columns if any(k in c for k in
                ["Net Income", "NetIncome", "Total Revenue", "TotalRevenue", "Revenue"])]
-        income_stmt = income_stmt.dropna(subset=key, how="all") if key else income_stmt.dropna(how="all")
+        income_stmt = income_stmt.dropna(subset=key, how="all") if key else income_stmt.dropna(how="all")  # drop rows where all key financial columns are empty
     if balance_sheet is not None and not balance_sheet.empty:
         key = [c for c in balance_sheet.columns if any(k in c for k in
                ["Total Debt", "TotalDebt", "Total Assets", "TotalAssets",
                 "Stockholders Equity", "StockholdersEquity"])]
-        balance_sheet = balance_sheet.dropna(subset=key, how="all") if key else balance_sheet.dropna(how="all")
+        balance_sheet = balance_sheet.dropna(subset=key, how="all") if key else balance_sheet.dropna(how="all")  # same idea for balance sheet — drop empty rows
 
     # -- Piotroski F-Score --
     cashflow = financials.get("cashflow")
@@ -132,6 +136,7 @@ def render(selected, info, financials, all_stocks_df, price_data,
             ni_col = _find_column(income_stmt, ["Net Income", "NetIncome", "Net Income Common Stockholders"])
             if ni_col:
                 fig = make_subplots(specs=[[{"secondary_y": True}]])
+                # divide by 1 billion for readability on chart ($B)
                 ni_vals = (income_stmt[ni_col] / 1e9).tolist()
                 fig.add_trace(go.Bar(x=prof_dates, y=ni_vals, name="Net Income ($B)",
                                       marker_color=TEAL), secondary_y=False)
@@ -253,7 +258,9 @@ def render(selected, info, financials, all_stocks_df, price_data,
     with col_val:
         eps = info.get("trailingEps")
         if eps is not None and eps > 0 and not price_data.empty:
+            # tail(504) = ~2 years of trading days for P/E history
             val_data = price_data.tail(504).copy()
+            # P/E = price / earnings per share
             hist_pe = val_data["Close"] / eps
 
             fig = go.Figure()
@@ -338,17 +345,18 @@ def render(selected, info, financials, all_stocks_df, price_data,
     stock_margin = info.get("profitMargins"); stock_rg = info.get("revenueGrowth")
     stock_de = info.get("debtToEquity")
 
-    med_pe = peers_df["pe"].dropna().median()
-    med_roe = peers_df["roe"].dropna().median()
-    med_margin = peers_df["net_margin"].dropna().median()
-    med_rg = peers_df["rev_growth"].dropna().median()
-    med_de = peers_df["de"].dropna().median()
+    # median is more robust than mean for financial metrics (resistant to outliers)
+    med_pe = peers_df["pe"].dropna().median()          # ignore peers with missing P/E
+    med_roe = peers_df["roe"].dropna().median()        # ignore peers with missing ROE
+    med_margin = peers_df["net_margin"].dropna().median()  # ignore peers with missing net margin
+    med_rg = peers_df["rev_growth"].dropna().median()  # ignore peers with missing revenue growth
+    med_de = peers_df["de"].dropna().median()          # ignore peers with missing debt/equity
 
     stock_fs = fscore
     med_fs = med_prof = med_lev = med_eff = None
     if peer_fscores_df is not None and not peer_fscores_df.empty:
         def _med(col):
-            vals = peer_fscores_df[col].dropna()
+            vals = peer_fscores_df[col].dropna()  # strip out peers with no F-score before computing median
             return float(vals.median()) if len(vals) > 0 else None
         med_fs, med_prof, med_lev, med_eff = _med("fscore"), _med("profitability"), _med("leverage"), _med("efficiency")
 
@@ -358,9 +366,11 @@ def render(selected, info, financials, all_stocks_df, price_data,
         ("Net Margin", stock_margin, med_margin, True), ("Rev Growth", stock_rg, med_rg, True),
         ("Debt/Equity", stock_de, med_de, False), ("F-Score", stock_fs, med_fs, True)]
 
+    # count how many metrics the stock beats its peers on
     wins = 0
     for label, sv, pv, hb in metrics_cmp:
-        if sv is not None and pv is not None and not pd.isna(pv):
+        if sv is not None and pv is not None and not pd.isna(pv):  # only count the metric if both stock & peer value exist
+            # hb = "higher is better" — for ROE, higher wins; for P/E, lower wins
             better = (sv >= pv) if hb else (sv <= pv)
             if better: wins += 1
             comparisons.append((label, sv, pv, hb, better))
@@ -372,7 +382,7 @@ def render(selected, info, financials, all_stocks_df, price_data,
     else: pv_text, pv_color = "Below Peers", CORAL
 
     def _pfmt(val, is_pct=False, is_score=False):
-        if val is None or (isinstance(val, float) and pd.isna(val)): return "\u2014"
+        if val is None or (isinstance(val, float) and pd.isna(val)): return "\u2014"  # show em-dash "—" for missing values instead of crashing
         if is_score: return f"{val:.0f}/9"
         if is_pct: return f"{val * 100:.1f}%"
         return f"{val:.1f}"
@@ -390,7 +400,7 @@ def render(selected, info, financials, all_stocks_df, price_data,
         peer_cells += (f'<div style="flex:1;text-align:center;"><div style="font-size:15px;font-weight:500;'
                        f'color:{TEXT_SEC};font-family:{FONT};">{_pfmt(pv, is_pct, is_score)}</div></div>')
 
-        if sv is not None and pv is not None and not pd.isna(sv) and not pd.isna(pv):
+        if sv is not None and pv is not None and not pd.isna(sv) and not pd.isna(pv):  # only compute diff if both values are valid
             diff = sv - pv
             if is_score: dt_txt = f"{'+' if diff >= 0 else ''}{int(round(diff))}"
             elif is_pct: dt_txt = f"{'+' if diff >= 0 else ''}{diff * 100:.1f}pp"

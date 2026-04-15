@@ -366,6 +366,7 @@ def explanation_html(text):
 
 def progress_bar(label_text, score, color=TEAL):
     """Horizontal bar with label and numeric value."""
+    # clamp to 0-100 range: max(0, ...) ensures not negative, min(100, ...) caps at 100
     pct = max(0, min(100, float(score)))
     return (
         f'<div style="margin-bottom:10px;">'
@@ -439,7 +440,7 @@ def render_metrics_strip(metrics):
 
 
 def metric_color(value, good, ok, higher_is_better=True):
-    """Green/amber/red based on thresholds."""
+    """Green/amber/red based on thresholds. Flip logic with higher_is_better=False for metrics like P/E."""
     if value is None:
         return MUTED
     if higher_is_better:

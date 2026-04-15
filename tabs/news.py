@@ -34,6 +34,7 @@ def render(news_items):
         ])
         st.html(strip)
 
+        # max() with key=sentiments.get returns the key with the highest count
         dominant = max(sentiments, key=sentiments.get)
         if dominant == "Positive":
             st.caption(f"News sentiment is mostly positive — {sentiments['Positive']} of {total} headlines are favorable.")
@@ -50,6 +51,7 @@ def render(news_items):
         source = item.get("source", "Unknown")
         url = item.get("url", "#")
         ts = item.get("datetime")
+        # convert unix timestamp (seconds since 1970) to readable date string
         when = dt.datetime.utcfromtimestamp(ts).strftime("%Y-%m-%d %H:%M") if ts else "N/A"
 
         sentiment = classify_headline_sentiment(headline)

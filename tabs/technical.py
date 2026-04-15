@@ -21,7 +21,7 @@ def _find_sma_crossovers(df):
     dates, prices = df["Date"].values, df["Close"].values
     for i in range(1, len(df)):
         if pd.isna(s20[i]) or pd.isna(s50[i]) or pd.isna(s20[i-1]) or pd.isna(s50[i-1]):
-            continue
+            continue  # SMAs need 20/50 days of history — skip crossover detection until enough data exists
         if s20[i-1] <= s50[i-1] and s20[i] > s50[i]:
             golden.append((dates[i], prices[i]))
         if s20[i-1] >= s50[i-1] and s20[i] < s50[i]:
@@ -34,7 +34,8 @@ def render(selected, price_data, info, last_row,
            paper1_details=None, rl_prediction=None, rsi_value=None):
 
     paper1_details = paper1_details or {}
-    rsi_safe = rsi_value if rsi_value is not None and not pd.isna(rsi_value) else 50
+    rsi_safe = rsi_value if rsi_value is not None and not pd.isna(rsi_value) else 50  # default to neutral RSI if missing so UI doesn't break
+    # tail(252) = last 252 trading days (~1 year of data) for the charts
     chart_data = price_data.tail(252).copy()
     dates = chart_data["Date"].tolist()
 
@@ -87,7 +88,10 @@ def render(selected, price_data, info, last_row,
     vol_fig = go.Figure()
     if "Volume" in chart_data.columns:
         close_vals = chart_data["Close"].values
+        # np.roll shifts the array by 1 so each day lines up with its previous day
+        # then set first element manually (no "previous" day for day 0)
         prev_close = np.roll(close_vals, 1); prev_close[0] = close_vals[0]
+        # green bars for up days, red for down — zip pairs each day with its previous
         vol_colors = ["rgba(16,185,129,0.5)" if c >= p else "rgba(255,107,107,0.5)"
                       for c, p in zip(close_vals, prev_close)]
         vol_fig.add_trace(go.Bar(x=dates, y=chart_data["Volume"].tolist(), name="Volume",
@@ -195,6 +199,7 @@ def render(selected, price_data, info, last_row,
     # Bollinger Bands
     bb_fig = go.Figure()
     bb_cols = {}
+    # column names vary depending on how indicators were computed — check both formats
     for key, names in [("upper", ["BB_Upper", "BB_UPPER"]), ("mid", ["BB_Mid", "BB_MID"]),
                         ("lower", ["BB_Lower", "BB_LOWER"])]:
         for n in names:
@@ -203,6 +208,7 @@ def render(selected, price_data, info, last_row,
 
     has_bb = len(bb_cols) == 3
     if has_bb:
+        # two invisible traces (width=0) with fill="tonexty" creates the shaded band between them
         bb_fig.add_trace(go.Scatter(x=dates, y=chart_data[bb_cols["upper"]].tolist(),
                                      line=dict(width=0), showlegend=False, hoverinfo="skip"))
         bb_fig.add_trace(go.Scatter(x=dates, y=chart_data[bb_cols["lower"]].tolist(),
@@ -220,6 +226,7 @@ def render(selected, price_data, info, last_row,
         upper = float(chart_data[bb_cols["upper"]].iloc[-1])
         lower = float(chart_data[bb_cols["lower"]].iloc[-1])
         bb_range = upper - lower if upper != lower else 1
+        # pos = where price sits within the band (0 = at lower, 1 = at upper)
         pos = (curr - lower) / bb_range
         if pos > 0.85:
             bb_verdict, bb_vcolor = "Near Upper Band", WARNING
