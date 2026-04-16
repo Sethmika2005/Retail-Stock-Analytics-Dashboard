@@ -1,6 +1,5 @@
 import streamlit as st
 
-# -- Design tokens --
 FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
 BG = "#F4F7F9"
 CARD_BG = "#FFFFFF"
@@ -21,12 +20,10 @@ SHADOW = "0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)"
 SHADOW_MD = "0 4px 12px rgba(0,0,0,0.05), 0 1px 4px rgba(0,0,0,0.03)"
 SIDEBAR_BG = "#F8FAFB"
 
-# -- Reusable CSS fragments --
 CARD = (
     f"background:{CARD_BG};border:1px solid {BORDER};border-radius:14px;"
     f"box-shadow:{SHADOW};"
 )
-CARD_PAD = CARD + "padding:18px 20px;"
 LABEL = (
     f"font-family:{FONT};font-size:11px;font-weight:600;"
     f"color:{MUTED};text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;"
@@ -37,7 +34,6 @@ EXPLAIN = (
 )
 
 
-# Inject global CSS. Call once from app.py.
 def inject_css():
     st.markdown("""
 <style>
@@ -297,9 +293,6 @@ button[data-testid="stBaseButton-primary"]:hover {
 """, unsafe_allow_html=True)
 
 
-# -- HTML helpers --
-
-# Pill-shaped badge
 def badge_html(text, color):
     return (
         f'<span style="display:inline-block;padding:3px 14px;border-radius:20px;'
@@ -308,7 +301,6 @@ def badge_html(text, color):
     )
 
 
-# Standard Plotly layout dict
 def chart_layout(height=280):
     return dict(
         height=height,
@@ -323,7 +315,6 @@ def chart_layout(height=280):
     )
 
 
-# Apply standard axis styling to a Plotly figure
 def chart_axes(fig, y_prefix="", x_category=False):
     xkw = dict(showgrid=False, showline=True, linecolor=BORDER,
                tickfont=dict(size=10, color=MUTED))
@@ -337,7 +328,6 @@ def chart_axes(fig, y_prefix="", x_category=False):
     )
 
 
-# White rounded background box that chart content sits on top of
 def chart_card_bg(height=380):
     return (
         f'<div style="background:{CARD_BG};border:1px solid {BORDER};border-radius:14px;'
@@ -345,7 +335,6 @@ def chart_card_bg(height=380):
     )
 
 
-# Header row: uppercase label + verdict badge
 def chart_card_header(title, verdict_text, verdict_color):
     return (
         f'<div style="padding:8px 16px 4px 16px;">'
@@ -356,7 +345,6 @@ def chart_card_header(title, verdict_text, verdict_color):
     )
 
 
-# Small muted text below a chart card
 def explanation_html(text):
     return (
         f'<div style="font-size:11px;color:{MUTED};line-height:1.4;'
@@ -364,9 +352,7 @@ def explanation_html(text):
     )
 
 
-# Horizontal bar with label and numeric value
 def progress_bar(label_text, score, color=TEAL):
-    # clamp to 0-100 range: max(0, ...) ensures not negative, min(100, ...) caps at 100
     pct = max(0, min(100, float(score)))
     return (
         f'<div style="margin-bottom:10px;">'
@@ -380,7 +366,6 @@ def progress_bar(label_text, score, color=TEAL):
     )
 
 
-# Key-value row for signal cards
 def signal_row(label_text, value, color):
     return (
         f'<div style="display:flex;justify-content:space-between;padding:4px 0;">'
@@ -390,7 +375,6 @@ def signal_row(label_text, value, color):
     )
 
 
-# Colored inline tag (e.g. "P/E 18.3")
 def metric_tag(lbl, value, color):
     return (
         f'<span style="display:inline-block;padding:4px 12px;background:{SIDEBAR_BG};'
@@ -402,7 +386,6 @@ def metric_tag(lbl, value, color):
     )
 
 
-# Map status keyword to hex color
 def get_status_color(status_type):
     return {
         "success": SUCCESS, "warning": WARNING, "danger": DANGER,
@@ -410,7 +393,6 @@ def get_status_color(status_type):
     }.get(status_type, TEXT)
 
 
-# Horizontal label:value strip (TradingView-style)
 def render_metrics_strip(metrics):
     items = ""
     for i, m in enumerate(metrics):
@@ -439,18 +421,12 @@ def render_metrics_strip(metrics):
     )
 
 
-# Green/amber/red based on thresholds. Flip logic with higher_is_better=False for metrics like P/E.
 def metric_color(value, good, ok, higher_is_better=True):
     if value is None:
         return MUTED
     if higher_is_better:
         return SUCCESS if value >= good else WARNING if value >= ok else CORAL
     return SUCCESS if value <= good else WARNING if value <= ok else CORAL
-
-
-# Vertical spacer div
-def spacer(px=12):
-    return f'<div style="height:{px}px;"></div>'
 
 
 DISCLAIMER_FULL = """
@@ -473,7 +449,6 @@ DISCLAIMER_SHORT = (
 )
 
 
-# Small persistent disclaimer footer (use at bottom of every page)
 def render_disclaimer_footer():
     import streamlit as st
     st.markdown(
@@ -490,7 +465,6 @@ def render_disclaimer_footer():
     )
 
 
-# Full disclaimer in the sidebar (no container box)
 def render_disclaimer_sidebar():
     import streamlit as st
     with st.sidebar:

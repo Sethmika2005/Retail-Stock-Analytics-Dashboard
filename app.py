@@ -38,17 +38,13 @@ def _sort(df):
 
 # -- Data loading (cached) --
 
-# Wikipedia blocks requests without a browser-like User-Agent header
-HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY", "")
 
 
-# @st.cache_data caches the result for ttl seconds (86400 = 24 hours)
-# so we don't re-scrape Wikipedia on every page refresh
-@st.cache_data(ttl=86400)
+@st.cache_data
 def load_sp500_tickers():
     url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-    resp = requests.get(url, headers=HEADERS)
+    resp = requests.get(url)
     # StringIO wraps the HTML string so pandas can read it like a file
     tables = pd.read_html(StringIO(resp.text))
     df = tables[0][["Symbol", "Security", "GICS Sector", "GICS Sub-Industry"]].copy()
@@ -59,10 +55,10 @@ def load_sp500_tickers():
     return df
 
 
-@st.cache_data(ttl=86400)
+@st.cache_data
 def load_nasdaq100_tickers():
     url = "https://en.wikipedia.org/wiki/Nasdaq-100"
-    resp = requests.get(url, headers=HEADERS)
+    resp = requests.get(url)
     tables = pd.read_html(StringIO(resp.text))
     # Wikipedia has multiple tables on the page — we need to find the one
     # with ticker/symbol columns by checking each table's column names
@@ -89,7 +85,7 @@ def load_nasdaq100_tickers():
     return pd.DataFrame(columns=["ticker", "name", "sector", "industry", "is_sp500"])
 
 
-@st.cache_data(ttl=86400)
+@st.cache_data
 def load_all_us_stocks():
     sp500 = load_sp500_tickers()
     nasdaq = load_nasdaq100_tickers()
@@ -99,7 +95,7 @@ def load_all_us_stocks():
     return combined.sort_values("ticker").reset_index(drop=True)
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data
 def load_history(ticker, period="max", interval="1d"):
     stock = yf.Ticker(ticker)
     # auto_adjust=False keeps raw OHLC prices (not adjusted for splits/dividends)
@@ -110,29 +106,29 @@ def load_history(ticker, period="max", interval="1d"):
     return data.rename_axis("Date").reset_index()
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data
 def load_fundamentals(ticker):
     return yf.Ticker(ticker).get_info() or {}
 
 
-@st.cache_data(ttl=86400)
+@st.cache_data
 def load_company_logo(ticker):
     url = f"https://finnhub.io/api/v1/stock/profile2?symbol={ticker}&token={FINNHUB_API_KEY}"
-    resp = requests.get(url, timeout=10)
+    resp = requests.get(url)
     return resp.json().get("logo", "") if resp.status_code == 200 else ""
 
 
-@st.cache_data(ttl=1800)
+@st.cache_data
 def load_finnhub_news(ticker):
     today = dt.date.today()
     from_date = (today - dt.timedelta(days=30)).strftime("%Y-%m-%d")
     to_date = today.strftime("%Y-%m-%d")
     url = f"https://finnhub.io/api/v1/company-news?symbol={ticker}&from={from_date}&to={to_date}&token={FINNHUB_API_KEY}"
-    resp = requests.get(url, timeout=10)
+    resp = requests.get(url)
     return resp.json() if resp.status_code == 200 else []
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data
 def load_financial_statements(ticker):
     stock = yf.Ticker(ticker)
     return {
@@ -145,7 +141,7 @@ def load_financial_statements(ticker):
     }
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data
 def load_sector_peers_metrics(tickers: tuple):
     rows = []
     for sym in tickers:
@@ -161,7 +157,7 @@ def load_sector_peers_metrics(tickers: tuple):
     return pd.DataFrame(rows)
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data
 def load_peer_fscores(tickers: tuple):
     rows = []
     for sym in tickers:
@@ -177,7 +173,7 @@ def load_peer_fscores(tickers: tuple):
     return pd.DataFrame(rows)
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data
 def load_market_data():
     sp500 = yf.Ticker("^GSPC").history(period="2y", interval="1d", auto_adjust=False)
     vix = yf.Ticker("^VIX").history(period="2y", interval="1d", auto_adjust=False)
@@ -205,7 +201,6 @@ with st.spinner("Loading US stocks..."):
     if all_stocks_df.empty:
         st.error("Failed to load stock list. Please refresh the page.")
         st.stop()
-    # convert to a set for O(1) lookup speed when checking if a ticker is in S&P 500
     sp500_set = set(all_stocks_df[all_stocks_df["is_sp500"]]["ticker"].tolist())
 
 # Sidebar
@@ -247,8 +242,8 @@ render_disclaimer_sidebar()
 with st.spinner("Loading data..."):
     try:
         price_data = load_history(selected)
-    except Exception as e:
-        st.error(f"Rate limited by Yahoo Finance. Please wait a moment and refresh. ({type(e).__name__})")
+    except Exception:
+        st.error("Could not load data. Please try again.")
         st.stop()
     info = load_fundamentals(selected)
     financials = load_financial_statements(selected)

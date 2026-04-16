@@ -16,7 +16,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 class StockTradingEnv(gym.Env):
     metadata = {"render_modes": []}
 
-    REWARD_HORIZON = 5  # days ahead for reward (deviation from Kadia's 1d — empirically better SELL-side markouts)
+    REWARD_HORIZON = 5  # days ahead for reward
 
     def __init__(self, df, beta=0.5):
         super().__init__()
@@ -32,7 +32,6 @@ class StockTradingEnv(gym.Env):
 
         self._precompute()
 
-    # Pre-calculate state features and reward inputs as numpy arrays
     def _precompute(self):
         df = self.df
         close = df["Close"].values.astype(np.float64)

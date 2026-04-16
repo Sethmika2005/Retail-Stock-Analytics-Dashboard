@@ -8,25 +8,21 @@ import pandas as pd
 RL_ACTION_MAP = {0: "BUY", 1: "SELL", 2: "HOLD"}
 
 POSITIVE_WORDS = {
-    # Earnings & performance
     "beat", "beats", "beating", "exceeded", "exceeds", "topped", "tops", "topping",
     "outperform", "outperforms", "outperformed", "outpacing",
     "record", "record-breaking", "all-time",
-    # Growth & gains
     "surge", "surges", "surging", "soar", "soars", "soaring",
     "rally", "rallies", "rallying", "rebound", "rebounds", "rebounding",
     "gain", "gains", "gaining", "rise", "rises", "rising", "climbs", "climbing",
     "jump", "jumps", "jumping", "spike", "spikes", "spiking",
     "growth", "growing", "grew", "expand", "expands", "expanding", "expansion",
     "boom", "booming", "breakout", "acceleration", "accelerating",
-    # Positive sentiment
     "profit", "profits", "profitable", "profitability",
     "upgrade", "upgrades", "upgraded", "upbeat", "optimistic", "optimism",
-    "bull", "bullish", "buy", "overweight", "outperform",
+    "bull", "bullish", "buy", "overweight",
     "strong", "strength", "strengthens", "robust", "solid", "resilient",
     "positive", "favorable", "favourable", "promising", "encouraging",
     "confident", "confidence", "momentum", "tailwind", "tailwinds",
-    # Business events
     "innovation", "innovative", "breakthrough", "launch", "launches", "launched",
     "partnership", "acquisition", "deal", "wins", "win", "winning", "won",
     "approval", "approved", "approves", "dividend", "buyback", "repurchase",
@@ -39,11 +35,9 @@ POSITIVE_WORDS = {
 }
 
 NEGATIVE_WORDS = {
-    # Earnings & performance
     "miss", "misses", "missed", "missing", "disappoint", "disappoints", "disappointing",
     "underperform", "underperforms", "underperformed", "underperforming",
     "shortfall", "below", "worse", "worst",
-    # Declines & losses
     "drop", "drops", "dropping", "dropped",
     "plunge", "plunges", "plunging", "plunged",
     "fall", "falls", "falling", "fell", "tumble", "tumbles", "tumbling",
@@ -53,7 +47,6 @@ NEGATIVE_WORDS = {
     "loss", "losses", "losing", "lost", "deficit",
     "selloff", "sell-off", "rout", "bloodbath", "wipeout",
     "plummets", "plummeting", "nosedive", "freefall",
-    # Negative sentiment
     "cut", "cuts", "cutting", "slash", "slashes", "slashing",
     "downgrade", "downgrades", "downgraded", "sell", "underweight",
     "bear", "bearish", "weak", "weakness", "weakens", "weaker", "weakening",
@@ -62,7 +55,6 @@ NEGATIVE_WORDS = {
     "risk", "risks", "risky", "threat", "threatens", "threatening",
     "volatile", "volatility", "uncertainty", "uncertain", "turbulence",
     "headwind", "headwinds", "downturn", "recession", "recessionary",
-    # Business events
     "lawsuit", "lawsuits", "sued", "sues", "litigation", "probe", "investigation",
     "fraud", "scandal", "violation", "penalty", "penalties", "fine", "fined", "fines",
     "layoff", "layoffs", "restructuring", "job-cuts", "downsizing",
@@ -76,11 +68,8 @@ NEGATIVE_WORDS = {
 }
 
 
-# Classify a headline as Positive, Negative, or Neutral via keyword matching
 def classify_headline_sentiment(title):
-    # regex extracts all lowercase words (including hyphenated ones like "sell-off")
     tokens = set(re.findall(r"[a-z]+(?:-[a-z]+)*", title.lower()))
-    # set intersection (&) finds which tokens appear in each word list
     pos = len(tokens & POSITIVE_WORDS)
     neg = len(tokens & NEGATIVE_WORDS)
     if pos > neg:
@@ -90,26 +79,15 @@ def classify_headline_sentiment(title):
     return "Neutral"
 
 
-# Find first matching column name from candidates
-def _find_col(df, candidates):
-    for name in candidates:
-        if name in df.columns:
-            return name
-    return None
-
-
-# Extract numeric value from df given column candidates. year_idx=-1 = most recent, -2 = prior year.
 def _safe_val(df, col_candidates, year_idx=-1):
-    col = _find_col(df, col_candidates)
-    if col is None:
+    if df is None:
         return None
-    try:
-        # iloc[-1] = latest year, iloc[-2] = prior year (for YoY comparisons)
-        val = df[col].iloc[year_idx]
-        if pd.notna(val):
-            return float(val)
-    except (IndexError, TypeError):
-        pass
+    for col in col_candidates:
+        if col in df.columns:
+            val = df[col].iloc[year_idx]
+            if pd.notna(val):
+                return float(val)
+            return None
     return None
 
 
