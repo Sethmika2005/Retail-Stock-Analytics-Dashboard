@@ -1,13 +1,6 @@
 #!/usr/bin/env python3
-"""
-Backtesting Engine
-==================
-Importable simulation engine with Sharpe/Sortino/accuracy metrics.
-Also runnable as CLI: python backtest.py AAPL --months 24
-
-Usage as module:
-    from backtest import simulate_strategy, calculate_backtest_metrics
-"""
+# Backtesting engine with Sharpe/Sortino/accuracy metrics.
+# CLI: python backtest.py AAPL --months 24
 
 import argparse
 import os
@@ -36,20 +29,9 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 
 # compute_indicators is now imported from models.py
 
+# Walk through historical data day by day, calling strategy_fn for signals.
+# Returns (equity_curve, trades, signals).
 def simulate_strategy(df, strategy_fn, initial_capital=10000):
-    """
-    Walk through historical data day by day, calling strategy_fn for signals.
-
-    Args:
-        df: DataFrame with indicators computed
-        strategy_fn: fn(df, idx) -> "BUY" | "SELL" | "HOLD"
-        initial_capital: Starting capital
-
-    Returns:
-        equity_curve: list of (date, equity_value)
-        trades: list of dicts with trade details
-        signals: list of (date, signal) for all days
-    """
     capital = initial_capital
     position = 0  # shares held
     equity_curve = []
@@ -103,18 +85,8 @@ def simulate_strategy(df, strategy_fn, initial_capital=10000):
     return equity_curve, trades, signals
 
 
+# Calculate backtest performance metrics (Sharpe, Sortino, accuracy, drawdown).
 def calculate_backtest_metrics(equity_curve, trades, risk_free_rate=0.04):
-    """
-    Calculate backtest performance metrics.
-
-    Args:
-        equity_curve: list of (date, value)
-        trades: list of trade dicts
-        risk_free_rate: annual risk-free rate (default 4%)
-
-    Returns:
-        dict with Sharpe, Sortino, total_return, trade_count, accuracy, max_drawdown
-    """
     if len(equity_curve) < 2:
         return {
             "sharpe_ratio": 0, "sortino_ratio": 0, "total_return": 0,
@@ -189,7 +161,7 @@ def calculate_backtest_metrics(equity_curve, trades, risk_free_rate=0.04):
 # =============================================================================
 
 def _make_novel_hybrid_strategy(info, market_regime, ppo_model):
-    """Novel Hybrid: EMA+ATV+RSI rules + RL agent + regime-aware fallback + confidence."""
+    # Novel Hybrid: EMA+ATV+RSI rules + RL agent + regime-aware fallback + confidence
     def strategy_fn(df, idx):
         historical = df.iloc[:idx + 1]
         if len(historical) < 50:
@@ -219,8 +191,8 @@ def _make_novel_hybrid_strategy(info, market_regime, ppo_model):
     return strategy_fn
 
 
+# Return dict of strategy functions for backtesting
 def get_strategy_functions(info, market_regime, backtest_df=None, ticker="UNKNOWN"):
-    """Return dict of strategy functions for backtesting."""
     ppo_model = None
     if backtest_df is not None and len(backtest_df) >= 100:
         print("  Training RL agent...", end=" ", flush=True)
@@ -236,15 +208,15 @@ def get_strategy_functions(info, market_regime, backtest_df=None, ticker="UNKNOW
 # HELPER: Load market data
 # =============================================================================
 
+# Load S&P 500 and VIX data
 def load_market_data():
-    """Load S&P 500 and VIX data."""
     sp500 = yf.Ticker("^GSPC").history(period="2y", interval="1d", auto_adjust=False)
     vix = yf.Ticker("^VIX").history(period="2y", interval="1d", auto_adjust=False)
     return sp500, vix
 
 
+# Load peer metrics for percentile scoring
 def load_peer_metrics(ticker):
-    """Load peer metrics for percentile scoring."""
     try:
         stock = yf.Ticker(ticker)
         info = stock.get_info()
@@ -302,8 +274,8 @@ def load_peer_metrics(ticker):
 # CLI ENTRY POINT
 # =============================================================================
 
+# Run backtest for a single ticker (CLI mode)
 def run_backtest_cli(ticker, lookback_months=24):
-    """Run backtest for a single ticker (CLI mode)."""
     print(f"\n{'='*70}")
     print(f"  BACKTESTING: {ticker}")
     print(f"{'='*70}")

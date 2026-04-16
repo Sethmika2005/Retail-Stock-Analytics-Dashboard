@@ -15,8 +15,8 @@ from styles import (
 BOX = CARD + "padding:18px 20px;"
 
 
+# Trend narrative based on price action
 def _smart_comment(price_data):
-    """Trend narrative based on price action."""
     current = float(price_data["Close"].iloc[-1])
     dates = price_data["Date"]
 

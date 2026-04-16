@@ -37,8 +37,8 @@ EXPLAIN = (
 )
 
 
+# Inject global CSS. Call once from app.py.
 def inject_css():
-    """Inject global CSS. Call once from app.py."""
     st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700&display=swap');
@@ -299,8 +299,8 @@ button[data-testid="stBaseButton-primary"]:hover {
 
 # -- HTML helpers --
 
+# Pill-shaped badge
 def badge_html(text, color):
-    """Pill-shaped badge."""
     return (
         f'<span style="display:inline-block;padding:3px 14px;border-radius:20px;'
         f'background:{color};color:white;font-size:11px;font-weight:700;'
@@ -308,8 +308,8 @@ def badge_html(text, color):
     )
 
 
+# Standard Plotly layout dict
 def chart_layout(height=280):
-    """Standard Plotly layout dict."""
     return dict(
         height=height,
         margin=dict(l=10, r=10, t=10, b=30),
@@ -323,8 +323,8 @@ def chart_layout(height=280):
     )
 
 
+# Apply standard axis styling to a Plotly figure
 def chart_axes(fig, y_prefix="", x_category=False):
-    """Apply standard axis styling to a Plotly figure."""
     xkw = dict(showgrid=False, showline=True, linecolor=BORDER,
                tickfont=dict(size=10, color=MUTED))
     if x_category:
@@ -337,16 +337,16 @@ def chart_axes(fig, y_prefix="", x_category=False):
     )
 
 
+# White rounded background box that chart content sits on top of
 def chart_card_bg(height=380):
-    """White rounded background box that chart content sits on top of."""
     return (
         f'<div style="background:{CARD_BG};border:1px solid {BORDER};border-radius:14px;'
         f'box-shadow:{SHADOW};min-height:{height}px;margin-bottom:-{height - 10}px;"></div>'
     )
 
 
+# Header row: uppercase label + verdict badge
 def chart_card_header(title, verdict_text, verdict_color):
-    """Header row: uppercase label + verdict badge."""
     return (
         f'<div style="padding:8px 16px 4px 16px;">'
         f'<span style="{LABEL} font-size:14px;margin-right:10px;display:inline-block;'
@@ -356,16 +356,16 @@ def chart_card_header(title, verdict_text, verdict_color):
     )
 
 
+# Small muted text below a chart card
 def explanation_html(text):
-    """Small muted text below a chart card."""
     return (
         f'<div style="font-size:11px;color:{MUTED};line-height:1.4;'
         f'font-family:{FONT};padding:0px 16px 12px 16px;margin-top:-12px;">{text}</div>'
     )
 
 
+# Horizontal bar with label and numeric value
 def progress_bar(label_text, score, color=TEAL):
-    """Horizontal bar with label and numeric value."""
     # clamp to 0-100 range: max(0, ...) ensures not negative, min(100, ...) caps at 100
     pct = max(0, min(100, float(score)))
     return (
@@ -380,8 +380,8 @@ def progress_bar(label_text, score, color=TEAL):
     )
 
 
+# Key-value row for signal cards
 def signal_row(label_text, value, color):
-    """Key-value row for signal cards."""
     return (
         f'<div style="display:flex;justify-content:space-between;padding:4px 0;">'
         f'<span style="font-size:12px;color:{TEXT_SEC};font-family:{FONT};">{label_text}</span>'
@@ -390,8 +390,8 @@ def signal_row(label_text, value, color):
     )
 
 
+# Colored inline tag (e.g. "P/E 18.3")
 def metric_tag(lbl, value, color):
-    """Colored inline tag (e.g. "P/E 18.3")."""
     return (
         f'<span style="display:inline-block;padding:4px 12px;background:{SIDEBAR_BG};'
         f'border-radius:8px;margin-right:10px;margin-bottom:6px;">'
@@ -402,16 +402,16 @@ def metric_tag(lbl, value, color):
     )
 
 
+# Map status keyword to hex color
 def get_status_color(status_type):
-    """Map status keyword to hex color."""
     return {
         "success": SUCCESS, "warning": WARNING, "danger": DANGER,
         "info": TEAL, "neutral": TEXT, "muted": MUTED,
     }.get(status_type, TEXT)
 
 
+# Horizontal label:value strip (TradingView-style)
 def render_metrics_strip(metrics):
-    """Horizontal label:value strip (TradingView-style)."""
     items = ""
     for i, m in enumerate(metrics):
         label = m.get("label", "")
@@ -439,8 +439,8 @@ def render_metrics_strip(metrics):
     )
 
 
+# Green/amber/red based on thresholds. Flip logic with higher_is_better=False for metrics like P/E.
 def metric_color(value, good, ok, higher_is_better=True):
-    """Green/amber/red based on thresholds. Flip logic with higher_is_better=False for metrics like P/E."""
     if value is None:
         return MUTED
     if higher_is_better:
@@ -448,8 +448,8 @@ def metric_color(value, good, ok, higher_is_better=True):
     return SUCCESS if value <= good else WARNING if value <= ok else CORAL
 
 
+# Vertical spacer div
 def spacer(px=12):
-    """Vertical spacer div."""
     return f'<div style="height:{px}px;"></div>'
 
 
@@ -473,8 +473,8 @@ DISCLAIMER_SHORT = (
 )
 
 
+# Small persistent disclaimer footer (use at bottom of every page)
 def render_disclaimer_footer():
-    """Small persistent disclaimer footer (use at bottom of every page)."""
     import streamlit as st
     st.markdown(
         f"""
@@ -490,8 +490,8 @@ def render_disclaimer_footer():
     )
 
 
+# Full disclaimer in the sidebar (no container box)
 def render_disclaimer_sidebar():
-    """Full disclaimer in the sidebar (no container box)."""
     import streamlit as st
     with st.sidebar:
         st.markdown(

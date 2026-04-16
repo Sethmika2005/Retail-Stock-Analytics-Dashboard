@@ -59,7 +59,11 @@
       "Bash(mkdir -p other)",
       "Bash(mv backtest.py testing_accuracy.py \"image.png\" \"image copy.png\" \"image1.png\" \"MyPostion.png\" \"Sector_Peer_Compariosn.png\" \"Dashboard_Screengrabs.pptx\" \"Smart_Stock_Trading.pdf\" \"Error.txt\" other/)",
       "Bash(wc -l app.py models.py rl_agent.py styles.py tabs/*.py)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(ls tests:*)",
+      "Bash(find . -maxdepth 3 -name \"test_*.py\" -not -path \"*/archive/*\")",
+      "Bash(find . -maxdepth 3 -name \"*_test.py\" -not -path \"*/archive/*\")",
+      "Bash(grep -rn '\"\"\"' *.py tabs/*.py other/*.py)"
     ]
   }
 }

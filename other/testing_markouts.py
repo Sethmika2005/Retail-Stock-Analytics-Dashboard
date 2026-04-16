@@ -1,19 +1,6 @@
 #!/usr/bin/env python3
-"""
-Markout / Reversion Analysis
-============================
-For every BUY/SELL signal produced by each strategy (Rule, Hybrid, RL-only),
-measure the % price move from entry price to the close at multiple future
-horizons (1, 2, 3, 5, 10, 21 trading days).
-
-Markout formula (entry-price denominator):
-    BUY  : (future_close - entry_close) / entry_close * 100
-    SELL : (entry_close - future_close) / entry_close * 100   (sign-flipped so
-           a "correct" SELL shows a positive markout)
-
-Usage:
-    python other/testing_markouts.py
-"""
+# Markout / Reversion Analysis (multi-budget version, kept for ad-hoc use)
+# BUY markout = (future-entry)/entry*100, SELL = flipped so positive = correct
 
 import os
 import sys
@@ -77,8 +64,8 @@ def fetch_stock_data(ticker: str):
 RL_ACTION_TO_SIGNAL = {0: "BUY", 1: "SELL", 2: "HOLD"}
 
 
+# Return (rule_signal, hybrid_signal, rl_signal) at row_pos
 def signals_at_bar(df, row_pos, ticker, market_regime, ppo_model):
-    """Return (rule_signal, hybrid_signal, rl_signal) at row_pos."""
     historical = df.iloc[: row_pos + 1]
 
     rule_signal, _ = generate_rule_signal(historical, row_idx=-1)
@@ -237,7 +224,7 @@ def main():
         for ticker, df in stock_data.items():
             print(f"\n[{ticker}] Training PPO ({budget:,} steps)...")
             try:
-                ppo_model = rl_agent.train_ppo_agent(df, total_timesteps=budget)
+                ppo_model = rl_agent.train_ppo_agent(df, total_timesteps=budget, train_split=0.8)
             except Exception as e:
                 print(f"  [WARNING] PPO training failed: {e}")
                 ppo_model = None

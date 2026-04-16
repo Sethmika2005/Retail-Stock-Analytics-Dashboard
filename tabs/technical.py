@@ -12,8 +12,8 @@ from styles import (
 )
 
 
+# Find SMA20/SMA50 crossover points
 def _find_sma_crossovers(df):
-    """Find SMA20/SMA50 crossover points."""
     if "SMA20" not in df.columns or "SMA50" not in df.columns:
         return [], []
     golden, death = [], []

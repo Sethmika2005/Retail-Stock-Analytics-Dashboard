@@ -1,19 +1,6 @@
 #!/usr/bin/env python3
-"""
-Testing Accuracy at Crossover Events
-=====================================
-Measures the actual accuracy (profitable trade %) of the rule-based and
-hybrid (rule + RL) models specifically at SMA-20/50 crossover points.
-
-For each stock:
-  1. Downloads historical data & computes indicators.
-  2. Finds every golden cross and death cross event.
-  3. Simulates the trade triggered by each crossover and tracks the outcome.
-  4. Reports per-stock and aggregate accuracy at crossover events only.
-
-Usage:
-    python testing_accuracy.py
-"""
+# Testing accuracy at SMA-20/50 crossover events.
+# Simulates trades at golden/death cross points and reports profitable trade %.
 
 import os
 import sys
@@ -46,16 +33,16 @@ HOLD_DAYS = [5, 10, 20]  # evaluate outcome after N trading days
 # compute_indicators is now imported from models.py
 
 
+# Flatten MultiIndex columns from yfinance
 def _flatten_columns(raw):
-    """Flatten MultiIndex columns from yfinance."""
     if isinstance(raw.columns, pd.MultiIndex):
         raw.columns = raw.columns.get_level_values(0)
     return raw
 
 
 # ── Download & prepare data ──────────────────────────────────────────────────
+# Download SP500 and VIX data for market regime detection
 def fetch_market_data():
-    """Download SP500 and VIX data for market regime detection."""
     try:
         sp500 = yf.download("^GSPC", period=PERIOD, progress=False)
         sp500 = _flatten_columns(sp500).reset_index()
@@ -66,8 +53,8 @@ def fetch_market_data():
         return pd.DataFrame(), pd.DataFrame()
 
 
+# Download historical data and compute indicators
 def fetch_stock_data(ticker: str) -> pd.DataFrame | None:
-    """Download historical data and compute indicators."""
     try:
         raw = yf.download(ticker, period=PERIOD, progress=False)
         if raw.empty or len(raw) < 200:
@@ -81,26 +68,19 @@ def fetch_stock_data(ticker: str) -> pd.DataFrame | None:
 
 
 # ── Train RL model for a stock ───────────────────────────────────────────────
+# Train PPO agent and return model (or None)
 def train_rl_model(df: pd.DataFrame, ticker: str):
-    """Train PPO agent and return model (or None)."""
     try:
-        return rl_agent.train_ppo_agent(df, total_timesteps=50_000)
+        return rl_agent.train_ppo_agent(df, total_timesteps=50_000, train_split=0.8)
     except Exception as e:
         print(f"  [WARNING] RL training failed for {ticker}: {e}")
         return None
 
 
 # ── Evaluate crossover accuracy ──────────────────────────────────────────────
+# Find every crossover event and measure post-trade accuracy.
+# Golden crosses: price UP after N days = profitable BUY. Death crosses: price DOWN = profitable SELL.
 def evaluate_crossovers(df: pd.DataFrame, ticker: str, market_regime: str, ppo_model=None):
-    """
-    Find every crossover event and measure post-trade accuracy.
-
-    For golden crosses: checks if price went UP after N days (profitable BUY).
-    For death crosses:  checks if price went DOWN after N days (profitable SELL).
-
-    Also records what the rule-based and hybrid models actually signalled,
-    so we can see if their gating (ATV / RSI) improved accuracy.
-    """
     info = {"shortName": ticker, "sector": "N/A"}
 
     crossover_indices = df.index[df["SMA_Cross_Signal"] != 0].tolist()
@@ -192,8 +172,8 @@ def evaluate_crossovers(df: pd.DataFrame, ticker: str, market_regime: str, ppo_m
     return results
 
 
+# Non-crossover days where RL triggers an override (rule=HOLD → RL=BUY/SELL)
 def evaluate_overrides(df: pd.DataFrame, ticker: str, market_regime: str, ppo_model):
-    """Non-crossover days where RL triggers an override (rule=HOLD → RL=BUY/SELL)."""
     if ppo_model is None:
         return []
     info = {"shortName": ticker, "sector": "N/A"}
@@ -248,8 +228,8 @@ def evaluate_overrides(df: pd.DataFrame, ticker: str, market_regime: str, ppo_mo
     return results
 
 
+# Buy-and-hold total return from day 200 (indicators warmed) to last day
 def compute_buy_hold(df: pd.DataFrame) -> dict:
-    """Buy-and-hold total return from day 200 (indicators warmed) to last day."""
     if len(df) < 210:
         return {"start_price": None, "end_price": None, "total_return_pct": None, "days": 0}
     start_price = df["Close"].iloc[200]
@@ -264,8 +244,8 @@ def compute_buy_hold(df: pd.DataFrame) -> dict:
 
 
 # ── Reporting ────────────────────────────────────────────────────────────────
+# Print a summary report from all crossover results
 def print_report(all_results: list[dict]):
-    """Print a summary report from all crossover results."""
     if not all_results:
         print("\nNo crossover events found.")
         return

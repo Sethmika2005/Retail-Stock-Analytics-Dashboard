@@ -76,8 +76,8 @@ NEGATIVE_WORDS = {
 }
 
 
+# Classify a headline as Positive, Negative, or Neutral via keyword matching
 def classify_headline_sentiment(title):
-    """Classify a headline as Positive, Negative, or Neutral via keyword matching."""
     # regex extracts all lowercase words (including hyphenated ones like "sell-off")
     tokens = set(re.findall(r"[a-z]+(?:-[a-z]+)*", title.lower()))
     # set intersection (&) finds which tokens appear in each word list
@@ -90,8 +90,8 @@ def classify_headline_sentiment(title):
     return "Neutral"
 
 
+# Find first matching column name from candidates
 def _find_col(df, candidates):
-    """Find first matching column name from candidates."""
     if df is None or df.empty:
         return None
     for name in candidates:
@@ -100,9 +100,8 @@ def _find_col(df, candidates):
     return None
 
 
+# Extract numeric value from df given column candidates. year_idx=-1 = most recent, -2 = prior year.
 def _safe_val(df, col_candidates, year_idx=-1):
-    """Extract a numeric value from df given column name candidates and row index.
-    year_idx=-1 means most recent year, -2 means the year before that."""
     if df is None or df.empty:
         return None
     col = _find_col(df, col_candidates)
@@ -118,8 +117,8 @@ def _safe_val(df, col_candidates, year_idx=-1):
     return None
 
 
+# Piotroski F-Score (0-9): 4 profitability + 3 leverage + 2 efficiency tests
 def calculate_piotroski_fscore(income_stmt, balance_sheet, cashflow):
-    """Piotroski F-Score (0-9): 4 profitability + 3 leverage + 2 efficiency tests."""
     details = {}
     score = 0
 
@@ -247,8 +246,8 @@ def calculate_piotroski_fscore(income_stmt, balance_sheet, cashflow):
     return score, details
 
 
+# Classify market as Bull/Bear/Sideways/High-Volatility using SMA200 slope + VIX
 def detect_market_regime(sp500_df, vix_df):
-    """Classify market as Bull/Bear/Sideways/High-Volatility using SMA200 slope + VIX."""
     if sp500_df.empty or vix_df.empty:
         return "Unknown", "gray", {}
 
@@ -301,8 +300,8 @@ def detect_market_regime(sp500_df, vix_df):
     return "Sideways", "orange", metrics
 
 
+# Volume score (0-100) from ATV slope alignment + relative volume strength
 def calculate_volume_score(df):
-    """Volume score (0-100) from ATV slope alignment + relative volume strength."""
     if df.empty or "Volume" not in df.columns:
         return 0, {"score": 0, "volume_confirms_trend": False, "details": {}}
 
@@ -358,8 +357,8 @@ def calculate_volume_score(df):
     return total, {"score": total, "volume_confirms_trend": volume_confirms, "details": details}
 
 
+# Rule-based signal (Paper 1): SMA20/50 crossover + ATV slope confirmation + RSI gate
 def generate_rule_signal(df, row_idx=-1):
-    """Rule-based signal (Paper 1): SMA20/50 crossover + ATV slope confirmation + RSI gate."""
     if df.empty or len(df) < 50:
         return "HOLD", {"reason": "insufficient_data"}
 
@@ -423,10 +422,10 @@ def generate_rule_signal(df, row_idx=-1):
         return "HOLD", details
 
 
+# Combine rule-based signal (Paper 1) with optional RL override
 def generate_hybrid_recommendation(volume_score, rsi_value,
                                     market_regime, ticker, info, time_horizon="long",
                                     price_data=None, rl_prediction=None):
-    """Combine rule-based signal (Paper 1) with optional RL override."""
     rule_signal = "HOLD"
     rule_details = {}
     if price_data is not None and not price_data.empty:
@@ -517,8 +516,8 @@ def generate_hybrid_recommendation(volume_score, rsi_value,
     }
 
 
+# Compute all technical indicators for price data
 def compute_indicators(df):
-    """Compute all technical indicators for price data."""
     # .copy() so we don't accidentally modify the original cached dataframe
     df = df.copy()
 
