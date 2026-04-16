@@ -245,7 +245,11 @@ render_disclaimer_sidebar()
 
 # Load data
 with st.spinner("Loading data..."):
-    price_data = load_history(selected)
+    try:
+        price_data = load_history(selected)
+    except Exception as e:
+        st.error(f"Rate limited by Yahoo Finance. Please wait a moment and refresh. ({type(e).__name__})")
+        st.stop()
     info = load_fundamentals(selected)
     financials = load_financial_statements(selected)
 
