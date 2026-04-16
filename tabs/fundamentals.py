@@ -77,10 +77,7 @@ def render(selected, info, financials, all_stocks_df, price_data,
 
     # -- Piotroski F-Score --
     cashflow = financials.get("cashflow")
-    try:
-        fscore, fscore_details = calculate_piotroski_fscore(income_stmt, balance_sheet, cashflow)
-    except Exception:
-        fscore, fscore_details = None, {}
+    fscore, fscore_details = calculate_piotroski_fscore(income_stmt, balance_sheet, cashflow)
 
     if fscore is not None:
         if fscore >= 7: fund_verdict, fund_vcolor = "Strong", SUCCESS
@@ -132,7 +129,7 @@ def render(selected, info, financials, all_stocks_df, price_data,
     col_prof, col_growth = st.columns(2)
 
     with col_prof:
-        if income_stmt is not None and prof_dates:
+        if prof_dates:
             ni_col = _find_column(income_stmt, ["Net Income", "NetIncome", "Net Income Common Stockholders"])
             if ni_col:
                 fig = make_subplots(specs=[[{"secondary_y": True}]])
@@ -338,8 +335,7 @@ def render(selected, info, financials, all_stocks_df, price_data,
         peers_df = load_sector_peers_metrics(tuple(sector_peers))
         peer_fscores_df = None
         if load_peer_fscores:
-            try: peer_fscores_df = load_peer_fscores(tuple(sector_peers))
-            except Exception: pass
+            peer_fscores_df = load_peer_fscores(tuple(sector_peers))
 
     stock_pe = info.get("trailingPE"); stock_roe = info.get("returnOnEquity")
     stock_margin = info.get("profitMargins"); stock_rg = info.get("revenueGrowth")
@@ -382,7 +378,7 @@ def render(selected, info, financials, all_stocks_df, price_data,
     else: peer_verdict_text, peer_verdict_color = "Below Peers", CORAL
 
     def _pfmt(val, is_pct=False, is_score=False):
-        if val is None or (isinstance(val, float) and pd.isna(val)): return "\u2014"  # show em-dash "—" for missing values instead of crashing
+        if val is None: return "\u2014"  # show em-dash "—" for missing values
         if is_score: return f"{val:.0f}/9"
         if is_pct: return f"{val * 100:.1f}%"
         return f"{val:.1f}"

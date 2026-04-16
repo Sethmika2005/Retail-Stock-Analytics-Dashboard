@@ -27,8 +27,8 @@ def _smart_comment(price_data):
     recent = price_data.tail(63)
     high_90, low_90 = float(recent["Close"].max()), float(recent["Close"].min())
     high_idx, low_idx = recent["Close"].idxmax(), recent["Close"].idxmin()
-    high_date = dates.iloc[high_idx] if high_idx < len(dates) else dates.iloc[-1]
-    low_date = dates.iloc[low_idx] if low_idx < len(dates) else dates.iloc[-1]
+    high_date = dates.iloc[high_idx]
+    low_date = dates.iloc[low_idx]
     pct_from_high = ((current - high_90) / high_90) * 100
     pct_from_low = ((current - low_90) / low_90) * 100
     range_pct = ((high_90 - low_90) / low_90) * 100
@@ -52,7 +52,7 @@ def _smart_comment(price_data):
     if current < price_30d_ago and current > price_90d_ago:
         return f"Short-term pullback from ${price_30d_ago:.2f} (30 days ago), but still above 90-day levels."
 
-    chg = ((current - price_90d_ago) / price_90d_ago) * 100 if price_90d_ago else 0
+    chg = ((current - price_90d_ago) / price_90d_ago) * 100
     return f"Price is {'up' if chg > 0 else 'down'} {abs(chg):.1f}% over the past 3 months, currently at ${current:.2f}."
 
 

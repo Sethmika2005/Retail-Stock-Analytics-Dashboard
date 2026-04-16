@@ -92,8 +92,6 @@ def classify_headline_sentiment(title):
 
 # Find first matching column name from candidates
 def _find_col(df, candidates):
-    if df is None or df.empty:
-        return None
     for name in candidates:
         if name in df.columns:
             return name
@@ -102,8 +100,6 @@ def _find_col(df, candidates):
 
 # Extract numeric value from df given column candidates. year_idx=-1 = most recent, -2 = prior year.
 def _safe_val(df, col_candidates, year_idx=-1):
-    if df is None or df.empty:
-        return None
     col = _find_col(df, col_candidates)
     if col is None:
         return None
@@ -134,7 +130,7 @@ def calculate_piotroski_fscore(income_stmt, balance_sheet, cashflow):
     cfo = _safe_val(cashflow, [
         "Operating Cash Flow", "Cash Flow From Continuing Operating Activities",
         "Total Cash From Operating Activities", "OperatingCashFlow",
-    ]) if cashflow is not None and not cashflow.empty else None
+    ])
 
     # Profitability (tests 1-4)
     roa_current = None
@@ -259,21 +255,17 @@ def detect_market_regime(sp500_df, vix_df):
     sma200 = sp500_df["SMA200"].iloc[-1]
     sma50 = sp500_df["SMA50"].iloc[-1]
 
-    sma200_20d_ago = sp500_df["SMA200"].iloc[-20] if len(sp500_df) >= 20 else sma200
-    sma200_slope = (sma200 - sma200_20d_ago) / sma200_20d_ago * 100 if sma200_20d_ago else 0
+    sma200_20d_ago = sp500_df["SMA200"].iloc[-20]
+    sma200_slope = (sma200 - sma200_20d_ago) / sma200_20d_ago * 100
 
     current_vix = vix_df["Close"].iloc[-1]
     vix_ma20 = vix_df["Close"].rolling(window=20).mean().iloc[-1]
 
-    price_vs_sma200 = (current_price - sma200) / sma200 * 100 if sma200 else 0
-    sma_crossover = (sma50 - sma200) / sma200 * 100 if sma200 else 0
+    price_vs_sma200 = (current_price - sma200) / sma200 * 100
+    sma_crossover = (sma50 - sma200) / sma200 * 100
 
-    sp500_1m_return = 0
-    sp500_3m_return = 0
-    if len(sp500_df) > 22:
-        sp500_1m_return = (sp500_df["Close"].iloc[-1] / sp500_df["Close"].iloc[-22] - 1) * 100
-    if len(sp500_df) > 66:
-        sp500_3m_return = (sp500_df["Close"].iloc[-1] / sp500_df["Close"].iloc[-66] - 1) * 100
+    sp500_1m_return = (sp500_df["Close"].iloc[-1] / sp500_df["Close"].iloc[-22] - 1) * 100
+    sp500_3m_return = (sp500_df["Close"].iloc[-1] / sp500_df["Close"].iloc[-66] - 1) * 100
 
     metrics = {
         "sp500_price": current_price,
@@ -313,7 +305,7 @@ def calculate_volume_score(df):
     if len(df) >= 10:
         price_change = df["Close"].iloc[-1] - df["Close"].iloc[-10]
 
-    vol_slope = df["Volume_Slope"].iloc[-1] if "Volume_Slope" in df.columns and pd.notna(df["Volume_Slope"].iloc[-1]) else 0
+    vol_slope = df["Volume_Slope"].iloc[-1]
     details["volume_slope"] = vol_slope
     details["price_direction"] = "up" if price_change > 0 else "down"
 
@@ -328,12 +320,10 @@ def calculate_volume_score(df):
         alignment_score = 25
     else:
         alignment_score = 10
-    # clamp between 0 and 50 — min/max combo is a common Python clamping pattern
-    alignment_score = min(50, max(0, alignment_score))
     details["alignment_score"] = alignment_score
 
     # Relative volume score (0-50)
-    rel_vol = df["Rel_Volume"].iloc[-1] if "Rel_Volume" in df.columns and pd.notna(df["Rel_Volume"].iloc[-1]) else 1.0
+    rel_vol = df["Rel_Volume"].iloc[-1]
     details["rel_volume"] = rel_vol
 
     if rel_vol >= 2.0:
@@ -351,7 +341,6 @@ def calculate_volume_score(df):
     details["rel_volume_score"] = rel_score
 
     total = int(alignment_score + rel_score)
-    total = min(100, max(0, total))
     details["total"] = total
 
     return total, {"score": total, "volume_confirms_trend": volume_confirms, "details": details}
@@ -368,13 +357,13 @@ def generate_rule_signal(df, row_idx=-1):
 
     details = {}
 
-    sma_cross = df["SMA_Cross_Signal"].iloc[row_idx] if "SMA_Cross_Signal" in df.columns else 0
+    sma_cross = df["SMA_Cross_Signal"].iloc[row_idx]
     details["sma_cross_signal"] = int(sma_cross)
 
-    atv_slope = df["ATV_Slope"].iloc[row_idx] if "ATV_Slope" in df.columns and pd.notna(df["ATV_Slope"].iloc[row_idx]) else 0
+    atv_slope = df["ATV_Slope"].iloc[row_idx]
     details["atv_slope"] = atv_slope
 
-    rsi = df["RSI"].iloc[row_idx] if "RSI" in df.columns and pd.notna(df["RSI"].iloc[row_idx]) else 50
+    rsi = df["RSI"].iloc[row_idx]
     details["rsi"] = rsi
 
     if sma_cross == 1:  # golden cross
@@ -408,16 +397,12 @@ def generate_rule_signal(df, row_idx=-1):
             return "HOLD", details
 
     else:  # no crossover — report SMA trend bias
-        sma20 = df["SMA20"].iloc[row_idx] if "SMA20" in df.columns else None
-        sma50 = df["SMA50"].iloc[row_idx] if "SMA50" in df.columns else None
+        sma20 = df["SMA20"].iloc[row_idx]
+        sma50 = df["SMA50"].iloc[row_idx]
         details["crossover_type"] = "none"
         details["atv_confirmed"] = False
         details["rsi_gate"] = "n/a"
-
-        if sma20 is not None and sma50 is not None and pd.notna(sma20) and pd.notna(sma50):
-            details["sma_trend"] = "bullish" if sma20 > sma50 else "bearish"
-        else:
-            details["sma_trend"] = "neutral"
+        details["sma_trend"] = "bullish" if sma20 > sma50 else "bearish"
 
         return "HOLD", details
 

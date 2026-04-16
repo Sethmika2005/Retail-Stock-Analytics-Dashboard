@@ -41,63 +41,52 @@ def _sort(df):
 # Wikipedia blocks requests without a browser-like User-Agent header
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY", "")
-if not FINNHUB_API_KEY:
-    try:
-        FINNHUB_API_KEY = st.secrets["FINNHUB_API_KEY"]
-    except (KeyError, FileNotFoundError, AttributeError):
-        FINNHUB_API_KEY = ""
 
 
 # @st.cache_data caches the result for ttl seconds (86400 = 24 hours)
 # so we don't re-scrape Wikipedia on every page refresh
 @st.cache_data(ttl=86400)
 def load_sp500_tickers():
-    try:
-        url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-        resp = requests.get(url, headers=HEADERS)
-        # StringIO wraps the HTML string so pandas can read it like a file
-        tables = pd.read_html(StringIO(resp.text))
-        df = tables[0][["Symbol", "Security", "GICS Sector", "GICS Sub-Industry"]].copy()
-        df.columns = ["ticker", "name", "sector", "industry"]
-        # yfinance uses dashes instead of dots in tickers (e.g. BRK-B not BRK.B)
-        df["ticker"] = df["ticker"].str.replace(".", "-", regex=False)
-        df["is_sp500"] = True
-        return df
-    except Exception:
-        return pd.DataFrame(columns=["ticker", "name", "sector", "industry", "is_sp500"])
+    url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
+    resp = requests.get(url, headers=HEADERS)
+    # StringIO wraps the HTML string so pandas can read it like a file
+    tables = pd.read_html(StringIO(resp.text))
+    df = tables[0][["Symbol", "Security", "GICS Sector", "GICS Sub-Industry"]].copy()
+    df.columns = ["ticker", "name", "sector", "industry"]
+    # yfinance uses dashes instead of dots in tickers (e.g. BRK-B not BRK.B)
+    df["ticker"] = df["ticker"].str.replace(".", "-", regex=False)
+    df["is_sp500"] = True
+    return df
 
 
 @st.cache_data(ttl=86400)
 def load_nasdaq100_tickers():
-    try:
-        url = "https://en.wikipedia.org/wiki/Nasdaq-100"
-        resp = requests.get(url, headers=HEADERS)
-        tables = pd.read_html(StringIO(resp.text))
-        # Wikipedia has multiple tables on the page — we need to find the one
-        # with ticker/symbol columns by checking each table's column names
-        for table in tables:
-            str_cols = [str(c).lower() for c in table.columns]
-            # skip tables that don't have a ticker or symbol column
-            if not any("ticker" in c or "symbol" in c for c in str_cols):
-                continue
-            ticker_col, name_col = None, None
-            for col in table.columns:
-                cl = str(col).lower()
-                if "ticker" in cl or "symbol" in cl:
-                    ticker_col = col
-                if "company" in cl or "security" in cl:
-                    name_col = col
-            if ticker_col:
-                df = pd.DataFrame()
-                df["ticker"] = table[ticker_col].astype(str).str.replace(".", "-", regex=False)
-                df["name"] = table[name_col] if name_col else df["ticker"]
-                df["sector"] = "Technology"
-                df["industry"] = "Technology"
-                df["is_sp500"] = False
-                return df
-        return pd.DataFrame(columns=["ticker", "name", "sector", "industry", "is_sp500"])
-    except Exception:
-        return pd.DataFrame(columns=["ticker", "name", "sector", "industry", "is_sp500"])
+    url = "https://en.wikipedia.org/wiki/Nasdaq-100"
+    resp = requests.get(url, headers=HEADERS)
+    tables = pd.read_html(StringIO(resp.text))
+    # Wikipedia has multiple tables on the page — we need to find the one
+    # with ticker/symbol columns by checking each table's column names
+    for table in tables:
+        str_cols = [str(c).lower() for c in table.columns]
+        # skip tables that don't have a ticker or symbol column
+        if not any("ticker" in c or "symbol" in c for c in str_cols):
+            continue
+        ticker_col, name_col = None, None
+        for col in table.columns:
+            cl = str(col).lower()
+            if "ticker" in cl or "symbol" in cl:
+                ticker_col = col
+            if "company" in cl or "security" in cl:
+                name_col = col
+        if ticker_col:
+            df = pd.DataFrame()
+            df["ticker"] = table[ticker_col].astype(str).str.replace(".", "-", regex=False)
+            df["name"] = table[name_col] if name_col else df["ticker"]
+            df["sector"] = "Technology"
+            df["industry"] = "Technology"
+            df["is_sp500"] = False
+            return df
+    return pd.DataFrame(columns=["ticker", "name", "sector", "industry", "is_sp500"])
 
 
 @st.cache_data(ttl=86400)
@@ -112,73 +101,48 @@ def load_all_us_stocks():
 
 @st.cache_data(ttl=3600)
 def load_history(ticker, period="max", interval="1d"):
-    try:
-        stock = yf.Ticker(ticker)
-        # auto_adjust=False keeps raw OHLC prices (not adjusted for splits/dividends)
-        data = stock.history(period=period, interval=interval, auto_adjust=False)
-        if data.empty:
-            st.warning(f"No data returned for {ticker}")
-            return data
-        for col in ["Open", "High", "Low", "Close", "Volume"]:
-            if col not in data.columns:
-                st.error(f"Missing column {col} in data for {ticker}")
-                return pd.DataFrame()
-        if data["Close"].min() <= 0:
-            st.warning(f"Warning: Found zero or negative Close prices for {ticker}")
-        return data.rename_axis("Date").reset_index()
-    except Exception as e:
-        st.error(f"Error loading data for {ticker}: {e}")
-        return pd.DataFrame()
+    stock = yf.Ticker(ticker)
+    # auto_adjust=False keeps raw OHLC prices (not adjusted for splits/dividends)
+    data = stock.history(period=period, interval=interval, auto_adjust=False)
+    if data.empty:
+        st.warning(f"No data returned for {ticker}")
+        return data
+    return data.rename_axis("Date").reset_index()
 
 
 @st.cache_data(ttl=3600)
 def load_fundamentals(ticker):
-    try:
-        return yf.Ticker(ticker).get_info() or {}
-    except Exception:
-        return {}
+    return yf.Ticker(ticker).get_info() or {}
 
 
 @st.cache_data(ttl=86400)
 def load_company_logo(ticker):
-    try:
-        url = f"https://finnhub.io/api/v1/stock/profile2?symbol={ticker}&token={FINNHUB_API_KEY}"
-        resp = requests.get(url, timeout=10)
-        return resp.json().get("logo", "") if resp.status_code == 200 else ""
-    except Exception:
-        return ""
+    url = f"https://finnhub.io/api/v1/stock/profile2?symbol={ticker}&token={FINNHUB_API_KEY}"
+    resp = requests.get(url, timeout=10)
+    return resp.json().get("logo", "") if resp.status_code == 200 else ""
 
 
 @st.cache_data(ttl=1800)
 def load_finnhub_news(ticker):
-    try:
-        today = dt.date.today()
-        from_date = (today - dt.timedelta(days=30)).strftime("%Y-%m-%d")
-        to_date = today.strftime("%Y-%m-%d")
-        url = f"https://finnhub.io/api/v1/company-news?symbol={ticker}&from={from_date}&to={to_date}&token={FINNHUB_API_KEY}"
-        resp = requests.get(url, timeout=10)
-        return resp.json() if resp.status_code == 200 else []
-    except Exception:
-        return []
+    today = dt.date.today()
+    from_date = (today - dt.timedelta(days=30)).strftime("%Y-%m-%d")
+    to_date = today.strftime("%Y-%m-%d")
+    url = f"https://finnhub.io/api/v1/company-news?symbol={ticker}&from={from_date}&to={to_date}&token={FINNHUB_API_KEY}"
+    resp = requests.get(url, timeout=10)
+    return resp.json() if resp.status_code == 200 else []
 
 
 @st.cache_data(ttl=3600)
 def load_financial_statements(ticker):
-    try:
-        stock = yf.Ticker(ticker)
-        return {
-            "income_stmt": _sort(stock.income_stmt),
-            "balance_sheet": _sort(stock.balance_sheet),
-            "cashflow": _sort(stock.cashflow),
-            "quarterly_income": _sort(stock.quarterly_income_stmt),
-            "quarterly_balance": _sort(stock.quarterly_balance_sheet),
-            "quarterly_cashflow": _sort(stock.quarterly_cashflow),
-        }
-    except Exception:
-        return {k: None for k in [
-            "income_stmt", "balance_sheet", "cashflow",
-            "quarterly_income", "quarterly_balance", "quarterly_cashflow",
-        ]}
+    stock = yf.Ticker(ticker)
+    return {
+        "income_stmt": _sort(stock.income_stmt),
+        "balance_sheet": _sort(stock.balance_sheet),
+        "cashflow": _sort(stock.cashflow),
+        "quarterly_income": _sort(stock.quarterly_income_stmt),
+        "quarterly_balance": _sort(stock.quarterly_balance_sheet),
+        "quarterly_cashflow": _sort(stock.quarterly_cashflow),
+    }
 
 
 @st.cache_data(ttl=3600)
@@ -201,19 +165,15 @@ def load_sector_peers_metrics(tickers: tuple):
 def load_peer_fscores(tickers: tuple):
     rows = []
     for sym in tickers:
-        try:
-            stock = yf.Ticker(sym)
-            inc, bs, cf = _sort(stock.income_stmt), _sort(stock.balance_sheet), _sort(stock.cashflow)
-            score, details = calculate_piotroski_fscore(inc, bs, cf)
-            rows.append({
-                "ticker": sym, "fscore": score,
-                "profitability": details.get("profitability"),
-                "leverage": details.get("leverage_liquidity"),
-                "efficiency": details.get("efficiency"),
-            })
-        except Exception:
-            rows.append({"ticker": sym, "fscore": None, "profitability": None,
-                         "leverage": None, "efficiency": None})
+        stock = yf.Ticker(sym)
+        inc, bs, cf = _sort(stock.income_stmt), _sort(stock.balance_sheet), _sort(stock.cashflow)
+        score, details = calculate_piotroski_fscore(inc, bs, cf)
+        rows.append({
+            "ticker": sym, "fscore": score,
+            "profitability": details.get("profitability"),
+            "leverage": details.get("leverage_liquidity"),
+            "efficiency": details.get("efficiency"),
+        })
     return pd.DataFrame(rows)
 
 
@@ -242,7 +202,7 @@ st.markdown(
 
 with st.spinner("Loading US stocks..."):
     all_stocks_df = load_all_us_stocks()
-    if all_stocks_df.empty or "is_sp500" not in all_stocks_df.columns:
+    if all_stocks_df.empty:
         st.error("Failed to load stock list. Please refresh the page.")
         st.stop()
     # convert to a set for O(1) lookup speed when checking if a ticker is in S&P 500
@@ -285,28 +245,16 @@ render_disclaimer_sidebar()
 
 # Load data
 with st.spinner("Loading data..."):
-    try:
-        price_data = load_history(selected)
-    except Exception as e:
-        st.error(f"Rate limited by Yahoo Finance. Please wait a moment and refresh. ({type(e).__name__})")
-        st.stop()
+    price_data = load_history(selected)
     info = load_fundamentals(selected)
     financials = load_financial_statements(selected)
 
-try:
-    fs = financials
-    piotroski_score, _ = calculate_piotroski_fscore(
-        fs.get("income_stmt"), fs.get("balance_sheet"), fs.get("cashflow"))
-except Exception:
-    piotroski_score = None
+fs = financials
+piotroski_score, _ = calculate_piotroski_fscore(
+    fs.get("income_stmt"), fs.get("balance_sheet"), fs.get("cashflow"))
 
 if price_data.empty:
     st.error("No price data available for this ticker. Try another selection or wait a moment if rate limited.")
-    st.stop()
-
-price_data = price_data.dropna(subset=["Close"])  # drop rows without Close — nothing downstream can work without a price
-if price_data.empty:
-    st.error("Price data contains no valid entries. Try again in a moment.")
     st.stop()
 
 price_data = compute_indicators(price_data)

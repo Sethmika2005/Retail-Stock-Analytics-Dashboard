@@ -34,7 +34,7 @@ def render(selected, price_data, info, last_row,
            rule_details=None, rl_prediction=None, rsi_value=None):
 
     rule_details = rule_details or {}
-    rsi_safe = rsi_value if rsi_value is not None and not pd.isna(rsi_value) else 50  # default to neutral RSI if missing so UI doesn't break
+    rsi_safe = rsi_value
     # tail(252) = last 252 trading days (~1 year of data) for the charts
     chart_data = price_data.tail(252).copy()
     dates = chart_data["Date"].tolist()
