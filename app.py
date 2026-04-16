@@ -44,7 +44,7 @@ FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY", "")
 @st.cache_data
 def load_sp500_tickers():
     url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-    resp = requests.get(url)
+    resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
     # StringIO wraps the HTML string so pandas can read it like a file
     tables = pd.read_html(StringIO(resp.text))
     df = tables[0][["Symbol", "Security", "GICS Sector", "GICS Sub-Industry"]].copy()
@@ -58,7 +58,7 @@ def load_sp500_tickers():
 @st.cache_data
 def load_nasdaq100_tickers():
     url = "https://en.wikipedia.org/wiki/Nasdaq-100"
-    resp = requests.get(url)
+    resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
     tables = pd.read_html(StringIO(resp.text))
     # Wikipedia has multiple tables on the page — we need to find the one
     # with ticker/symbol columns by checking each table's column names
