@@ -270,6 +270,9 @@ def detect_market_regime(sp500_df, vix_df):
     return "Sideways", "orange", metrics
 
 
+# --- TECHNICAL ANALYSIS SCORING AND SIGNALS --- 
+
+
 # Volume score (0-100) from ATV slope alignment + relative volume strength
 def calculate_volume_score(df):
     if df.empty or "Volume" not in df.columns:
@@ -324,7 +327,7 @@ def calculate_volume_score(df):
     return total, {"score": total, "volume_confirms_trend": volume_confirms, "details": details}
 
 
-# Rule-based signal (Paper 1): SMA20/50 crossover + ATV slope confirmation + RSI gate
+# Rule-based signal: SMA20/50 crossover + ATV slope confirmation + RSI gate
 def generate_rule_signal(df, row_idx=-1):
     if df.empty or len(df) < 50:
         return "HOLD", {"reason": "insufficient_data"}
@@ -522,11 +525,11 @@ def compute_indicators(df):
     ma60 = df["Close"].rolling(60).mean()
     df["Z_SCORE_60"] = (df["Close"] - ma60) / df["Close"].rolling(60).std()
 
-    # SMA crossover signal (vectorised instead of looping):
+    # SMA crossover signal:
     # above=1 when SMA20 > SMA50, diff() catches the moment it flips: +1 = golden cross, -1 = death cross
     above = (df["SMA20"] > df["SMA50"]).astype(int)
     cross = above.diff()
-    df["SMA_Cross_Signal"] = cross.fillna(0).astype(int)  # NaN on day 1 (no prior day to diff) → 0 = no signal
+    df["SMA_Cross_Signal"] = cross.fillna(0).astype(int) 
 
     # Volume indicators
     if "Volume" in df.columns:

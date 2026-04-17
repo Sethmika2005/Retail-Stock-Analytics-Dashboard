@@ -25,6 +25,7 @@ from models import (
 )
 from styles import inject_css, render_disclaimer_footer, render_disclaimer_sidebar
 from tabs import overview, technical, fundamentals, news
+import rl_agent
 
 st.set_page_config(page_title="US Stock Analytics Dashboard", layout="wide")
 inject_css()
@@ -96,15 +97,20 @@ def load_all_us_stocks():
 
 
 @st.cache_data
-def load_history(ticker, period="max", interval="1d"):
+def load_history(ticker, period="max", interval="1d", as_of_date=None):
     stock = yf.Ticker(ticker)
     #extract raw price data
-    data = stock.history(period=period, interval=interval, auto_adjust=False) 
+    data = stock.history(period=period, interval=interval, auto_adjust=False)
     data = data.dropna()
     if data.empty:
         st.warning(f"No data returned for {ticker}")
         return data
-    return data.rename_axis("Date").reset_index()
+    data = data.rename_axis("Date").reset_index()
+    # Truncate to as_of_date so the dashboard shows what would have been visible on that day
+    if as_of_date is not None:
+        cutoff = pd.Timestamp(as_of_date).tz_localize(data["Date"].dt.tz) if data["Date"].dt.tz is not None else pd.Timestamp(as_of_date)
+        data = data[data["Date"] <= cutoff].reset_index(drop=True)
+    return data
 
 
 @st.cache_data
@@ -174,10 +180,21 @@ def load_peer_fscores(tickers: tuple):
     return pd.DataFrame(rows)
 
 
+@st.cache_resource(show_spinner=False)
+def get_rl_model(ticker, as_of_date, _df):
+    # Keyed on (ticker, as_of_date) so switching demo dates is fast after first train.
+    # _df is prefixed with underscore so Streamlit skips hashing it.
+    return rl_agent.train_ppo_agent(_df)
+
+
 @st.cache_data
-def load_market_data():
+def load_market_data(as_of_date=None):
     sp500 = yf.Ticker("^GSPC").history(period="2y", interval="1d", auto_adjust=False).dropna()
     vix = yf.Ticker("^VIX").history(period="2y", interval="1d", auto_adjust=False).dropna()
+    if as_of_date is not None:
+        cutoff = pd.Timestamp(as_of_date).tz_localize(sp500.index.tz) if sp500.index.tz is not None else pd.Timestamp(as_of_date)
+        sp500 = sp500[sp500.index <= cutoff]
+        vix = vix[vix.index <= cutoff]
     return sp500, vix
 
 
@@ -232,6 +249,17 @@ with st.sidebar:
     cost_basis = st.number_input("Avg cost per share ($)", min_value=0.01, value=100.0, step=0.01) if owns_stock else None
 
     st.divider()
+
+    # As-of-Date: treat this date as "today". Lets the dashboard be rewound to a historical
+    # date for thesis/viva demos of strong rule+RL concordant signals.
+    as_of_date = st.date_input(
+        "As of Date",
+        value=dt.date.today(),
+        max_value=dt.date.today(),
+        help="Treat this date as 'today'. Useful for demoing historical signals.",
+    )
+
+    st.divider()
     st.caption(f"*Last updated: {dt.datetime.now().strftime('%I:%M %p')}*")
     if st.button("Refresh Data", help="Clear cached data and reload fresh data"):
         st.cache_data.clear()
@@ -242,7 +270,7 @@ render_disclaimer_sidebar()
 # Load data
 with st.spinner("Loading data..."):
     try:
-        price_data = load_history(selected)
+        price_data = load_history(selected, as_of_date=as_of_date)
     except Exception:
         st.error("Could not load data. Please try again.")
         st.stop()
@@ -266,7 +294,7 @@ change_pct = (last_row["Close"] - prev_row["Close"]) / prev_row["Close"] * 100
 
 # Market analysis
 with st.spinner("Analyzing market conditions..."):
-    sp500_market, vix_market = load_market_data()
+    sp500_market, vix_market = load_market_data(as_of_date=as_of_date)
     market_regime, regime_color, regime_metrics = detect_market_regime(sp500_market, vix_market)
     volume_score, volume_details = calculate_volume_score(price_data)
     rsi_value = price_data["RSI"].iloc[-1] if "RSI" in price_data.columns else 50
@@ -275,11 +303,10 @@ with st.spinner("Analyzing market conditions..."):
     if len(price_data) >= 50:
         _, rule_details = generate_rule_signal(price_data)
 
-    # RL agent
-    import rl_agent
+    # RL agent — cached wrapper avoids retraining when switching between dates/tickers in a demo
     rl_prediction = None
     with st.spinner("Loading RL agent..."):
-        model = rl_agent.train_ppo_agent(price_data)
+        model = get_rl_model(selected, as_of_date, price_data)
         if model is not None:
             rl_prediction = rl_agent.predict_action(model, price_data)
 
@@ -306,6 +333,7 @@ with overview_tab:
         rule_details=overview_recommendation.get("rule_details", rule_details),
         logo_url=company_logo_url, is_sp500=selected in sp500_set,
         chart_period=chart_period, piotroski_score=piotroski_score,
+        as_of_date=as_of_date,
     )
 
 with technical_tab:

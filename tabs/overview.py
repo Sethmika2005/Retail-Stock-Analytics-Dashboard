@@ -128,7 +128,12 @@ def render(selected, price_data, info, last_row, change_pct,
            market_regime, regime_metrics,
            recommendation_data, rsi_value,
            news_items, cost_basis, rule_details,
-           logo_url="", is_sp500=False, chart_period="6M", piotroski_score=None):
+           logo_url="", is_sp500=False, chart_period="6M", piotroski_score=None,
+           as_of_date=None):
+
+    # Show "As of" banner only when rewound to a past date — signals the historical context
+    if as_of_date is not None and as_of_date != dt.date.today():
+        st.info(f"📅 Viewing dashboard **as of {as_of_date:%B %d, %Y}** — all signals, prices, and news reflect what would have been visible on that date.")
 
     rec = recommendation_data.get("recommendation", "HOLD")
     confidence = recommendation_data.get("confidence", 50)
