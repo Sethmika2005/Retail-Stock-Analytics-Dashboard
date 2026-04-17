@@ -9,7 +9,7 @@ from models import classify_headline_sentiment
 from styles import (
     CARD, LABEL, EXPLAIN, FONT, TEAL, CORAL, SUCCESS, WARNING, DANGER, MUTED, TEXT,
     TEXT_SEC, BORDER, CARD_BG, SIDEBAR_BG,
-    progress_bar, signal_row, chart_layout, chart_axes,
+    signal_row, chart_layout, chart_axes,
 )
 
 BOX = CARD + "padding:18px 20px;"
@@ -84,19 +84,6 @@ def _calc_period_returns(price_data):
     return periods
 
 
-def _fund_snippet(info):
-    pe, roe = info.get("trailingPE"), info.get("returnOnEquity")
-    parts = []
-    if pe is not None: parts.append(f"P/E {pe:.1f}")
-    if roe is not None: parts.append(f"ROE {roe * 100:.0f}%")
-    metrics = ", ".join(parts) if parts else "Limited data"
-    strong = (roe is not None and roe > 0.15) or (pe is not None and pe < 20)
-    weak = (roe is not None and roe < 0.08) or (pe is not None and pe > 35)
-    if strong: return f"Fundamentals are solid ({metrics})."
-    if weak: return f"Fundamental concerns ({metrics})."
-    return f"Fundamentals are mixed ({metrics})."
-
-
 def _build_chart(price_data, n_days=126):
     chart_df = price_data.tail(n_days).copy()
     dates, close = chart_df["Date"].tolist(), chart_df["Close"].tolist()
@@ -128,12 +115,7 @@ def render(selected, price_data, info, last_row, change_pct,
            market_regime, regime_metrics,
            recommendation_data, rsi_value,
            news_items, cost_basis, rule_details,
-           logo_url="", is_sp500=False, chart_period="6M", piotroski_score=None,
-           as_of_date=None):
-
-    # Show "As of" banner only when rewound to a past date — signals the historical context
-    if as_of_date is not None and as_of_date != dt.date.today():
-        st.info(f"📅 Viewing dashboard **as of {as_of_date:%B %d, %Y}** — all signals, prices, and news reflect what would have been visible on that date.")
+           logo_url="", is_sp500=False, chart_period="6M"):
 
     rec = recommendation_data.get("recommendation", "HOLD")
     confidence = recommendation_data.get("confidence", 50)
@@ -144,7 +126,6 @@ def render(selected, price_data, info, last_row, change_pct,
     current_price = float(price_data["Close"].iloc[-1])
     change_sign = "+" if change_pct >= 0 else ""
     change_color = SUCCESS if change_pct >= 0 else DANGER
-    rsi_safe = rsi_value if rsi_value is not None and not pd.isna(rsi_value) else 50  # default to neutral RSI if missing so UI doesn't break
 
     logo_html = ""
     if logo_url:
@@ -339,111 +320,70 @@ def render(selected, price_data, info, last_row, change_pct,
         rsi_label, rsi_color = "N/A", MUTED
         rl_row = signal_row("RL Agent (PPO)", "Not Active", MUTED)
 
-    sig_cols = st.columns([1, 1, 1, 1.5])
-    with sig_cols[0]:
-        st.markdown(f"""
-        <div style="{BOX}">
-            <div style="{LABEL}">Market Regime</div>
-            <div style="font-size:20px;font-weight:700;color:{regime_clr};margin-top:4px;
-                        letter-spacing:-0.01em;font-family:{FONT};">{market_regime}</div>
-            <div style="{EXPLAIN}">{regime_explain}</div>
-        </div>""", unsafe_allow_html=True)
-    with sig_cols[1]:
-        st.markdown(f"""
-        <div style="{BOX}">
-            <div style="{LABEL}">Signal</div>
-            <div style="font-size:28px;font-weight:700;color:{rec_color};margin-top:4px;
-                        letter-spacing:-0.02em;font-family:{FONT};">{rec}</div>
-            <div style="{EXPLAIN}">{signal_explain}</div>
-        </div>""", unsafe_allow_html=True)
-    with sig_cols[2]:
-        st.markdown(f"""
-        <div style="{BOX}">
-            <div style="{LABEL}">Confidence</div>
-            <div style="font-size:28px;font-weight:700;color:{confidence_color};margin-top:4px;
-                        letter-spacing:-0.02em;font-family:{FONT};">{confidence}%</div>
-            <div style="{EXPLAIN}">{confidence_explain}</div>
-        </div>""", unsafe_allow_html=True)
-    with sig_cols[3]:
-        st.markdown(f"""
-        <div style="{BOX}">
-            <div style="{LABEL}">Key Signals</div>
-            <div style="line-height:1.6;font-family:{FONT};">
-                {signal_row("SMA Crossover", cross_name, cross_color)}
-                {signal_row("ATV Volume", atv, atv_color)}
-                {signal_row("RSI Gate", rsi_label, rsi_color)}
-                {rl_row}
-            </div>
-        </div>""", unsafe_allow_html=True)
+    # 5. Signals 2x2 grid (left) + News & Sentiment panel (right, full height)
+    signal_card = f"""
+    <div style="{BOX}">
+        <div style="{LABEL}">Signal</div>
+        <div style="font-size:28px;font-weight:700;color:{rec_color};margin-top:4px;
+                    letter-spacing:-0.02em;font-family:{FONT};">{rec}</div>
+        <div style="{EXPLAIN}">{signal_explain}</div>
+    </div>"""
 
-    st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
+    confidence_card = f"""
+    <div style="{BOX}">
+        <div style="{LABEL}">Confidence</div>
+        <div style="font-size:28px;font-weight:700;color:{confidence_color};margin-top:4px;
+                    letter-spacing:-0.02em;font-family:{FONT};">{confidence}%</div>
+        <div style="{EXPLAIN}">{confidence_explain}</div>
+    </div>"""
 
-    # 6. Health check + news
-    news_col, hc_col = st.columns(2)
+    regime_card = f"""
+    <div style="{BOX}">
+        <div style="{LABEL}">Market Regime</div>
+        <div style="font-size:20px;font-weight:700;color:{regime_clr};margin-top:4px;
+                    letter-spacing:-0.01em;font-family:{FONT};">{market_regime}</div>
+        <div style="{EXPLAIN}">{regime_explain}</div>
+    </div>"""
 
-    with hc_col:
-        rsi_zone = "Overbought" if rsi_safe > 70 else "Oversold" if rsi_safe < 30 else "Neutral"
-        rsi_bar_color = CORAL if rsi_safe > 70 or rsi_safe < 30 else TEAL
+    key_signals_card = f"""
+    <div style="{BOX}">
+        <div style="{LABEL}">Key Signals</div>
+        <div style="line-height:1.6;font-family:{FONT};">
+            {signal_row("SMA Crossover", cross_name, cross_color)}
+            {signal_row("ATV Volume", atv, atv_color)}
+            {signal_row("RSI Gate", rsi_label, rsi_color)}
+            {rl_row}
+        </div>
+    </div>"""
 
-        sma50_hc = float(price_data["SMA50"].iloc[-1]) if "SMA50" in price_data.columns and pd.notna(price_data["SMA50"].iloc[-1]) else None
-        sma50_row = ""
-        if sma50_hc is not None:
-            pct_vs = (current_price - sma50_hc) / sma50_hc * 100
-            pct_color = SUCCESS if pct_vs >= 0 else CORAL
-            sma50_row = (
-                f'<div style="display:flex;justify-content:space-between;padding:6px 0;'
-                f'border-bottom:1px solid {BORDER};">'
-                f'<span style="font-size:12px;color:{TEXT_SEC};font-family:{FONT};">Price vs SMA50</span>'
-                f'<span style="font-size:12px;font-weight:700;color:{pct_color};font-family:{FONT};">'
-                f'{"+" if pct_vs >= 0 else ""}{pct_vs:.1f}% {"above" if pct_vs >= 0 else "below"}</span></div>')
+    sentiment_colors = {"Positive": SUCCESS, "Negative": CORAL, "Neutral": MUTED}
+    news_html = ""
+    if news_items:
+        for item in news_items[:5]:
+            headline = item.get("headline", "Untitled")
+            url = item.get("url", "#")
+            sentiment = classify_headline_sentiment(headline)
+            bc = sentiment_colors.get(sentiment, MUTED)
+            news_html += (
+                f'<div style="border-left:3px solid {bc};padding:8px 12px;margin-bottom:6px;'
+                f'border-radius:0 8px 8px 0;background:{SIDEBAR_BG};">'
+                f'<a href="{url}" target="_blank" style="font-size:12.5px;font-weight:450;'
+                f'color:{TEXT};text-decoration:none;line-height:1.4;font-family:{FONT};">'
+                f'{headline}</a></div>')
+    else:
+        news_html = f'<div style="font-size:13px;color:{MUTED};padding:8px 0;font-family:{FONT};">No recent news available.</div>'
 
-        rel_vol_hc = float(price_data["Rel_Volume"].iloc[-1]) if "Rel_Volume" in price_data.columns and pd.notna(price_data["Rel_Volume"].iloc[-1]) else None
-        rel_vol_row = ""
-        if rel_vol_hc is not None:
-            rv_label, rv_color = ("High Activity", SUCCESS) if rel_vol_hc >= 2.0 else \
-                                  ("Normal Activity", TEAL) if rel_vol_hc >= 0.8 else ("Low Activity", WARNING)
-            rel_vol_row = (
-                f'<div style="display:flex;justify-content:space-between;padding:6px 0;'
-                f'border-bottom:1px solid {BORDER};">'
-                f'<span style="font-size:12px;color:{TEXT_SEC};font-family:{FONT};">Relative Volume</span>'
-                f'<span style="font-size:12px;font-weight:700;color:{rv_color};font-family:{FONT};">'
-                f'{rel_vol_hc:.2f}x \u2014 {rv_label}</span></div>')
-
-        fscore_bar = ""
-        if piotroski_score is not None:
-            fs_val = int(piotroski_score / 9 * 100)
-            fs_color = SUCCESS if piotroski_score >= 7 else WARNING if piotroski_score >= 4 else CORAL
-            fs_label = "Strong" if piotroski_score >= 7 else "Moderate" if piotroski_score >= 4 else "Weak"
-            fscore_bar = progress_bar(f"Piotroski F-Score \u2014 {piotroski_score}/9 ({fs_label})", fs_val, fs_color)
-
-        bars = progress_bar(f"RSI Momentum \u2014 {rsi_zone}", rsi_safe, rsi_bar_color) + fscore_bar
-
-        st.markdown(f"""
-        <div style="{CARD} padding:16px 20px;">
-            <div style="{LABEL}">Health Check</div>
-            {bars} {sma50_row} {rel_vol_row}
-            <div style="font-family:{FONT};font-size:13px;color:{TEXT_SEC};line-height:1.5;
-                        margin-top:8px;">{_fund_snippet(info)}</div>
-        </div>""", unsafe_allow_html=True)
-
-    with news_col:
-        sentiment_colors = {"Positive": SUCCESS, "Negative": CORAL, "Neutral": MUTED}
-        news_html = ""
-        if news_items:
-            for item in news_items[:5]:
-                headline = item.get("headline", "Untitled")
-                url = item.get("url", "#")
-                sentiment = classify_headline_sentiment(headline)
-                bc = sentiment_colors.get(sentiment, MUTED)
-                news_html += (
-                    f'<div style="border-left:3px solid {bc};padding:8px 12px;margin-bottom:6px;'
-                    f'border-radius:0 8px 8px 0;background:{SIDEBAR_BG};">'
-                    f'<a href="{url}" target="_blank" style="font-size:12.5px;font-weight:450;'
-                    f'color:{TEXT};text-decoration:none;line-height:1.4;font-family:{FONT};">'
-                    f'{headline}</a></div>')
-        else:
-            news_html = f'<div style="font-size:13px;color:{MUTED};padding:8px 0;font-family:{FONT};">No recent news available.</div>'
-
+    main_cols = st.columns([1, 1, 2])
+    spacer = "<div style='height:12px;'></div>"
+    with main_cols[0]:
+        st.markdown(signal_card, unsafe_allow_html=True)
+        st.markdown(spacer, unsafe_allow_html=True)
+        st.markdown(regime_card, unsafe_allow_html=True)
+    with main_cols[1]:
+        st.markdown(confidence_card, unsafe_allow_html=True)
+        st.markdown(spacer, unsafe_allow_html=True)
+        st.markdown(key_signals_card, unsafe_allow_html=True)
+    with main_cols[2]:
         st.markdown(f"""
         <div style="{CARD} padding:16px 20px;">
             <div style="{LABEL}">News & Sentiment</div>

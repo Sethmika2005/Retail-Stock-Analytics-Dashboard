@@ -252,7 +252,7 @@ with st.sidebar:
         "As of Date",
         value=dt.date.today(),
         max_value=dt.date.today(),
-        help="Treat this date as 'today'. Useful for demoing historical signals.",
+        help="Treat this as today's date. Only affects trading data.",
     )
 
     st.divider()
@@ -328,8 +328,7 @@ with overview_tab:
         news_items=news_items, cost_basis=cost_basis,
         rule_details=overview_recommendation.get("rule_details", rule_details),
         logo_url=company_logo_url, is_sp500=selected in sp500_set,
-        chart_period=chart_period, piotroski_score=piotroski_score,
-        as_of_date=as_of_date,
+        chart_period=chart_period,
     )
 
 with technical_tab:
