@@ -208,11 +208,7 @@ _disclaimer_tip = (
     "Data from third parties (Yahoo Finance, Finnhub); accuracy not guaranteed. "
     "Do your own research and consult a licensed financial advisor before investing."
 )
-st.markdown(
-    f'<h1 style="display:inline;">US Stock Analytics Dashboard</h1>'
-    f'<span title="{_disclaimer_tip}" style="font-size:18px;color:#64748B;cursor:help;margin-left:8px;vertical-align:super;">&#9432;</span>',
-    unsafe_allow_html=True,
-)
+st.title("US Stock Analytics Dashboard", help=_disclaimer_tip)
 
 with st.spinner("Loading US stocks..."):
     all_stocks_df = load_all_us_stocks()
