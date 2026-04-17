@@ -223,7 +223,7 @@ def calculate_piotroski_fscore(income_stmt, balance_sheet, cashflow):
 # Classify market as Bull/Bear/Sideways/High-Volatility using SMA200 slope + VIX
 def detect_market_regime(sp500_df, vix_df):
     if sp500_df.empty or vix_df.empty:
-        return "Unknown", "gray", {}
+        return "Unknown"
 
     sp500_df = sp500_df.copy()
     sp500_df["SMA200"] = sp500_df["Close"].rolling(window=200).mean()
@@ -242,89 +242,19 @@ def detect_market_regime(sp500_df, vix_df):
     price_vs_sma200 = (current_price - sma200) / sma200 * 100
     sma_crossover = (sma50 - sma200) / sma200 * 100
 
-    sp500_1m_return = (sp500_df["Close"].iloc[-1] / sp500_df["Close"].iloc[-22] - 1) * 100
-    sp500_3m_return = (sp500_df["Close"].iloc[-1] / sp500_df["Close"].iloc[-66] - 1) * 100
-
-    metrics = {
-        "sp500_price": current_price,
-        "sma200": sma200,
-        "sma50": sma50,
-        "price_vs_sma200": price_vs_sma200,
-        "sma200_slope": sma200_slope,
-        "sma_crossover": sma_crossover,
-        "vix": current_vix,
-        "vix_ma20": vix_ma20,
-        "sp500_1m_return": sp500_1m_return,
-        "sp500_3m_return": sp500_3m_return,
-    }
-
     if current_vix > 25 or current_vix > vix_ma20 * 1.3:
-        return "High-Volatility", "red", metrics
+        return "High-Volatility"
 
     if price_vs_sma200 > 2 and sma200_slope > 0 and sma_crossover > 0:
-        return "Bull", "green", metrics
+        return "Bull"
 
     if price_vs_sma200 < -2 and sma200_slope < 0 and sma_crossover < 0:
-        return "Bear", "red", metrics
+        return "Bear"
 
-    return "Sideways", "orange", metrics
+    return "Sideways"
 
 
 # --- TECHNICAL ANALYSIS SCORING AND SIGNALS --- 
-
-
-# Volume score (0-100) from ATV slope alignment + relative volume strength
-def calculate_volume_score(df):
-    if df.empty or "Volume" not in df.columns:
-        return 0, {"score": 0, "volume_confirms_trend": False, "details": {}}
-
-    details = {}
-
-    # ATV slope alignment score (0-50)
-    # checks whether volume trend aligns with price direction
-    price_change = 0
-    if len(df) >= 10:
-        price_change = df["Close"].iloc[-1] - df["Close"].iloc[-10]
-
-    vol_slope = df["Volume_Slope"].iloc[-1]
-    details["volume_slope"] = vol_slope
-    details["price_direction"] = "up" if price_change > 0 else "down"
-
-    # positive ATV slope = volume is increasing = institutional activity, confirms signal
-    volume_confirms = vol_slope > 0
-    details["volume_confirms_trend"] = volume_confirms
-
-    if volume_confirms:
-        # base 40 + bonus up to 10 based on how steep the slope is (capped with min())
-        alignment_score = 40 + min(10, abs(vol_slope) / 100000)
-    elif vol_slope == 0:
-        alignment_score = 25
-    else:
-        alignment_score = 10
-    details["alignment_score"] = alignment_score
-
-    # Relative volume score (0-50)
-    rel_vol = df["Rel_Volume"].iloc[-1]
-    details["rel_volume"] = rel_vol
-
-    if rel_vol >= 2.0:
-        rel_score = 50
-    elif rel_vol >= 1.5:
-        rel_score = 40
-    elif rel_vol >= 1.2:
-        rel_score = 35
-    elif rel_vol >= 0.8:
-        rel_score = 25
-    elif rel_vol >= 0.5:
-        rel_score = 15
-    else:
-        rel_score = 5
-    details["rel_volume_score"] = rel_score
-
-    total = int(alignment_score + rel_score)
-    details["total"] = total
-
-    return total, {"score": total, "volume_confirms_trend": volume_confirms, "details": details}
 
 
 # Rule-based signal: SMA20/50 crossover + ATV slope confirmation + RSI gate
@@ -389,7 +319,7 @@ def generate_rule_signal(df, row_idx=-1):
 
 
 # Combine rule-based signal (Paper 1) with optional RL override
-def generate_hybrid_recommendation(volume_score, rsi_value,
+def generate_hybrid_recommendation(rsi_value,
                                     market_regime, ticker, info, time_horizon="long",
                                     price_data=None, rl_prediction=None):
     rule_signal = "HOLD"
@@ -477,7 +407,6 @@ def generate_hybrid_recommendation(volume_score, rsi_value,
         "explanation": explanation,
         "rsi_gate_applied": rsi_gate not in ("n/a", "passed"),
         "rsi_warning": f"RSI at {rsi_value:.1f}" if rsi_gate not in ("n/a", "passed") else "",
-        "volume_confirms": volume_score > 50,
         "rule_details": rule_details,
     }
 
@@ -513,44 +442,23 @@ def compute_indicators(df):
     df["MACD_SIGNAL"] = df["MACD"].ewm(span=9, adjust=False).mean()
     df["MACD_HIST"] = df["MACD"] - df["MACD_SIGNAL"]
 
-    # ATR (Average True Range) — measures volatility
-    # True Range = max of these three values (accounts for overnight gaps)
-    high_low = df["High"] - df["Low"]
-    high_close = (df["High"] - df["Close"].shift()).abs()  # .shift() gets previous day's close
-    low_close = (df["Low"] - df["Close"].shift()).abs()
-    # stack all three into columns, take the max of each row, then average over 14 days
-    df["ATR"] = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1).rolling(14).mean()
-
-    # Z-score — how many std deviations the price is from its 60-day mean
-    ma60 = df["Close"].rolling(60).mean()
-    df["Z_SCORE_60"] = (df["Close"] - ma60) / df["Close"].rolling(60).std()
-
     # SMA crossover signal:
     # above=1 when SMA20 > SMA50, diff() catches the moment it flips: +1 = golden cross, -1 = death cross
     above = (df["SMA20"] > df["SMA50"]).astype(int)
     cross = above.diff()
-    df["SMA_Cross_Signal"] = cross.fillna(0).astype(int) 
+    df["SMA_Cross_Signal"] = cross.fillna(0).astype(int)
 
     # Volume indicators
     if "Volume" in df.columns:
         df["Volume_SMA20"] = df["Volume"].rolling(20).mean()
-        df["Volume_SMA50"] = df["Volume"].rolling(50).mean()
         # relative volume: today's volume vs 20-day average (>1 = above average)
         df["Rel_Volume"] = df["Volume"] / df["Volume_SMA20"]
 
-        # ATV slope: fit a straight line (linear regression) through last 10 days of volume
+        # ATV slope: fit a straight line (linear regression) through last 10 days of 20-day average volume
         # np.polyfit returns [slope, intercept] — we grab [0] for just the slope
-        vol_sma = df["Volume_SMA20"]
-        df["Volume_Slope"] = vol_sma.rolling(10).apply(
+        df["ATV_Slope"] = df["Volume_SMA20"].rolling(10).apply(
             lambda x: np.polyfit(range(len(x)), x, 1)[0] if x.notna().all() else 0,
             raw=False)
 
-        df["ATV_20"] = df["Volume"].rolling(20).mean()
-        df["ATV_Slope"] = df["ATV_20"].rolling(10).apply(
-            lambda x: np.polyfit(range(len(x)), x, 1)[0] if x.notna().all() else 0,
-            raw=False)
-
-    # ~22 trading days in a month
-    df["Monthly_Return"] = df["Close"].pct_change(periods=22)
     return df
 

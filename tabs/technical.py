@@ -30,7 +30,6 @@ def _find_sma_crossovers(df):
 
 
 def render(selected, price_data, info, last_row,
-           volume_score=0, volume_details=None,
            rule_details=None, rl_prediction=None, rsi_value=None):
 
     rule_details = rule_details or {}
@@ -281,7 +280,7 @@ def render(selected, price_data, info, last_row,
 
         from models import generate_hybrid_recommendation
         rule_rec_data = generate_hybrid_recommendation(
-            volume_score, rsi_safe, "Bull", selected, info,
+            rsi_safe, "Bull", selected, info,
             time_horizon="long", price_data=price_data, rl_prediction=rl_prediction)
         rule_rec = rule_rec_data.get("recommendation", "HOLD")
         agrees = rl_agrees if rl_agrees is not None else (rl_signal == rule_rec)

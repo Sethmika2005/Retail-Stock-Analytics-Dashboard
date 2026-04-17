@@ -78,8 +78,7 @@ def main():
         regime = "Unknown"
         print("  WARNING: market data unavailable — regime='Unknown'")
     else:
-        regime_result = detect_market_regime(sp, vix)
-        regime = regime_result[0] if isinstance(regime_result, tuple) else regime_result
+        regime = detect_market_regime(sp, vix)
         print(f"  Market regime: {regime}")
 
     all_records = []

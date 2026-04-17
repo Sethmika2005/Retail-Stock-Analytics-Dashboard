@@ -13,7 +13,6 @@ import pandas as pd
 import yfinance as yf
 
 from models import (
-    calculate_volume_score,
     compute_indicators,
     detect_market_regime,
     generate_rule_signal,
@@ -77,10 +76,8 @@ def signals_at_bar(df, row_pos, ticker, market_regime, ppo_model):
         if rl_prediction is not None:
             rl_signal = RL_ACTION_TO_SIGNAL.get(int(rl_prediction), "HOLD")
 
-    volume_score, _ = calculate_volume_score(historical)
     rsi_value = historical["RSI"].iloc[-1] if "RSI" in historical.columns else 50
     hybrid_rec = generate_hybrid_recommendation(
-        volume_score=volume_score,
         rsi_value=rsi_value,
         market_regime=market_regime,
         ticker=ticker,
@@ -204,8 +201,7 @@ def main():
         market_regime = "Unknown"
         print("  WARNING: market data unavailable - regime='Unknown'")
     else:
-        regime_result = detect_market_regime(sp500_df, vix_df)
-        market_regime = regime_result[0] if isinstance(regime_result, tuple) else regime_result
+        market_regime = detect_market_regime(sp500_df, vix_df)
         print(f"  Market regime: {market_regime}")
 
     all_records = []

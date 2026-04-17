@@ -13,7 +13,6 @@ import pandas as pd
 import yfinance as yf
 
 from models import (
-    calculate_volume_score,
     compute_indicators,
     detect_market_regime,
     generate_rule_signal,
@@ -102,11 +101,9 @@ def evaluate_crossovers(df: pd.DataFrame, ticker: str, market_regime: str, ppo_m
         if ppo_model is not None:
             rl_prediction = rl_agent.predict_action(ppo_model, historical, row_idx=-1)
 
-        volume_score, _ = calculate_volume_score(historical)
         rsi_value = historical["RSI"].iloc[-1] if "RSI" in historical.columns else 50
 
         hybrid_rec = generate_hybrid_recommendation(
-            volume_score=volume_score,
             rsi_value=rsi_value,
             market_regime=market_regime,
             ticker=ticker,
@@ -191,10 +188,8 @@ def evaluate_overrides(df: pd.DataFrame, ticker: str, market_regime: str, ppo_mo
         if rl_prediction is None or rl_prediction == 2:  # HOLD => no override
             continue
 
-        volume_score, _ = calculate_volume_score(historical)
         rsi_value = historical["RSI"].iloc[-1] if "RSI" in historical.columns else 50
         hybrid_rec = generate_hybrid_recommendation(
-            volume_score=volume_score,
             rsi_value=rsi_value,
             market_regime=market_regime,
             ticker=ticker,
@@ -454,8 +449,7 @@ def main():
         print("  WARNING: Could not fetch market data - defaulting to 'Unknown' regime.")
         market_regime = "Unknown"
     else:
-        regime_result = detect_market_regime(sp500_df, vix_df)
-        market_regime = regime_result[0] if isinstance(regime_result, tuple) else regime_result
+        market_regime = detect_market_regime(sp500_df, vix_df)
         print(f"  Current market regime: {market_regime}")
 
     for ticker in TEST_STOCKS:

@@ -65,7 +65,8 @@
       "Bash(find . -maxdepth 3 -name \"*_test.py\" -not -path \"*/archive/*\")",
       "Bash(grep -rn '\"\"\"' *.py tabs/*.py other/*.py)",
       "Bash(grep -E \"\\\\.py$|^d\")",
-      "Bash(grep -v \"^\\\\.$|^\\\\.\\\\.$\")"
+      "Bash(grep -v \"^\\\\.$|^\\\\.\\\\.$\")",
+      "Bash(wait)"
     ]
   }
 }

@@ -16,7 +16,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from models import (
-    calculate_volume_score,
     compute_indicators,
     detect_market_regime,
     generate_hybrid_recommendation,
@@ -291,8 +290,7 @@ change_pct = (last_row["Close"] - prev_row["Close"]) / prev_row["Close"] * 100
 # Market analysis
 with st.spinner("Analyzing market conditions..."):
     sp500_market, vix_market = load_market_data(as_of_date=as_of_date)
-    market_regime, regime_color, regime_metrics = detect_market_regime(sp500_market, vix_market)
-    volume_score, volume_details = calculate_volume_score(price_data)
+    market_regime = detect_market_regime(sp500_market, vix_market)
     rsi_value = price_data["RSI"].iloc[-1] if "RSI" in price_data.columns else 50
 
     rule_details = None
@@ -309,7 +307,7 @@ with st.spinner("Analyzing market conditions..."):
 # Shared data
 company_logo_url = load_company_logo(selected)
 overview_recommendation = generate_hybrid_recommendation(
-    volume_score, rsi_value, market_regime, selected, info,
+    rsi_value, market_regime, selected, info,
     time_horizon="long", price_data=price_data, rl_prediction=rl_prediction,
 )
 news_items = load_finnhub_news(selected)
@@ -322,8 +320,7 @@ with overview_tab:
     overview.render(
         selected=selected, price_data=price_data, info=info,
         last_row=last_row, change_pct=change_pct,
-        volume_score=volume_score, volume_details=volume_details,
-        market_regime=market_regime, regime_metrics=regime_metrics,
+        market_regime=market_regime,
         recommendation_data=overview_recommendation, rsi_value=rsi_value,
         news_items=news_items, cost_basis=cost_basis,
         rule_details=overview_recommendation.get("rule_details", rule_details),
@@ -334,7 +331,7 @@ with overview_tab:
 with technical_tab:
     technical.render(
         selected=selected, price_data=price_data, info=info,
-        last_row=last_row, volume_score=volume_score, volume_details=volume_details,
+        last_row=last_row,
         rule_details=overview_recommendation.get("rule_details", rule_details),
         rl_prediction=rl_prediction, rsi_value=rsi_value,
     )

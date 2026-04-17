@@ -111,8 +111,7 @@ def _build_chart(price_data, n_days=126):
 
 
 def render(selected, price_data, info, last_row, change_pct,
-           volume_score, volume_details,
-           market_regime, regime_metrics,
+           market_regime,
            recommendation_data, rsi_value,
            news_items, cost_basis, rule_details,
            logo_url="", is_sp500=False, chart_period="6M"):

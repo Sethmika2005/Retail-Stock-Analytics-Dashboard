@@ -15,7 +15,6 @@ import pandas as pd
 import yfinance as yf
 
 from models import (
-    calculate_volume_score,
     compute_indicators,
     detect_market_regime,
     generate_hybrid_recommendation,
@@ -167,8 +166,6 @@ def _make_novel_hybrid_strategy(info, market_regime, ppo_model):
         if len(historical) < 50:
             return "HOLD"
 
-        # Compute scores at this step
-        volume_score, _ = calculate_volume_score(historical)
         rsi_value = historical["RSI"].iloc[-1] if "RSI" in historical.columns else 50
 
         # RL prediction
@@ -178,7 +175,6 @@ def _make_novel_hybrid_strategy(info, market_regime, ppo_model):
 
         # Full recommendation with regime awareness and RL integration
         rec = generate_hybrid_recommendation(
-            volume_score=volume_score,
             rsi_value=rsi_value,
             market_regime=market_regime,
             ticker="BACKTEST",
@@ -291,7 +287,7 @@ def run_backtest_cli(ticker, lookback_months=24):
 
     print("Loading market data...")
     sp500, vix = load_market_data()
-    market_regime, _, _ = detect_market_regime(sp500, vix)
+    market_regime = detect_market_regime(sp500, vix)
 
     print("Loading peer metrics...")
     peer_metrics = load_peer_metrics(ticker)
