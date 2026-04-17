@@ -24,7 +24,7 @@ from models import (
     calculate_piotroski_fscore,
 )
 from styles import inject_css, render_disclaimer_footer, render_disclaimer_sidebar
-from tabs import dashboard, technical, fundamentals, news
+from tabs import overview, technical, fundamentals, news
 
 st.set_page_config(page_title="US Stock Analytics Dashboard", layout="wide")
 inject_css()
@@ -98,8 +98,9 @@ def load_all_us_stocks():
 @st.cache_data
 def load_history(ticker, period="max", interval="1d"):
     stock = yf.Ticker(ticker)
-    # auto_adjust=False keeps raw OHLC prices (not adjusted for splits/dividends)
-    data = stock.history(period=period, interval=interval, auto_adjust=False)
+    #extract raw price data
+    data = stock.history(period=period, interval=interval, auto_adjust=False) 
+    data = data.dropna()
     if data.empty:
         st.warning(f"No data returned for {ticker}")
         return data
@@ -175,8 +176,8 @@ def load_peer_fscores(tickers: tuple):
 
 @st.cache_data
 def load_market_data():
-    sp500 = yf.Ticker("^GSPC").history(period="2y", interval="1d", auto_adjust=False)
-    vix = yf.Ticker("^VIX").history(period="2y", interval="1d", auto_adjust=False)
+    sp500 = yf.Ticker("^GSPC").history(period="2y", interval="1d", auto_adjust=False).dropna()
+    vix = yf.Ticker("^VIX").history(period="2y", interval="1d", auto_adjust=False).dropna()
     return sp500, vix
 
 
@@ -284,25 +285,25 @@ with st.spinner("Analyzing market conditions..."):
 
 # Shared data
 company_logo_url = load_company_logo(selected)
-dashboard_recommendation = generate_hybrid_recommendation(
+overview_recommendation = generate_hybrid_recommendation(
     volume_score, rsi_value, market_regime, selected, info,
     time_horizon="long", price_data=price_data, rl_prediction=rl_prediction,
 )
 news_items = load_finnhub_news(selected)
 
 # Tabs
-dashboard_tab, technical_tab, fundamentals_tab, news_tab = st.tabs(
-    ["Dashboard", "Technical", "Fundamentals", "Recent News"])
+overview_tab, technical_tab, fundamentals_tab, news_tab = st.tabs(
+    ["Overview", "Technical", "Fundamentals", "Recent News"])
 
-with dashboard_tab:
-    dashboard.render(
+with overview_tab:
+    overview.render(
         selected=selected, price_data=price_data, info=info,
         last_row=last_row, change_pct=change_pct,
         volume_score=volume_score, volume_details=volume_details,
         market_regime=market_regime, regime_metrics=regime_metrics,
-        recommendation_data=dashboard_recommendation, rsi_value=rsi_value,
+        recommendation_data=overview_recommendation, rsi_value=rsi_value,
         news_items=news_items, cost_basis=cost_basis,
-        rule_details=dashboard_recommendation.get("rule_details", rule_details),
+        rule_details=overview_recommendation.get("rule_details", rule_details),
         logo_url=company_logo_url, is_sp500=selected in sp500_set,
         chart_period=chart_period, piotroski_score=piotroski_score,
     )
@@ -311,7 +312,7 @@ with technical_tab:
     technical.render(
         selected=selected, price_data=price_data, info=info,
         last_row=last_row, volume_score=volume_score, volume_details=volume_details,
-        rule_details=dashboard_recommendation.get("rule_details", rule_details),
+        rule_details=overview_recommendation.get("rule_details", rule_details),
         rl_prediction=rl_prediction, rsi_value=rsi_value,
     )
 

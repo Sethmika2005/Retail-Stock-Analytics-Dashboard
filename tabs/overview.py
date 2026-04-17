@@ -1,4 +1,4 @@
-# Dashboard tab — at-a-glance executive briefing
+# Overview tab — at-a-glance executive briefing
 
 import datetime as dt
 import pandas as pd
