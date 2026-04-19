@@ -11,24 +11,25 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
 
 
-# 3-dim state (Kadia §4.4): [SMA crossover signal, ATV slope, price return].
-# 3 actions (buy/sell/hold). Reward uses Kadia Eq. 5 (volume-scaled directional return).
+# 3-dim state: [SMA crossover signal, ATV slope, price return] - 3 actions (buy/sell/hold).
 class StockTradingEnv(gym.Env):
     metadata = {"render_modes": []}
 
-    REWARD_HORIZON = 5  # days ahead for reward
+    REWARD_HORIZON = 5  # 5 days ahead for reward
 
     def __init__(self, df, beta=0.5):
         super().__init__()
         self.df = df
-        self.beta = beta  # Eq. 5 weight on volume scaling
+        self.beta = beta  # weight on volume scaling
         self.current_step = 0
-        self.max_steps = len(df) - (self.REWARD_HORIZON + 1)
+        self.max_steps = len(df) - (self.REWARD_HORIZON + 1) # stop 6 days before the current date
 
+        # Action Space - 3 possible actions only
         self.action_space = spaces.Discrete(3)  # buy=0, sell=1, hold=2
+        
+        # Observation Space = 3 floats 
         self.observation_space = spaces.Box(
-            low=-np.inf, high=np.inf, shape=(3,), dtype=np.float32
-        )
+            low=-np.inf, high=np.inf, shape=(3,), dtype=np.float32)
 
         self._precompute()
 
@@ -36,17 +37,19 @@ class StockTradingEnv(gym.Env):
         df = self.df
         close = df["Close"].values.astype(np.float64)
 
+        # Feature 1: SMA crossover signal (+1 golden / -1 death / 0 none)
         self.sma_cross = df["SMA_Cross_Signal"].values.astype(np.float32)
 
-        # normalise ATV slope by its std so values are roughly -1 to 1
+        # Feature 2: ATV slope, divided by its own std for normalisation
         atv = df["ATV_Slope"].fillna(0).values.astype(np.float64)
         atv_std = np.std(atv) or 1.0
         self.atv_norm = (atv / atv_std).astype(np.float32)
 
-        # 1-day price return (Kadia's state feature)
+        # Feature 3: 1-day return — gives the agent a short-term momentum infromation
         self.ret_1d = np.zeros(len(df), dtype=np.float32)
         self.ret_1d[1:] = ((close[1:] - close[:-1]) / close[:-1]).astype(np.float32)
 
+        # Cached for the reward computation — need future closes and a 20-day volume baseline
         self.close = close
         vol = df["Volume"].fillna(0).values.astype(np.float64)
         self.volume = vol
@@ -63,15 +66,18 @@ class StockTradingEnv(gym.Env):
         self.current_step = 0
         return self._get_obs(), {}
 
-    # Reward = Kadia Eq. 5 (volume-scaled directional return)
+    # Reward
     def step(self, action):
         i = self.current_step
-        n = self.REWARD_HORIZON
+        n = self.REWARD_HORIZON # = 5 days
+        # "Directional return": look 5 days ahead to see whether the trade would have been right
         price_return = (self.close[i + n] - self.close[i]) / self.close[i] if i + n < len(self.close) else 0
+        
+        # Volume factor: today's volume vs 20-day avg, tuned by beta - larger reward when participation is heavy
         v_avg = self.vol_avg[i] or 1
         vol_factor = 1 + self.beta * (self.volume[i] - v_avg) / v_avg
 
-        # Eq. 5: buy rewarded if price rises, sell if falls; scaled by volume factor
+        #(BUY profits if price rises, SELL profits if it falls, HOLD earns nothing ) x volume factor
         reward = {0: price_return, 1: -price_return, 2: 0.0}[action] * vol_factor
 
         self.current_step += 1
@@ -80,26 +86,28 @@ class StockTradingEnv(gym.Env):
         return obs, float(reward), terminated, False, {}
 
 
-# Train PPO on historical data. Returns model or None if too little data.
-# train_split: fraction of df for training. 1.0 = all data (dashboard). 0.8 = hold out test set.
-def train_ppo_agent(df, total_timesteps=100000, train_split=1.0):
+# Train PPO on historical data. 
+def train_ppo_agent(df, total_timesteps=100000, train_split=1.0): #trained on all data(1.0) but split(0.8) when checking for accuracy
     if 0 < train_split < 1:
         train_df = df.iloc[:int(len(df) * train_split)].copy()
     else:
         train_df = df.copy()
+    # Stops training if the dataset is too small
     if len(train_df) < 100:
         return None
 
     env = DummyVecEnv([lambda: StockTradingEnv(train_df)])
+    # PPO hyperparameters (defined by Schulman)
     model = PPO(
         "MlpPolicy", env,
         learning_rate=3e-4,
-        n_steps=256,
+        n_steps=256,          # short for daily bar granularity
         batch_size=64,
         n_epochs=10,
         gamma=0.99,
-        verbose=0,
-    )
+        seed=42,
+        verbose=0,)
+    # 100K timesteps = several hundred passes over a 10-year daily series
     model.learn(total_timesteps=total_timesteps)
     return model
 

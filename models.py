@@ -67,8 +67,10 @@ NEGATIVE_WORDS = {
     "failure", "fails", "failed", "struggling", "struggle",
 }
 
+# --- NEWS SENTIMENT ANALYSIS ---
 
 def classify_headline_sentiment(title):
+    # Count positive vs negative words in the headline; majority wins
     tokens = set(re.findall(r"[a-z]+(?:-[a-z]+)*", title.lower()))
     pos = len(tokens & POSITIVE_WORDS)
     neg = len(tokens & NEGATIVE_WORDS)
@@ -90,6 +92,8 @@ def _safe_val(df, col_candidates, year_idx=-1):
             return None
     return None
 
+
+# -- Fundamental Analysis Scoring -- 
 
 # Piotroski F-Score (0-9): 4 profitability + 3 leverage + 2 efficiency tests
 def calculate_piotroski_fscore(income_stmt, balance_sheet, cashflow):
@@ -114,14 +118,17 @@ def calculate_piotroski_fscore(income_stmt, balance_sheet, cashflow):
     roa_current = None
     if net_income is not None and total_assets_curr is not None and total_assets_curr > 0:
         roa_current = net_income / total_assets_curr
+    # Test 1: company is profitable
     roa_positive = 1 if roa_current is not None and roa_current > 0 else 0
     details["roa_positive"] = {"score": roa_positive, "value": roa_current}
     score += roa_positive
 
+    # Test 2: operations generate real cash (not just paper profits)
     cfo_positive = 1 if cfo is not None and cfo > 0 else 0
     details["cfo_positive"] = {"score": cfo_positive, "value": cfo}
     score += cfo_positive
 
+    # Test 3: profitability is getting better year-over-year
     roa_improving = 0
     roa_prior = None
     if has_two_years and total_assets_prev is not None and total_assets_prev > 0:
@@ -133,7 +140,8 @@ def calculate_piotroski_fscore(income_stmt, balance_sheet, cashflow):
     details["roa_increasing"] = {"score": roa_improving, "value_curr": roa_current, "value_prev": roa_prior}
     score += roa_improving
 
-    accruals_quality = 0  # CFO > net income (accrual quality)
+    # Test 4: cash flow exceeds reported profit → earnings are high quality, not inflated by accruals
+    accruals_quality = 0
     if cfo is not None and net_income is not None and cfo > net_income:
         accruals_quality = 1
     details["cfo_gt_net_income"] = {"score": accruals_quality, "cfo": cfo, "net_income": net_income}
@@ -150,7 +158,7 @@ def calculate_piotroski_fscore(income_stmt, balance_sheet, cashflow):
             if ratio_current <= ratio_prior:
                 leverage_decreasing = 1
         elif long_term_debt_current is None or long_term_debt_current == 0:
-            leverage_decreasing = 1
+            leverage_decreasing = 1  # No debt at all → pass by default
     details["debt_decreasing"] = {"score": leverage_decreasing}
     score += leverage_decreasing
 
@@ -181,7 +189,7 @@ def calculate_piotroski_fscore(income_stmt, balance_sheet, cashflow):
         if shares_curr is not None and shares_prev is not None and shares_curr <= shares_prev:
             no_share_dilution = 1
         elif shares_curr is None and shares_prev is None:
-            no_share_dilution = 1
+            no_share_dilution = 1  # No share data either year → don't penalise
     details["no_dilution"] = {"score": no_share_dilution}
     score += no_share_dilution
 
@@ -254,79 +262,142 @@ def detect_market_regime(sp500_df, vix_df):
     return "Sideways"
 
 
-# --- TECHNICAL ANALYSIS SCORING AND SIGNALS --- 
+# --- TECHNICAL ANALYSIS SCORING AND SIGNALS ---
+
+
+# Compute all technical indicators for price data
+def compute_indicators(df):
+    # .copy() so we don't accidentally modify the original cached dataframe
+    df = df.copy()
+
+    # Moving averages
+    df["SMA20"] = df["Close"].rolling(20).mean()
+    df["SMA50"] = df["Close"].rolling(50).mean()
+    df["SMA200"] = df["Close"].rolling(200).mean()
+
+    # Bollinger Bands — middle band is SMA20, upper/lower are +/- 2 standard deviations
+    r20 = df["Close"].rolling(20)
+    df["BB_MID"] = r20.mean()
+    df["BB_UPPER"] = df["BB_MID"] + 2 * r20.std()
+    df["BB_LOWER"] = df["BB_MID"] - 2 * r20.std()
+
+    # RSI (14-period)
+    delta = df["Close"].diff() # daily price change
+    avg_gain = delta.where(delta > 0, 0.0).rolling(14).mean() # average gain over 14 days
+    avg_loss = (-delta.where(delta < 0, 0.0)).rolling(14).mean() # average loss over 14 days
+
+    # RSI formula: 100 - (100 / (1 + RS)) where RS = avg gain / avg loss
+    df["RSI"] = 100 - (100 / (1 + avg_gain / avg_loss))
+
+    # MACD — ewm() calculates exponential weighted moving average (reacts faster to recent prices)
+    ema12 = df["Close"].ewm(span=12, adjust=False).mean()
+    ema26 = df["Close"].ewm(span=26, adjust=False).mean()
+    df["MACD"] = ema12 - ema26
+    df["MACD_SIGNAL"] = df["MACD"].ewm(span=9, adjust=False).mean()
+    df["MACD_HIST"] = df["MACD"] - df["MACD_SIGNAL"]
+
+    # SMA crossover signal:
+    # above=1 when SMA20 > SMA50, diff() catches the moment it flips: +1 = golden cross, -1 = death cross
+    above = (df["SMA20"] > df["SMA50"]).astype(int)
+    cross = above.diff()
+    df["SMA_Cross_Signal"] = cross.fillna(0).astype(int)
+
+    # Volume indicators
+    if "Volume" in df.columns:
+        df["Volume_SMA20"] = df["Volume"].rolling(20).mean()
+        # relative volume: today's volume vs 20-day average (>1 = above average)
+        df["Rel_Volume"] = df["Volume"] / df["Volume_SMA20"]
+
+        # ATV slope (m): linear regression through last 10 days of 20-day average volume
+        # np.polyfit returns [slope, intercept] — we grab [0] for just the slope
+        df["ATV_Slope"] = df["Volume_SMA20"].rolling(10).apply(
+            lambda x: np.polyfit(range(len(x)), x, 1)[0] if x.notna().all() else 0,
+            raw=False)
+
+    return df
 
 
 # Rule-based signal: SMA20/50 crossover + ATV slope confirmation + RSI gate
 def generate_rule_signal(df, row_idx=-1):
+    # Need at least 50 bars so SMA50 is defined else 'Hold' 
     if df.empty or len(df) < 50:
         return "HOLD", {"reason": "insufficient_data"}
-
-    # convert negative index to positive (e.g. -1 becomes last row index)
     if row_idx < 0:
         row_idx = len(df) + row_idx
 
+    # details{} - explain WHY we arrived at the signal
     details = {}
 
+    # SMA_Cross_Signal was precomputed in compute_indicators: +1=golden, -1=death, 0=no event today
     sma_cross = df["SMA_Cross_Signal"].iloc[row_idx]
     details["sma_cross_signal"] = int(sma_cross)
 
+    # ATV_Slope = slope of the 20-day average volume over the last 10 days (+ means volume ↑)
     atv_slope = df["ATV_Slope"].iloc[row_idx]
     details["atv_slope"] = atv_slope
 
+    # 14-period RSI
     rsi = df["RSI"].iloc[row_idx]
     details["rsi"] = rsi
 
-    if sma_cross == 1:  # golden cross
+    # --- Gate 1: does a crossover event exist today? 
+    if sma_cross == 1:  # golden cross → candidate BUY
         details["crossover_type"] = "golden_cross"
+
+        # Gate 2: Crossover but high Volume (atv_slope > 0)
         atv_confirmed = atv_slope > 0
         details["atv_confirmed"] = atv_confirmed
         if atv_confirmed:
-            if rsi > 70:  # RSI gate: block overbought
+            # Gate 3: RSI gate — if already overbought -> HOLD
+            if rsi > 70:
                 details["rsi_gate"] = "blocked_overbought"
                 return "HOLD", details
-            else:
-                details["rsi_gate"] = "passed"
-                return "BUY", details
-        else:
-            details["rsi_gate"] = "n/a"
-            return "HOLD", details
+            # All three gates passed → fire the BUY
+            details["rsi_gate"] = "passed"
+            return "BUY", details
+        # Gate 2: Crossover but weak Volume (atv_slope < 0)
+        details["rsi_gate"] = "n/a"  
 
-    elif sma_cross == -1:  # death cross
+
+    elif sma_cross == -1:  # death cross → candidate SELL 
         details["crossover_type"] = "death_cross"
-        atv_confirmed = atv_slope > 0
+
+        # Gate 2: Crossover but high Volume (atv_slope > 0)
+        atv_confirmed = atv_slope > 0 
         details["atv_confirmed"] = atv_confirmed
         if atv_confirmed:
-            if rsi < 30:  # RSI gate: block oversold
+            # Gate 3: RSI gate — if already oversold -> HOLD
+            if rsi < 30:
                 details["rsi_gate"] = "blocked_oversold"
                 return "HOLD", details
-            else:
-                details["rsi_gate"] = "passed"
-                return "SELL", details
-        else:
-            details["rsi_gate"] = "n/a"
-            return "HOLD", details
+            # All three gates passed → fire the SELL
+            details["rsi_gate"] = "passed"
+            return "SELL", details
+        # Gate 2: Crossover but weak Volume (atv_slope < 0)
+        details["rsi_gate"] = "n/a"
+        return "HOLD", details
 
-    else:  # no crossover — report SMA trend bias
+    # --- No crossover event today: always HOLD
+    else:
         sma20 = df["SMA20"].iloc[row_idx]
         sma50 = df["SMA50"].iloc[row_idx]
         details["crossover_type"] = "none"
         details["atv_confirmed"] = False
         details["rsi_gate"] = "n/a"
+        # sma_trend for context
         details["sma_trend"] = "bullish" if sma20 > sma50 else "bearish"
-
         return "HOLD", details
 
 
-# Combine rule-based signal (Paper 1) with optional RL override
-def generate_hybrid_recommendation(rsi_value,
-                                    market_regime, ticker, info, time_horizon="long",
-                                    price_data=None, rl_prediction=None):
+# Combine rule-based signal with optional RL override
+def generate_hybrid_recommendation(rsi_value, market_regime, ticker, info, time_horizon="long", price_data=None, rl_prediction=None):
+    # Default option is always Hold
     rule_signal = "HOLD"
     rule_details = {}
     if price_data is not None and not price_data.empty:
         rule_signal, rule_details = generate_rule_signal(price_data)
 
+    # Rules lead; RL is a second opinion layered on top
     recommendation = rule_signal
     confidence = 50
 
@@ -337,25 +408,26 @@ def generate_hybrid_recommendation(rsi_value,
         rl_agrees = (rl_signal == recommendation)
         rule_details["rl_agrees"] = rl_agrees
 
-        # hierarchy: if rules say HOLD (no crossover) but RL sees something, let RL take over
+        # If rules say Hold (no crossover) but RL sees something, let RL take over
         if not rl_agrees and rule_details.get("crossover_type") == "none":
             recommendation = rl_signal
             rule_details["rl_override"] = True
 
+    # Confidence tiers: both layers agree = highest, disagree = low, no RL info = middle
     if rule_signal in ("BUY", "SELL"):
         if rl_agrees is True:
-            confidence = 90
+            confidence = 90  # Rules fire + RL agrees = strongest signal
         elif rl_agrees is False:
-            confidence = 60
+            confidence = 60  # Rules fire but RL disagrees
         else:
-            confidence = 75
+            confidence = 75  # Rules fire, no RL available
     else:
         if rl_agrees is True:
-            confidence = 70
+            confidence = 70  # Both say HOLD = confidently boring
         elif rl_agrees is False:
-            confidence = 55
+            confidence = 55  # RL overrode HOLD → act cautiously
         else:
-            confidence = 40
+            confidence = 40  # Pure HOLD, no RL = lowest conviction
     confidence = int(confidence)
 
     rec_color = {"BUY": "green", "SELL": "red"}.get(recommendation, "orange")
@@ -409,56 +481,4 @@ def generate_hybrid_recommendation(rsi_value,
         "rsi_warning": f"RSI at {rsi_value:.1f}" if rsi_gate not in ("n/a", "passed") else "",
         "rule_details": rule_details,
     }
-
-
-# Compute all technical indicators for price data
-def compute_indicators(df):
-    # .copy() so we don't accidentally modify the original cached dataframe
-    df = df.copy()
-
-    # Moving averages
-    df["SMA20"] = df["Close"].rolling(20).mean()
-    df["SMA50"] = df["Close"].rolling(50).mean()
-    df["SMA200"] = df["Close"].rolling(200).mean()
-
-    # Bollinger Bands — middle band is SMA20, upper/lower are +/- 2 standard deviations
-    r20 = df["Close"].rolling(20)
-    df["BB_MID"] = r20.mean()
-    df["BB_UPPER"] = df["BB_MID"] + 2 * r20.std()
-    df["BB_LOWER"] = df["BB_MID"] - 2 * r20.std()
-
-    # RSI (14-period)
-    # .diff() gets day-to-day price change, .where() zeros out the losses/gains respectively
-    delta = df["Close"].diff()
-    avg_gain = delta.where(delta > 0, 0.0).rolling(14).mean()
-    avg_loss = (-delta.where(delta < 0, 0.0)).rolling(14).mean()
-    # standard RSI formula: 100 - (100 / (1 + RS)) where RS = avg gain / avg loss
-    df["RSI"] = 100 - (100 / (1 + avg_gain / avg_loss))
-
-    # MACD — ewm() calculates exponential weighted moving average (reacts faster to recent prices)
-    ema12 = df["Close"].ewm(span=12, adjust=False).mean()
-    ema26 = df["Close"].ewm(span=26, adjust=False).mean()
-    df["MACD"] = ema12 - ema26
-    df["MACD_SIGNAL"] = df["MACD"].ewm(span=9, adjust=False).mean()
-    df["MACD_HIST"] = df["MACD"] - df["MACD_SIGNAL"]
-
-    # SMA crossover signal:
-    # above=1 when SMA20 > SMA50, diff() catches the moment it flips: +1 = golden cross, -1 = death cross
-    above = (df["SMA20"] > df["SMA50"]).astype(int)
-    cross = above.diff()
-    df["SMA_Cross_Signal"] = cross.fillna(0).astype(int)
-
-    # Volume indicators
-    if "Volume" in df.columns:
-        df["Volume_SMA20"] = df["Volume"].rolling(20).mean()
-        # relative volume: today's volume vs 20-day average (>1 = above average)
-        df["Rel_Volume"] = df["Volume"] / df["Volume_SMA20"]
-
-        # ATV slope: fit a straight line (linear regression) through last 10 days of 20-day average volume
-        # np.polyfit returns [slope, intercept] — we grab [0] for just the slope
-        df["ATV_Slope"] = df["Volume_SMA20"].rolling(10).apply(
-            lambda x: np.polyfit(range(len(x)), x, 1)[0] if x.notna().all() else 0,
-            raw=False)
-
-    return df
 

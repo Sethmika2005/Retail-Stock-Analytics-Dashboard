@@ -202,7 +202,7 @@ def load_market_data(as_of_date=None):
 _disclaimer_tip = (
     "DISCLAIMER: For educational purposes only. Not investment advice. "
     "The creator is not a registered investment advisor (RIA), broker-dealer, or financial planner. "
-    "BUY/SELL/HOLD signals are automated outputs of academic research models, not personalized advice. "
+    "BUY/SELL/HOLD signals are automated outputs of academic research models, not personalised advice. "
     "Investing involves risk of loss. Past performance does not guarantee future results. "
     "Data from third parties (Yahoo Finance, Finnhub); accuracy not guaranteed. "
     "Do your own research and consult a licensed financial advisor before investing."

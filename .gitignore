@@ -36,3 +36,18 @@ ENV/
 # OS
 .DS_Store
 Thumbs.db
+
+# Evaluation artifacts
+other/cache/
+other/leaderboard_sp500.csv
+other/lifecycle_signals.csv
+other/lifecycle_equity.csv
+other/lifecycle_summary.csv
+
+# Office lock/temp files
+.~lock.*#
+~$*
+
+# Claude Code local state
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
