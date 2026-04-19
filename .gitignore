@@ -51,3 +51,4 @@ other/lifecycle_summary.csv
 # Claude Code local state
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
+CLAUDE.md
