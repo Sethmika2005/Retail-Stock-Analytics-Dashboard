@@ -278,14 +278,8 @@ def render(selected, price_data, info, last_row,
         if "Rel_Volume" in price_data.columns and pd.notna(price_data["Rel_Volume"].iloc[-1]):
             rel_vol = float(price_data["Rel_Volume"].iloc[-1])
 
-        from models import generate_hybrid_recommendation
-        rule_rec_data = generate_hybrid_recommendation(
-            rsi_safe, "Bull", selected, info,
-            time_horizon="long", price_data=price_data, rl_prediction=rl_prediction)
-        rule_rec = rule_rec_data.get("recommendation", "HOLD")
-        agrees = rl_agrees if rl_agrees is not None else (rl_signal == rule_rec)
-        agree_text = "Agrees" if agrees else "Disagrees"
-        agree_color = SUCCESS if agrees else WARNING
+        agree_text = "Agrees" if rl_agrees else "Disagrees"
+        agree_color = SUCCESS if rl_agrees else WARNING
 
         def _row(lbl, val):
             return (f'<div style="display:flex;justify-content:space-between;padding:6px 0;'

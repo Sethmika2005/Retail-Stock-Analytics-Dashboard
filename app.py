@@ -272,10 +272,6 @@ with st.spinner("Loading data..."):
     info = load_fundamentals(selected)
     financials = load_financial_statements(selected)
 
-fs = financials
-piotroski_score, _ = calculate_piotroski_fscore(
-    fs.get("income_stmt"), fs.get("balance_sheet"), fs.get("cashflow"))
-
 if price_data.empty:
     st.error("No price data available for this ticker. Try another selection or wait a moment if rate limited.")
     st.stop()
