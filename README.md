@@ -1,73 +1,107 @@
-# US Stock Analytics Dashboard
+# Retail Stock Analytics Dashboard
 
-A comprehensive financial analysis tool built with Python and Streamlit, providing retail investors with institutional-grade stock analysis capabilities.
+A Streamlit dashboard that produces Buy / Sell / Hold recommendations for US stocks by combining a rule-based strategy with a PPO reinforcement-learning agent. Built as a final-year project for retail investors who want a clearer picture than raw charts provide.
 
-![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)
+![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.28+-red.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 
-## Overview
+## What it does
 
-This dashboard aggregates financial data from multiple sources to provide real-time stock analysis, technical indicators, fundamental metrics, news sentiment analysis, and risk assessment for US equities.
+Pick a stock, and the dashboard shows:
 
-## Features
+- A Buy / Sell / Hold call, with a confidence score and a written explanation of why
+- The current market regime (Bull / Bear / Sideways / High-Volatility)
+- Technical charts and indicators
+- Company fundamentals, Piotroski F-Score, and peer comparison
+- Recent news with headline sentiment
 
-### 1. Analysis Tab
-- Interactive candlestick charts with volume overlay
-- Multiple timeframe selection (1M, 3M, 6M, 1Y, 5Y, Max)
-- Technical indicator overlays (SMA, EMA, Bollinger Bands)
+The recommendation comes from two sources: a rule strategy based on SMA crossovers, volume confirmation and RSI; and a PPO agent trained on the same stock's history. The rule is primary — the RL agent acts as a second opinion and can override when the rule defaults to HOLD.
 
-### 2. Overview Tab
-- Company information (Exchange, S&P 500 membership, Sector, Industry)
-- Key financial metrics (P/E, PEG, ROE, Debt/Equity)
-- **Sector Market Share Pie Chart** - Visual representation of company's market cap relative to sector peers
-- Risk level assessment
+## How the recommendation is built
 
-### 3. Technical Tab
-- RSI (Relative Strength Index)
-- MACD (Moving Average Convergence Divergence)
-- Bollinger Bands
-- Moving Averages (20, 50, 200-day)
+**Rule-based signal** (`models.py`):
+- SMA-20 / SMA-50 crossover triggers a candidate Buy (golden cross) or Sell (death cross)
+- ATV slope (linear regression through the last 10 days of 20-day average volume) must be positive to confirm
+- RSI gate blocks Buys when RSI > 70 and Sells when RSI < 30
+- Otherwise the signal is HOLD
 
-### 4. Fundamentals Tab
-- Income Statement analysis
-- Balance Sheet metrics
-- Cash Flow statements
-- Historical valuation charts
+**RL agent** (`rl_agent.py`):
+- PPO from stable-baselines3, trained per ticker on that ticker's full history
+- 3-dimensional state: SMA crossover signal, normalised ATV slope, 1-day return
+- 3 actions: Buy / Sell / Hold
+- Reward: 5-day forward price return, scaled by a volume factor (heavier reward when the trade happens on high-volume days)
+- 100,000 training timesteps by default
 
-### 5. News & Sentiment Tab
-- Real-time news feed powered by Finnhub API
-- Sentiment analysis with visual indicators
-- Sentiment summary metrics (Positive/Neutral/Negative counts)
+**Hybrid layer**:
+- Confidence starts at 50
+- Rule fires + RL agrees → 90
+- Rule fires alone → 75
+- Rule fires, RL disagrees → 60
+- Both say HOLD → 70
+- RL overrides a HOLD (no crossover event) → 55
+- Pure HOLD with no RL → 40
 
+**Market regime** is tagged using the S&P 500 and VIX: SMA-200 slope, SMA-50/200 crossover, and VIX level vs. its 20-day average.
 
-## Tech Stack
+## Tabs
 
-| Component | Technology |
-|-----------|------------|
-| Frontend | Streamlit |
-| Visualisation | Plotly |
-| Data Processing | Pandas, NumPy |
-| Financial Data | yfinance |
-| News Data | Finnhub API |
-| Stock Lists | Wikipedia (S&P 500, NASDAQ-100, DJIA) |
+- **Overview** — recommendation, confidence, written reasoning, regime, price chart with SMA overlays, key stats, position tracker (enter your cost basis to see P&L)
+- **Technical** — candlestick chart with volume, RSI, MACD, Bollinger Bands, and the rule trace alongside the RL agent's current prediction
+- **Fundamentals** — income statement, balance sheet, cash flow (annual + quarterly), Piotroski F-Score, sector peer comparison
+- **Recent News** — Finnhub news feed with keyword-based sentiment labels (positive / neutral / negative)
 
+## Project structure
 
-## Data Sources
+```
+app.py                  Streamlit entry point
+models.py               Indicators, rule logic, hybrid layer, regime detection, F-Score
+rl_agent.py             PPO training and inference (stable-baselines3 + Gymnasium)
+styles.py               CSS and disclaimers
+tabs/                   Per-tab render functions
+EDA.ipynb               Exploratory data analysis
+evaluation_results/     Main hybrid-strategy evaluation (markouts, agreement matrix, Kadia P&L)
+accuracy_check/         Crossover-event accuracy test
+thesis_diagrams/        Figures and tables for the thesis
+archive/                Older prototypes and one-off scripts
+other/                  Reference material and additional testing scripts
+```
 
-| Source | Data Provided | Update Frequency |
-|--------|---------------|------------------|
-| yfinance | Historical prices, fundamentals | Real-time |
-| Finnhub | Company news | 30-min cache |
-| Wikipedia | Index constituents (S&P 500, NASDAQ-100, DJIA) | 1-hour cache |
+## Tech stack
 
+| Component | Used for |
+|-----------|----------|
+| Streamlit | Web UI |
+| Plotly | Charts |
+| Pandas, NumPy | Data processing |
+| stable-baselines3, Gymnasium | PPO agent |
+| yfinance | Prices and fundamentals |
+| Finnhub | Company news |
+| Wikipedia | S&P 500 and NASDAQ-100 constituents |
+
+## Setup
+
+```bash
+pip install -r requirements.txt
+cp .env.example .env     # then paste your Finnhub API key
+streamlit run app.py
+```
+
+A free Finnhub key (https://finnhub.io/register) covers the news and company-logo endpoints. yfinance needs no key.
+
+## Data sources and caveats
+
+- **yfinance** is an unofficial wrapper around Yahoo Finance. It has no SLA and Yahoo's terms do not permit redistribution of its data, so the project is fine for a thesis or personal use but is not suitable for a production deployment. A licensed vendor (Polygon, Finnhub, Alpaca, Tiingo) would be needed for that.
+- Prices from Yahoo are delayed by 15 minutes.
+- The first load for any ticker trains a PPO agent from scratch, which takes a minute or so. The trained model is then cached for the session.
+
+## Disclaimer
+
+This tool is for research and educational use only. It is not investment advice. Signals are automated outputs of academic models and past performance does not guarantee future results.
 
 ## Acknowledgements
 
-- [Streamlit](https://streamlit.io/) for the web framework
-- [yfinance](https://github.com/ranaroussi/yfinance) for financial data
-- [Finnhub](https://finnhub.io/) for news API
-- [Plotly](https://plotly.com/) for interactive visualisations
+- Streamlit, Plotly, stable-baselines3, yfinance, Finnhub
 
 ## Author
 
@@ -75,5 +109,4 @@ Sethmika Dias
 
 ---
 
-*Last updated: 16 February 2026*
-
+*Last updated: 19 April 2026*

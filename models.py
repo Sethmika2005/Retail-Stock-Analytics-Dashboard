@@ -356,10 +356,10 @@ def generate_rule_signal(df, row_idx=-1):
             details["rsi_gate"] = "passed"
             return "BUY", details
         # Gate 2: Crossover but weak Volume (atv_slope < 0)
-        details["rsi_gate"] = "n/a"  
+        details["rsi_gate"] = "n/a"
+        return "HOLD", details
 
-
-    elif sma_cross == -1:  # death cross → candidate SELL 
+    elif sma_cross == -1:  # death cross → candidate SELL
         details["crossover_type"] = "death_cross"
 
         # Gate 2: Crossover but high Volume (atv_slope > 0)
