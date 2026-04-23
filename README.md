@@ -4,7 +4,6 @@ A Streamlit dashboard that produces Buy / Sell / Hold recommendations for US sto
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.28+-red.svg)
-![License](https://img.shields.io/badge/License-MIT-green.svg)
 
 ## What it does
 
@@ -76,24 +75,9 @@ other/                  Reference material and additional testing scripts
 | Pandas, NumPy | Data processing |
 | stable-baselines3, Gymnasium | PPO agent |
 | yfinance | Prices and fundamentals |
-| Finnhub | Company news |
+| Finnhub | Company news, description & logo |
 | Wikipedia | S&P 500 and NASDAQ-100 constituents |
 
-## Setup
-
-```bash
-pip install -r requirements.txt
-cp .env.example .env     # then paste your Finnhub API key
-streamlit run app.py
-```
-
-A free Finnhub key (https://finnhub.io/register) covers the news and company-logo endpoints. yfinance needs no key.
-
-## Data sources and caveats
-
-- **yfinance** is an unofficial wrapper around Yahoo Finance. It has no SLA and Yahoo's terms do not permit redistribution of its data, so the project is fine for a thesis or personal use but is not suitable for a production deployment. A licensed vendor (Polygon, Finnhub, Alpaca, Tiingo) would be needed for that.
-- Prices from Yahoo are delayed by 15 minutes.
-- The first load for any ticker trains a PPO agent from scratch, which takes a minute or so. The trained model is then cached for the session.
 
 ## Disclaimer
 
@@ -109,4 +93,4 @@ Sethmika Dias
 
 ---
 
-*Last updated: 19 April 2026*
+*Last updated: 23 April 2026*
