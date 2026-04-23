@@ -107,15 +107,15 @@ def render(selected, info, financials, all_stocks_df, price_data,
                     f'font-size:11px;font-weight:500;color:{color};font-family:{FONT};">● {label}</span>')
 
         html += (f'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;">'
-                 f'{_test("roa_positive", "ROA Positive")}'
-                 f'{_test("cfo_positive", "Cash Flow Positive")}'
-                 f'{_test("roa_increasing", "ROA Increasing")}'
-                 f'{_test("cfo_gt_net_income", "CFO > Net Income")}'
-                 f'{_test("debt_decreasing", "Debt Decreasing")}'
-                 f'{_test("current_ratio_increasing", "Current Ratio Up")}'
-                 f'{_test("no_dilution", "No Dilution")}'
-                 f'{_test("gross_margin_increasing", "Gross Margin Up")}'
-                 f'{_test("asset_turnover_increasing", "Asset Turnover Up")}'
+                 f'{_test("roa_positive", "ROA Positive?")}'
+                 f'{_test("cfo_positive", "Cash Flow Positive?")}'
+                 f'{_test("roa_increasing", "ROA Increasing?")}'
+                 f'{_test("cfo_gt_net_income", "CFO > Net Income?")}'
+                 f'{_test("debt_decreasing", "Debt Decreasing?")}'
+                 f'{_test("current_ratio_increasing", "Current Ratio Up?")}'
+                 f'{_test("no_dilution", "No Dilution?")}'
+                 f'{_test("gross_margin_increasing", "Gross Margin Up?")}'
+                 f'{_test("asset_turnover_increasing", "Asset Turnover Up?")}'
                  f'</div>')
         html += CARD_CLOSE
         st.markdown(html, unsafe_allow_html=True)
